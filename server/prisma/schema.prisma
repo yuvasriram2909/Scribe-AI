@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  name          String
+  email         String         @unique
+  passwordHash  String?
+  createdAt     DateTime       @default(now())
+  gmailAccounts GmailAccount[]
+  contacts      Contact[]
+  emails        Email[]
+  notifications Notification[]
+  signature     UserSignature?
+}
+
+model GmailAccount {
+  id                    String   @id @default(uuid())
+  userId                String
+  gmailEmail            String
+  encryptedAccessToken  String
+  encryptedRefreshToken String?
+  createdAt             DateTime @default(now())
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Contact {
+  id           String   @id @default(uuid())
+  userId       String
+  name         String
+  email        String
+  relationship String   // Client, Manager, HR, Friend, Colleague, Other
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Email {
+  id                String         @id @default(uuid())
+  userId            String
+  recipient         String
+  cc                String?
+  bcc               String?
+  subject           String
+  body              String
+  instruction       String?
+  originalSituation String?
+  category          String         // Emergency, Leave/Holiday, Resume/Job Application, Official/Professional, Casual, Occasion, Follow-up, Important
+  situation         String?        // 🚨 Emergency, ⚠️ Important / Necessary, 💼 Official / Professional, 📅 Leave / Holiday, 📄 Resume / Job Application, 🔄 Follow-up, 💬 Casual, 🎉 Celebration / Occasion
+  situationSource   String         @default("ai") // "ai" or "manual"
+  priority          String         // High, Medium, Normal
+  tone              String         // Urgent, Professional, Formal, Friendly, Warm, Apologetic, Appreciative, Direct
+  status            String         @default("Draft") // Draft, AI Processing, Preview Ready, Sending, Sent, Failed
+  errorMessage      String?
+  gmailMessageId    String?
+  createdAt         DateTime       @default(now())
+  sentAt            DateTime?
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments       Attachment[]
+  notifications     Notification[]
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  emailId   String
+  filename  String
+  fileUrl   String
+  fileType  String
+  createdAt DateTime @default(now())
+  email     Email    @relation(fields: [emailId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id               String   @id @default(uuid())
+  userId           String
+  emailId          String?
+  notificationType String   // Emergency, Leave, Resume, Official, Casual, Occasion, Follow-up, System
+  message          String
+  read             Boolean  @default(false)
+  isTrashed        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email            Email?   @relation(fields: [emailId], references: [id], onDelete: SetNull)
+}
+
+model UserSignature {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  name          String
+  designation   String?
+  company       String?
+  phone         String?
+  website       String?
+  preferredTone String   @default("Professional")
+  enabled       Boolean  @default(true)
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Template {
+  id          String   @id @default(uuid())
+  category    String   // Leave, Resume, Official, Follow-up, Occasion, Emergency
+  title       String
+  instruction String
+  sampleText  String
+  isDefault   Boolean  @default(true)
+}
