@@ -26,11 +26,6 @@ export function SettingsView() {
   const [savingSig, setSavingSig] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const [appEmail, setAppEmail] = useState('');
-  const [appPassword, setAppPassword] = useState('');
-  const [savingAppPass, setSavingAppPass] = useState(false);
-  const [appPassMsg, setAppPassMsg] = useState('');
-
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -46,7 +41,6 @@ export function SettingsView() {
       if (authRes.ok) {
         const data = await authRes.json();
         setAuthStatus(data);
-        if (data.connectedEmail) setAppEmail(data.connectedEmail);
       }
       if (sigRes.ok) {
         const sigData = await sigRes.json();
@@ -61,41 +55,10 @@ export function SettingsView() {
     }
   };
 
-  const handleSaveAppPassword = async (e) => {
-    e.preventDefault();
-    if (!appEmail.trim() || !appPassword.trim()) {
-      setAppPassMsg('Please enter your Gmail address and 16-character App Password.');
-      return;
-    }
-    setSavingAppPass(true);
-    setAppPassMsg('');
-    try {
-      const res = await apiFetch('/api/auth/app-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gmailEmail: appEmail, appPassword })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setAppPassMsg('✅ Gmail App Password saved! Connected for live email dispatches.');
-        setAppPassword('');
-        fetchSettings();
-      } else {
-        setAppPassMsg(`❌ ${data.error || 'Failed to save App Password.'}`);
-      }
-    } catch (err) {
-      setAppPassMsg(`❌ Error: ${err.message}`);
-    } finally {
-      setSavingAppPass(false);
-    }
-  };
-
   const handleDisconnect = async () => {
     try {
       const res = await apiFetch('/api/auth/google/disconnect', { method: 'DELETE' });
       if (res.ok) {
-        setAppEmail('');
-        setAppPassword('');
         fetchSettings();
       }
     } catch (err) {
