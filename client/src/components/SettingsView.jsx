@@ -133,7 +133,48 @@ export function SettingsView() {
         <p className="text-xs text-slate-400">Configure Gmail sender authorization, user signature, and security defaults</p>
       </div>
 
-      {/* 1. Direct Gmail App Password Authorization */}
+      {/* 1. Official Google OAuth 2.0 Authorization Card */}
+      <div className="glass-panel p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
+        <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+          <div>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <Shield className="w-5 h-5 text-indigo-400" />
+              Official Google OAuth 2.0 Gmail Authorization
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Authorize Scribe-AI to send emails directly via Google OAuth 2.0 Gmail API
+            </p>
+          </div>
+          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
+            authStatus.isConnected && authStatus.authMethod === 'oauth'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+          }`}>
+            {authStatus.isConnected && authStatus.authMethod === 'oauth' ? 'OAuth Connected ✓' : 'Not Connected'}
+          </span>
+        </div>
+
+        {authUrl ? (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-300">
+              Click the button below to sign in with your Google Account and grant Gmail sending permissions:
+            </p>
+            <a
+              href={authUrl}
+              className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs inline-flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+            >
+              <ExternalLink className="w-4 h-4" />
+              ⚡ Connect via Google OAuth 2.0
+            </a>
+          </div>
+        ) : (
+          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400">
+            Google OAuth 2.0 is active. Set <strong>GOOGLE_CLIENT_ID</strong> & <strong>GOOGLE_CLIENT_SECRET</strong> in server environment variables to enable 1-click Google popup sign-in.
+          </div>
+        )}
+      </div>
+
+      {/* 2. Direct Gmail App Password Authorization */}
       <div className="glass-panel p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
         <div className="flex items-start justify-between border-b border-slate-800 pb-4">
           <div>
