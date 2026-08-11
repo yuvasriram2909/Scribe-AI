@@ -379,7 +379,8 @@ router.post('/auth/app-password', async (req, res) => {
       data: {
         userId: user.id,
         gmailEmail: cleanEmail,
-        appPassword: cleanPass
+        appPassword: cleanPass,
+        encryptedAccessToken: ''
       }
     });
 
