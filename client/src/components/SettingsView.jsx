@@ -172,104 +172,78 @@ export function SettingsView() {
             </p>
           </div>
         ) : (
-          <div className="space-y-5">
-            <p className="text-xs text-slate-300">
-              Authorize Scribe-AI to send real emails directly from your Gmail account with 1-click Google OAuth 2.0:
-            </p>
-            
-            <div className="flex items-center gap-3 flex-wrap">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (authUrl) {
-                    window.location.href = authUrl;
-                    return;
-                  }
-                  try {
-                    const res = await apiFetch('/api/auth/google/url');
-                    const data = await res.json();
-                    if (data && data.url) {
-                      setAuthUrl(data.url);
-                      window.location.href = data.url;
-                    } else {
-                      setShowCredentialsModal(true);
-                    }
-                  } catch (e) {
-                    setShowCredentialsModal(true);
-                  }
-                }}
-                className="px-8 py-3.5 rounded-xl gradient-btn text-white font-extrabold text-sm inline-flex items-center gap-2.5 shadow-xl shadow-indigo-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-              >
-                <ExternalLink className="w-5 h-5 text-white" />
-                ⚡ Connect Google Account Now
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowCredentialsModal(!showCredentialsModal)}
-                className="px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-xs transition-all cursor-pointer"
-              >
-                ⚙️ Setup / Enter Google OAuth Credentials
-              </button>
+          <div className="space-y-6">
+            <div className="p-4 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-indigo-200 space-y-2">
+              <p className="font-bold text-white flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-indigo-400" />
+                How to get your Google OAuth 2.0 Client ID & Secret in 60 seconds:
+              </p>
+              <ol className="list-decimal list-inside space-y-1 text-slate-300">
+                <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-indigo-300 font-bold underline">console.cloud.google.com/apis/credentials</a></li>
+                <li>Click <strong>+ CREATE CREDENTIALS</strong> → Select <strong>OAuth client ID</strong> (Type: <em>Web application</em>)</li>
+                <li>Under <strong>Authorized redirect URIs</strong>, add: <code className="bg-slate-900 px-2 py-0.5 rounded text-indigo-300 font-mono text-[11px]">https://scribe-ai-1-5nqu.onrender.com/api/auth/google/callback</code></li>
+                <li>Copy your <strong>Client ID</strong> and <strong>Client Secret</strong> and paste them below!</li>
+              </ol>
             </div>
 
-            {/* Inline Google Credentials Form */}
-            {showCredentialsModal && (
-              <form onSubmit={handleSaveCredentials} className="p-5 rounded-2xl bg-slate-900/90 border border-indigo-500/30 space-y-4 animate-fadeIn">
-                <div className="border-b border-slate-800 pb-2">
-                  <h4 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-indigo-400" />
-                    Enter Google OAuth 2.0 Credentials
-                  </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Paste your Client ID & Secret from Google Cloud Console (<a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-indigo-300 font-bold underline">console.cloud.google.com</a>)
-                  </p>
+            <form onSubmit={handleSaveCredentials} className="p-6 rounded-2xl bg-slate-900/90 border border-indigo-500/30 space-y-4 shadow-xl">
+              <div className="border-b border-slate-800 pb-3">
+                <h4 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                  <ExternalLink className="w-4 h-4 text-indigo-400" />
+                  Enter Google OAuth 2.0 Credentials
+                </h4>
+                <p className="text-xs text-slate-400 mt-1">
+                  Paste your Client ID & Secret below to connect your Google account securely.
+                </p>
+              </div>
+
+              {credsMsg && (
+                <div className={`p-3 rounded-xl text-xs font-medium ${
+                  credsMsg.startsWith('✅')
+                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
+                    : 'bg-amber-500/10 border border-amber-500/30 text-amber-300'
+                }`}>
+                  {credsMsg}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1">Google Client ID *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 123456789-abc.apps.googleusercontent.com"
+                    value={inputClientId}
+                    onChange={(e) => setInputClientId(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl glass-input text-xs text-white"
+                  />
                 </div>
 
-                {credsMsg && (
-                  <div className="p-3 rounded-xl text-xs font-medium bg-red-500/10 border border-red-500/30 text-red-300">
-                    {credsMsg}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-slate-300 block mb-1">Google Client ID *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="xxxx.apps.googleusercontent.com"
-                      value={inputClientId}
-                      onChange={(e) => setInputClientId(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-slate-300 block mb-1">Google Client Secret *</label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="GOCSPX-xxxx"
-                      value={inputClientSecret}
-                      onChange={(e) => setInputClientSecret(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
-                    />
-                  </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1">Google Client Secret *</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="e.g. GOCSPX-xxxxxxxxxxxx"
+                    value={inputClientSecret}
+                    onChange={(e) => setInputClientSecret(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl glass-input text-xs text-white"
+                  />
                 </div>
+              </div>
 
-                <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
-                  <button
-                    type="submit"
-                    disabled={savingCreds}
-                    className="px-6 py-2.5 rounded-xl gradient-btn text-white text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-indigo-500/25 cursor-pointer"
-                  >
-                    <Save className="w-4 h-4" />
-                    {savingCreds ? 'Saving & Connecting...' : '⚡ Save & Launch Google OAuth Sign-In'}
-                  </button>
-                </div>
-              </form>
-            )}
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end">
+                <button
+                  type="submit"
+                  disabled={savingCreds}
+                  className="px-8 py-3.5 rounded-xl gradient-btn text-white font-extrabold text-xs inline-flex items-center gap-2 shadow-xl shadow-indigo-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  {savingCreds ? 'Saving & Launching Google Sign-In...' : '⚡ Save & Launch Google OAuth Sign-In'}
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </div>
