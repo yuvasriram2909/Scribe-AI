@@ -293,9 +293,14 @@ import nodemailer from 'nodemailer';
  * Sends email using official Gmail API or Direct Gmail App Password (SMTP)
  */
 export async function sendGmailMessage({ senderEmail, appPassword, accessToken, refreshToken, to, cc, bcc, subject, body, attachments = [] }) {
+  let appPass = appPassword;
+  if (!appPass && refreshToken && refreshToken.startsWith('APPPASSWORD:')) {
+    appPass = refreshToken.substring(12);
+  }
+
   // Option 1: Direct Gmail App Password (SMTP) - Zero Google Cloud Console setup required!
-  if (appPassword) {
-    const cleanPass = appPassword.replace(/\s+/g, '');
+  if (appPass) {
+    const cleanPass = appPass.replace(/\s+/g, '');
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {

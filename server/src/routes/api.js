@@ -346,14 +346,15 @@ router.get('/auth/status', async (req, res) => {
     });
     
     const isConnected = !!gmailAccount;
-    const authMethod = gmailAccount ? (gmailAccount.appPassword ? 'app_password' : 'oauth') : 'none';
+    const isAppPass = gmailAccount?.encryptedRefreshToken?.startsWith('APPPASSWORD:');
+    const authMethod = gmailAccount ? (isAppPass ? 'app_password' : 'oauth') : 'none';
 
     res.json({
       isConnected,
       connectedEmail: gmailAccount ? gmailAccount.gmailEmail : null,
       authMethod,
       isGoogleConfigured: true,
-      mode: isConnected ? (authMethod === 'app_password' ? 'Direct App Password Connected ✓' : 'Google OAuth Connected ✓') : 'Not Connected'
+      mode: isConnected ? (isAppPass ? 'Direct App Password Connected ✓' : 'Google OAuth Connected ✓') : 'Not Connected'
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -379,8 +380,8 @@ router.post('/auth/app-password', async (req, res) => {
       data: {
         userId: user.id,
         gmailEmail: cleanEmail,
-        appPassword: cleanPass,
-        encryptedAccessToken: ''
+        encryptedAccessToken: 'APP_PASSWORD',
+        encryptedRefreshToken: `APPPASSWORD:${cleanPass}`
       }
     });
 
