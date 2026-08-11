@@ -80,7 +80,7 @@ export function LoginPage({ onLoginSuccess }) {
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center justify-center gap-1.5">
-              AI Smart <span className="gradient-text">Sender</span>
+              Scribe <span className="gradient-text">AI</span>
             </h1>
             <p className="text-xs text-slate-400 font-medium mt-1">
               {isSignUpMode ? 'Create your new account' : 'Sign in with your Email & Password'}

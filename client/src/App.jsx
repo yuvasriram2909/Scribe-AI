@@ -13,16 +13,33 @@ import { SettingsView } from './components/SettingsView';
 import { ContactsManager } from './components/ContactsManager';
 import { TemplatesLibrary } from './components/TemplatesLibrary';
 import { apiFetch } from './utils/api';
-import { Users, Layout } from 'lucide-react';
+import { PublicLandingPage } from './components/PublicLandingPage';
+import { PrivacyPolicy } from './components/PrivacyPolicy';
+import { TermsOfService } from './components/TermsOfService';
 
 export default function App() {
   const [currentUserEmail, setCurrentUserEmail] = useState(() => localStorage.getItem('userEmail') || '');
   const [currentUserName, setCurrentUserName] = useState(() => localStorage.getItem('userName') || '');
 
+  const [currentRoute, setCurrentRoute] = useState(() => window.location.pathname);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [composeInitialData, setComposeInitialData] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentRoute(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = (path) => {
+    window.history.pushState({}, '', path);
+    setCurrentRoute(path);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     if (currentUserEmail) {
@@ -47,6 +64,7 @@ export default function App() {
   const handleLoginSuccess = (user) => {
     setCurrentUserEmail(user.email);
     setCurrentUserName(user.name || user.email.split('@')[0]);
+    navigateTo('/app');
     setActiveTab('dashboard');
   };
 
@@ -57,6 +75,7 @@ export default function App() {
     setCurrentUserEmail('');
     setCurrentUserName('');
     setUnreadNotifCount(0);
+    navigateTo('/');
   };
 
   const handleStartCompose = (data = {}) => {
@@ -74,13 +93,37 @@ export default function App() {
       case 'contacts': return 'Address Book & Contacts Manager';
       case 'templates': return 'Canned Email Templates';
       case 'settings': return 'Settings & Account Authorization';
-      default: return 'AI Smart Email Sender';
+      default: return 'Scribe AI';
     }
   };
 
-  // If no user is logged in, show the Login Page
+  // Public Routes (Accessible without login)
+  if (currentRoute === '/privacy') {
+    return <PrivacyPolicy onBackToHome={() => navigateTo('/')} onNavigateToTerms={() => navigateTo('/terms')} />;
+  }
+
+  if (currentRoute === '/terms') {
+    return <TermsOfService onBackToHome={() => navigateTo('/')} onNavigateToPrivacy={() => navigateTo('/privacy')} />;
+  }
+
+  if (currentRoute === '/login') {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} onBackToHome={() => navigateTo('/')} />;
+  }
+
+  // If on homepage and not logged in, show Public Landing Page
+  if (!currentUserEmail && (currentRoute === '/' || currentRoute === '')) {
+    return (
+      <PublicLandingPage
+        onNavigateToLogin={() => navigateTo('/login')}
+        onNavigateToPrivacy={() => navigateTo('/privacy')}
+        onNavigateToTerms={() => navigateTo('/terms')}
+      />
+    );
+  }
+
+  // If no user is logged in, show Login Page
   if (!currentUserEmail) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+    return <LoginPage onLoginSuccess={handleLoginSuccess} onBackToHome={() => navigateTo('/')} />;
   }
 
   return (
