@@ -6,7 +6,9 @@ export async function apiFetch(url, options = {}) {
   const userEmail = localStorage.getItem('userEmail') || '';
   const authToken = localStorage.getItem('authToken') || (userEmail ? btoa(userEmail) : '');
 
-  const rawBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+  // Default fallback URL points directly to your live Render backend
+  const DEFAULT_BACKEND_URL = 'https://scribe-ai-1-5nqu.onrender.com/api';
+  const rawBase = (import.meta.env.VITE_API_BASE_URL || DEFAULT_BACKEND_URL).replace(/\/+$/, '');
   
   let targetUrl = url;
   if (rawBase) {
