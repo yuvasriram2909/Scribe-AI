@@ -61,13 +61,20 @@ async function getAuthUser(req) {
     targetEmail = emailHeader.trim().toLowerCase();
   }
 
-  if (!targetEmail) {
+  if (!targetEmail || !targetEmail.includes('@')) {
     return null;
   }
 
   const cleanEmail = targetEmail.trim().toLowerCase();
-  return await prisma.user.findUnique({
+  
+  // Upsert user to guarantee user record exists even if SQLite DB restarted
+  return await prisma.user.upsert({
     where: { email: cleanEmail },
+    update: {},
+    create: {
+      email: cleanEmail,
+      name: cleanEmail.split('@')[0]
+    },
     include: { signature: true, gmailAccounts: true }
   });
 }
