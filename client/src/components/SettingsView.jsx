@@ -26,6 +26,40 @@ export function SettingsView() {
   const [savingSig, setSavingSig] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [inputClientId, setInputClientId] = useState('');
+  const [inputClientSecret, setInputClientSecret] = useState('');
+  const [savingCreds, setSavingCreds] = useState(false);
+  const [credsMsg, setCredsMsg] = useState('');
+
+  const handleSaveCredentials = async (e) => {
+    e.preventDefault();
+    if (!inputClientId.trim() || !inputClientSecret.trim()) {
+      setCredsMsg('Please enter both Client ID and Client Secret.');
+      return;
+    }
+    setSavingCreds(true);
+    setCredsMsg('');
+    try {
+      const res = await apiFetch('/api/auth/google/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: inputClientId.trim(), clientSecret: inputClientSecret.trim() })
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setAuthUrl(data.url);
+        window.location.href = data.url;
+      } else {
+        setCredsMsg(`❌ ${data.error || 'Failed to save credentials.'}`);
+      }
+    } catch (err) {
+      setCredsMsg(`❌ Error: ${err.message}`);
+    } finally {
+      setSavingCreds(false);
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -138,35 +172,104 @@ export function SettingsView() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <p className="text-xs text-slate-300">
               Authorize Scribe-AI to send real emails directly from your Gmail account with 1-click Google OAuth 2.0:
             </p>
-            <button
-              type="button"
-              onClick={async () => {
-                if (authUrl) {
-                  window.location.href = authUrl;
-                  return;
-                }
-                try {
-                  const res = await apiFetch('/api/auth/google/url');
-                  const data = await res.json();
-                  if (data && data.url) {
-                    window.location.href = data.url;
-                  } else {
-                    alert(data.message || 'Google OAuth 2.0 credentials not set in server environment variables.');
+            
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (authUrl) {
+                    window.location.href = authUrl;
+                    return;
                   }
-                } catch (e) {
-                  console.error('OAuth connect error:', e);
-                  alert('Unable to connect to Google OAuth server. Please ensure backend is running.');
-                }
-              }}
-              className="px-8 py-3.5 rounded-xl gradient-btn text-white font-extrabold text-sm inline-flex items-center gap-2.5 shadow-xl shadow-indigo-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-            >
-              <ExternalLink className="w-5 h-5 text-white" />
-              ⚡ Connect Google Account Now
-            </button>
+                  try {
+                    const res = await apiFetch('/api/auth/google/url');
+                    const data = await res.json();
+                    if (data && data.url) {
+                      setAuthUrl(data.url);
+                      window.location.href = data.url;
+                    } else {
+                      setShowCredentialsModal(true);
+                    }
+                  } catch (e) {
+                    setShowCredentialsModal(true);
+                  }
+                }}
+                className="px-8 py-3.5 rounded-xl gradient-btn text-white font-extrabold text-sm inline-flex items-center gap-2.5 shadow-xl shadow-indigo-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+              >
+                <ExternalLink className="w-5 h-5 text-white" />
+                ⚡ Connect Google Account Now
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowCredentialsModal(!showCredentialsModal)}
+                className="px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-xs transition-all cursor-pointer"
+              >
+                ⚙️ Setup / Enter Google OAuth Credentials
+              </button>
+            </div>
+
+            {/* Inline Google Credentials Form */}
+            {showCredentialsModal && (
+              <form onSubmit={handleSaveCredentials} className="p-5 rounded-2xl bg-slate-900/90 border border-indigo-500/30 space-y-4 animate-fadeIn">
+                <div className="border-b border-slate-800 pb-2">
+                  <h4 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-indigo-400" />
+                    Enter Google OAuth 2.0 Credentials
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Paste your Client ID & Secret from Google Cloud Console (<a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-indigo-300 font-bold underline">console.cloud.google.com</a>)
+                  </p>
+                </div>
+
+                {credsMsg && (
+                  <div className="p-3 rounded-xl text-xs font-medium bg-red-500/10 border border-red-500/30 text-red-300">
+                    {credsMsg}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-slate-300 block mb-1">Google Client ID *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="xxxx.apps.googleusercontent.com"
+                      value={inputClientId}
+                      onChange={(e) => setInputClientId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-slate-300 block mb-1">Google Client Secret *</label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="GOCSPX-xxxx"
+                      value={inputClientSecret}
+                      onChange={(e) => setInputClientSecret(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+                  <button
+                    type="submit"
+                    disabled={savingCreds}
+                    className="px-6 py-2.5 rounded-xl gradient-btn text-white text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-indigo-500/25 cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    {savingCreds ? 'Saving & Connecting...' : '⚡ Save & Launch Google OAuth Sign-In'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         )}
       </div>

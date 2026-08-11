@@ -272,6 +272,29 @@ router.get('/auth/google/url', async (req, res) => {
   }
 });
 
+router.post('/auth/google/credentials', async (req, res) => {
+  try {
+    const { clientId, clientSecret } = req.body || {};
+    if (!clientId || !clientSecret) {
+      return res.status(400).json({ error: 'Client ID and Client Secret are required.' });
+    }
+    process.env.GOOGLE_CLIENT_ID = clientId.trim();
+    process.env.GOOGLE_CLIENT_SECRET = clientSecret.trim();
+
+    const user = await getAuthUser(req);
+    const state = user ? Buffer.from(user.email).toString('base64') : '';
+    const url = getAuthUrl(state);
+
+    res.json({
+      success: true,
+      message: 'Google OAuth credentials configured successfully!',
+      url
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/auth/google/callback', async (req, res) => {
   try {
     const { code, state } = req.query;
