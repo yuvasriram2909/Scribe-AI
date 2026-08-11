@@ -21,6 +21,17 @@ app.use(express.urlencoded({ extended: true }));
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
+// Root Landing Route
+app.get('/', (req, res) => {
+  res.send(`
+    <div style="font-family: system-ui, sans-serif; background: #0b0f19; color: #fff; padding: 40px; text-align: center; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <h1 style="color: #6366f1; margin-bottom: 8px;">🤖 Scribe-AI Backend API is Live!</h1>
+      <p style="color: #94a3b8; max-width: 500px;">Your Node.js + Express API server is active and running cleanly on Render.</p>
+      <a href="/api/health" style="margin-top: 16px; background: #4f46e5; color: #fff; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold;">Check API Health Status</a>
+    </div>
+  `);
+});
+
 // Healthcheck
 app.get('/api/health', (req, res) => {
   res.json({
