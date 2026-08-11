@@ -228,15 +228,25 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
             <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
             <span>{errorMessage}</span>
           </div>
-          {(errorMessage.includes('Gmail account not connected') || errorMessage.includes('insufficient authentication scopes') || errorMessage.includes('OAuth')) && (
+          {(errorMessage.includes('Gmail account not connected') || errorMessage.includes('insufficient authentication scopes') || errorMessage.includes('OAuth') || errorMessage.includes('scopes')) && (
             <button
-              onClick={() => {
-                if (onNavigateToSettings) onNavigateToSettings();
+              onClick={async () => {
+                try {
+                  const res = await apiFetch('/api/auth/google/url');
+                  const data = await res.json();
+                  if (data && data.url) {
+                    window.location.href = data.url;
+                  } else if (onNavigateToSettings) {
+                    onNavigateToSettings();
+                  }
+                } catch (e) {
+                  if (onNavigateToSettings) onNavigateToSettings();
+                }
               }}
               className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/30 transition-all shrink-0 cursor-pointer"
             >
-              <Key className="w-4 h-4" />
-              ⚡ Set Gmail App Password in Settings
+              <ExternalLink className="w-4 h-4" />
+              ⚡ Re-authorize Google OAuth Permissions
             </button>
           )}
         </div>
