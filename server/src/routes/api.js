@@ -328,7 +328,8 @@ router.get('/auth/status', async (req, res) => {
       return res.json({
         isConnected: false,
         connectedEmail: null,
-        isGoogleConfigured: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+        authMethod: 'none',
+        isGoogleConfigured: true,
         mode: 'Not Logged In'
       });
     }
@@ -337,16 +338,53 @@ router.get('/auth/status', async (req, res) => {
       where: { userId: user.id }
     });
     
-    const isGoogleConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+    const isConnected = !!gmailAccount;
+    const authMethod = gmailAccount ? (gmailAccount.appPassword ? 'app_password' : 'oauth') : 'none';
 
     res.json({
-      isConnected: !!gmailAccount,
+      isConnected,
       connectedEmail: gmailAccount ? gmailAccount.gmailEmail : null,
-      isGoogleConfigured,
-      mode: gmailAccount ? 'Gmail Connected ✓' : (isGoogleConfigured ? 'Not Connected (OAuth Ready)' : 'Google OAuth Credentials Required in .env')
+      authMethod,
+      isGoogleConfigured: true,
+      mode: isConnected ? (authMethod === 'app_password' ? 'Direct App Password Connected ✓' : 'Google OAuth Connected ✓') : 'Not Connected'
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Save Direct Gmail App Password Endpoint (Zero Google Console Required)
+router.post('/auth/app-password', async (req, res) => {
+  try {
+    const user = await getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { gmailEmail, appPassword } = req.body || {};
+    if (!gmailEmail || !appPassword) {
+      return res.status(400).json({ error: 'Gmail Email and 16-character App Password are required.' });
+    }
+
+    const cleanEmail = gmailEmail.trim().toLowerCase();
+    const cleanPass = appPassword.trim().replace(/\s+/g, '');
+
+    await prisma.gmailAccount.deleteMany({ where: { userId: user.id } });
+    const account = await prisma.gmailAccount.create({
+      data: {
+        userId: user.id,
+        gmailEmail: cleanEmail,
+        appPassword: cleanPass
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Gmail App Password saved successfully!',
+      connectedEmail: account.gmailEmail,
+      authMethod: 'app_password'
+    });
+  } catch (err) {
+    console.error('App Password endpoint error:', err);
+    res.status(500).json({ error: 'Failed to save App Password: ' + err.message });
   }
 });
 
@@ -400,6 +438,8 @@ router.post('/emails/send', upload.array('attachments'), async (req, res) => {
     let sendResult;
     try {
       sendResult = await sendGmailMessage({
+        senderEmail: gmailAccount ? gmailAccount.gmailEmail : user.email,
+        appPassword: gmailAccount ? gmailAccount.appPassword : null,
         accessToken: gmailAccount ? gmailAccount.encryptedAccessToken : null,
         refreshToken: gmailAccount ? gmailAccount.encryptedRefreshToken : null,
         to: recipient,

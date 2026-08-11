@@ -287,12 +287,48 @@ export function postGmailRawMessage({ accessToken, raw }) {
   });
 }
 
+import nodemailer from 'nodemailer';
+
 /**
- * Sends email using official Gmail API with server-side OAuth tokens & automatic token refresh
+ * Sends email using official Gmail API or Direct Gmail App Password (SMTP)
  */
-export async function sendGmailMessage({ accessToken, refreshToken, to, cc, bcc, subject, body, attachments = [] }) {
+export async function sendGmailMessage({ senderEmail, appPassword, accessToken, refreshToken, to, cc, bcc, subject, body, attachments = [] }) {
+  // Option 1: Direct Gmail App Password (SMTP) - Zero Google Cloud Console setup required!
+  if (appPassword) {
+    const cleanPass = appPassword.replace(/\s+/g, '');
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: senderEmail,
+        pass: cleanPass
+      }
+    });
+
+    const mailOptions = {
+      from: senderEmail,
+      to,
+      cc: cc || undefined,
+      bcc: bcc || undefined,
+      subject,
+      text: body,
+      attachments: attachments.map(att => ({
+        filename: att.originalname || att.filename,
+        path: att.path || att.fileUrl
+      }))
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    return {
+      success: true,
+      gmailMessageId: info.messageId,
+      mode: 'Gmail Direct App Password (SMTP)',
+      sentAt: new Date()
+    };
+  }
+
+  // Option 2: Official Google OAuth 2.0
   if (!accessToken && !refreshToken) {
-    throw new Error('Gmail account not connected. Please connect your Gmail account via Google OAuth in Settings before sending.');
+    throw new Error('Gmail account not connected. Please enter your Gmail App Password or connect via Google OAuth in Settings before sending.');
   }
 
   const raw = createRawMessage({ to, cc, bcc, subject, body, attachments });
