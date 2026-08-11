@@ -1,13 +1,23 @@
 /**
  * Utility helper to perform authenticated API calls with multi-user isolation headers
- * and configurable VITE_API_BASE_URL support.
+ * and configurable VITE_API_BASE_URL support without duplicate /api/api pathing.
  */
 export async function apiFetch(url, options = {}) {
   const userEmail = localStorage.getItem('userEmail') || '';
   const authToken = localStorage.getItem('authToken') || (userEmail ? btoa(userEmail) : '');
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-  const targetUrl = (url.startsWith('/') && baseUrl) ? `${baseUrl}${url}` : url;
+  const rawBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+  
+  let targetUrl = url;
+  if (rawBase) {
+    if (rawBase.endsWith('/api') && url.startsWith('/api/')) {
+      targetUrl = `${rawBase}${url.slice(4)}`;
+    } else if (url.startsWith('/')) {
+      targetUrl = `${rawBase}${url}`;
+    } else {
+      targetUrl = `${rawBase}/${url}`;
+    }
+  }
 
   const customHeaders = options.headers || {};
 
@@ -48,14 +58,15 @@ export async function safeParseResponse(res) {
       }
       return data;
     } catch (e) {
-      if (!res.ok) throw new Error(`HTTP ${status}: ${text}`);
-      throw new Error(`Invalid JSON format: ${e.message}`);
+      if (!res.ok) {
+        throw new Error(e.message || `Server returned error status HTTP ${status}`);
+      }
     }
   }
 
   if (!res.ok) {
-    throw new Error(`Server Error (HTTP ${status}): ${text.slice(0, 150)}`);
+    throw new Error(text || `Server returned error HTTP ${status}`);
   }
 
-  return { success: true, text };
+  return { text };
 }
