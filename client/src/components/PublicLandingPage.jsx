@@ -55,11 +55,16 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-extrabold text-white tracking-tight leading-tight">
-            AI-Powered Email Composition & <span className="gradient-text">Gmail Dispatch</span>
+            Scribe <span className="gradient-text">AI</span>
           </h1>
 
-          <div className="p-6 rounded-2xl bg-slate-900/90 border border-indigo-500/30 text-slate-200 text-sm sm:text-base leading-relaxed font-medium shadow-2xl text-left sm:text-center">
-            <strong>Scribe AI</strong> helps users compose and send emails through their own Gmail account using Google OAuth.
+          <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-indigo-500/40 text-slate-100 space-y-3 shadow-2xl text-center">
+            <p className="text-lg sm:text-xl font-extrabold text-white leading-relaxed">
+              Scribe AI helps users compose and send emails through their own Gmail account using Google OAuth.
+            </p>
+            <p className="text-sm sm:text-base text-indigo-300 font-bold leading-relaxed">
+              Users connect their Gmail account securely with Google OAuth and approve emails before sending.
+            </p>
           </div>
 
           <div className="flex items-center justify-center gap-4 pt-2">
