@@ -298,6 +298,41 @@ export async function sendGmailMessage({ senderEmail, appPassword, accessToken, 
     appPass = refreshToken.substring(12);
   }
 
+  // Option 0: Resend HTTP API (HTTPS Port 443 - Never blocked on Render!)
+  const resendApiKey = process.env.RESEND_API_KEY || (appPass && appPass.startsWith('re_') ? appPass : null);
+  if (resendApiKey) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'Scribe-AI <onboarding@resend.dev>',
+          to: [to],
+          cc: cc ? [cc] : undefined,
+          bcc: bcc ? [bcc] : undefined,
+          subject: subject,
+          text: body
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.id) {
+        return {
+          success: true,
+          gmailMessageId: data.id,
+          mode: 'Resend HTTP API (Port 443 Live Inbox Delivery)',
+          sentAt: new Date()
+        };
+      } else {
+        console.warn('Resend API returned error:', data);
+      }
+    } catch (rErr) {
+      console.warn('Resend API call error:', rErr.message);
+    }
+  }
+
   // Option 1: Direct Gmail App Password (SMTP) - Zero Google Cloud Console setup required!
   if (appPass) {
     const cleanPass = appPass.replace(/\s+/g, '');
