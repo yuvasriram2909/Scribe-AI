@@ -8,6 +8,10 @@ import { categorizeInstruction, generateEmail } from '../aiService.js';
 import { sendGmailMessage, getAuthUrl, getTokensFromCode, getUserInfo } from '../gmailService.js';
 import { sendLoginSecurityAlert } from '../securityService.js';
 
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = "file:./dev.db";
+}
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
