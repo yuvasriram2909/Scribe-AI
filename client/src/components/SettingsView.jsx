@@ -119,40 +119,54 @@ export function SettingsView() {
 
         {authStatus.isConnected ? (
           <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
+                <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
                 <span className="text-sm font-bold text-white">
-                  Gmail Account Active: <span className="text-indigo-300">{authStatus.connectedEmail}</span>
+                  Gmail Account Connected: <span className="text-indigo-300">{authStatus.connectedEmail}</span>
                 </span>
               </div>
               <button
                 onClick={handleDisconnect}
-                className="px-3 py-1 rounded-lg bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold transition-all cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold transition-all cursor-pointer shadow-md"
               >
-                Disconnect
+                Disconnect Account
               </button>
             </div>
             <p className="text-xs text-slate-400">
-              All AI-generated emails will be dispatched directly from your authentic Gmail address ({authStatus.connectedEmail}) via official Google OAuth 2.0 Gmail REST API.
+              All AI-generated emails are dispatched directly from your authentic Gmail address ({authStatus.connectedEmail}) via official Google OAuth 2.0 Gmail API.
             </p>
-          </div>
-        ) : authUrl ? (
-          <div className="space-y-3">
-            <p className="text-xs text-slate-300">
-              Click the button below to sign in with your Google Account and grant Gmail sending permissions:
-            </p>
-            <a
-              href={authUrl}
-              className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs inline-flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
-            >
-              <ExternalLink className="w-4 h-4" />
-              ⚡ Connect via Google OAuth 2.0
-            </a>
           </div>
         ) : (
-          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400">
-            Google OAuth 2.0 is active. Set <strong>GOOGLE_CLIENT_ID</strong> & <strong>GOOGLE_CLIENT_SECRET</strong> in server environment variables to enable 1-click Google popup sign-in.
+          <div className="space-y-4">
+            <p className="text-xs text-slate-300">
+              Authorize Scribe-AI to send real emails directly from your Gmail account with 1-click Google OAuth 2.0:
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                if (authUrl) {
+                  window.location.href = authUrl;
+                  return;
+                }
+                try {
+                  const res = await apiFetch('/api/auth/google/url');
+                  const data = await res.json();
+                  if (data && data.url) {
+                    window.location.href = data.url;
+                  } else {
+                    alert(data.message || 'Google OAuth 2.0 credentials not set in server environment variables.');
+                  }
+                } catch (e) {
+                  console.error('OAuth connect error:', e);
+                  alert('Unable to connect to Google OAuth server. Please ensure backend is running.');
+                }
+              }}
+              className="px-8 py-3.5 rounded-xl gradient-btn text-white font-extrabold text-sm inline-flex items-center gap-2.5 shadow-xl shadow-indigo-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+            >
+              <ExternalLink className="w-5 h-5 text-white" />
+              ⚡ Connect Google Account Now
+            </button>
           </div>
         )}
       </div>
