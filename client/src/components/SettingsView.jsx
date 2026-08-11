@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, CheckCircle, ExternalLink, Save, UserCheck, Check } from 'lucide-react';
+import { Settings, Shield, CheckCircle, ExternalLink, Save, UserCheck, Check, Lock } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
 export function SettingsView() {
