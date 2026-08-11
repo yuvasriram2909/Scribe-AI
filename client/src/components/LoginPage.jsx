@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, Mail, ArrowRight, ShieldCheck, Lock, User, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { apiFetch, safeParseResponse } from '../utils/api';
 
 export function LoginPage({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
@@ -33,7 +34,7 @@ export function LoginPage({ onLoginSuccess }) {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -44,8 +45,8 @@ export function LoginPage({ onLoginSuccess }) {
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await safeParseResponse(res);
+      if (!res.ok || data.error) {
         throw new Error(data.error || 'Authentication failed. Please check your credentials.');
       }
 
