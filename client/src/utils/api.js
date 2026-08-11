@@ -40,9 +40,13 @@ export async function apiFetch(url, options = {}) {
  * without throwing "Unexpected end of JSON input".
  */
 export async function safeParseResponse(res) {
-  const contentType = res.headers.get('content-type') || '';
   const status = res.status;
 
+  if (status === 503) {
+    throw new Error('Backend service suspended on Render. Please open Render Dashboard (dashboard.render.com) and click Resume Service.');
+  }
+
+  const contentType = res.headers.get('content-type') || '';
   const text = await res.text();
   
   if (!text || text.trim() === '') {
@@ -50,6 +54,10 @@ export async function safeParseResponse(res) {
       throw new Error(`Server returned HTTP ${status} with empty response.`);
     }
     return { success: true };
+  }
+
+  if (text.includes('Service Suspended') || text.includes('suspended by its owner')) {
+    throw new Error('Render backend suspended. Please resume service in Render Dashboard (dashboard.render.com).');
   }
 
   if (contentType.includes('application/json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
@@ -60,15 +68,13 @@ export async function safeParseResponse(res) {
       }
       return data;
     } catch (e) {
-      if (!res.ok) {
-        throw new Error(e.message || `Server returned error status HTTP ${status}`);
-      }
+      if (!res.ok) throw new Error(e.message);
     }
   }
 
   if (!res.ok) {
-    throw new Error(text || `Server returned error HTTP ${status}`);
+    throw new Error(`Server returned HTTP ${status}: ${text.substring(0, 100)}`);
   }
 
-  return { text };
+  return { success: true, message: text };
 }
