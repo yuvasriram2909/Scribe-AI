@@ -302,11 +302,18 @@ export async function sendGmailMessage({ senderEmail, appPassword, accessToken, 
   if (appPass) {
     const cleanPass = appPass.replace(/\s+/g, '');
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      family: 4, // Force IPv4 to prevent Render ENETUNREACH IPv6 errors
       auth: {
         user: senderEmail,
         pass: cleanPass
-      }
+      },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 15000
     });
 
     const mailOptions = {

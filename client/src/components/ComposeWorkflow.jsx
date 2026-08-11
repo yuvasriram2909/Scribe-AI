@@ -183,8 +183,8 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel }) {
         body: formData
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send email.');
+      const data = await safeParseResponse(res);
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to send email.');
 
       setSentResult(data);
       setStep(6); // Success screen animation
