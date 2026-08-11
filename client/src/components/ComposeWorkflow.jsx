@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Sparkles, Send, Edit3, RefreshCw, X, CheckCircle, ShieldAlert, Paperclip, 
-  AlertCircle, ArrowLeft, FileText, Check, ShieldCheck, Mail, Users, UserPlus, ExternalLink, ChevronDown
+  AlertCircle, ArrowLeft, FileText, Check, ShieldCheck, Mail, Users, UserPlus, ExternalLink, ChevronDown, Key
 } from 'lucide-react';
 import { apiFetch, safeParseResponse } from '../utils/api';
 
@@ -16,7 +16,7 @@ const SUPPORTED_SITUATIONS = [
   { id: '🎉 Celebration / Occasion', label: '🎉 Celebration / Occasion', category: 'Occasion', priority: 'Normal', tone: 'Warm', badgeClass: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' }
 ];
 
-export function ComposeWorkflow({ initialData = {}, onComplete, onCancel }) {
+export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavigateToSettings }) {
   // Workflow Steps: 1 = Form, 2 = AI Processing, 3 = Preview, 4 = Confirm Modal, 5 = Sending, 6 = Success
   const [step, setStep] = useState(1);
 
@@ -228,25 +228,15 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel }) {
             <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
             <span>{errorMessage}</span>
           </div>
-          {(errorMessage.includes('Gmail account not connected') || errorMessage.includes('insufficient authentication scopes')) && (
+          {(errorMessage.includes('Gmail account not connected') || errorMessage.includes('insufficient authentication scopes') || errorMessage.includes('OAuth')) && (
             <button
-              onClick={async () => {
-                try {
-                  const res = await apiFetch('/api/auth/google/url');
-                  const data = await res.json();
-                  if (data.url) {
-                    window.location.href = data.url;
-                  } else {
-                    alert(data.message || 'Google OAuth credentials not set in .env');
-                  }
-                } catch (e) {
-                  console.error('OAuth URL fetch error:', e);
-                }
+              onClick={() => {
+                if (onNavigateToSettings) onNavigateToSettings();
               }}
-              className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-red-600/30 transition-all shrink-0 cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/30 transition-all shrink-0 cursor-pointer"
             >
-              <ExternalLink className="w-4 h-4" />
-              {errorMessage.includes('insufficient authentication scopes') ? 'Re-authorize Gmail Permissions' : 'Connect Gmail Account Now'}
+              <Key className="w-4 h-4" />
+              ⚡ Set Gmail App Password in Settings
             </button>
           )}
         </div>

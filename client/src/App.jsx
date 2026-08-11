@@ -312,6 +312,7 @@ export default function App() {
               initialData={composeInitialData}
               onComplete={() => setActiveTab('dashboard')}
               onCancel={() => setActiveTab('dashboard')}
+              onNavigateToSettings={() => setActiveTab('settings')}
             />
           )}
 
