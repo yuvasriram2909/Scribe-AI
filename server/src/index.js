@@ -4,10 +4,21 @@ import path from 'path';
 import dotenv from 'dotenv';
 import apiRouter from './routes/api.js';
 
+import { execSync } from 'child_process';
+
 dotenv.config();
 
 if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = "file:./dev.db";
+}
+
+// Automatically ensure database schema & tables exist on boot
+try {
+  console.log('📦 Auto-syncing database schema with Prisma...');
+  execSync('npx prisma db push --accept-data-loss', { stdio: 'inherit' });
+  console.log('✅ Database schema ready!');
+} catch (dbErr) {
+  console.warn('⚠️ Auto DB push notice:', dbErr.message);
 }
 
 const app = express();
