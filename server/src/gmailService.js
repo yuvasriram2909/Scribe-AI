@@ -9,7 +9,10 @@ dotenv.config();
 export function getOAuth2Client() {
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
   const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-  const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
+  const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 
+    (process.env.RENDER || process.env.NODE_ENV === 'production'
+      ? 'https://scribe-ai-1-5nqu.onrender.com/api/auth/google/callback'
+      : 'http://localhost:5000/api/auth/google/callback');
 
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     return null;
@@ -17,7 +20,7 @@ export function getOAuth2Client() {
   return new google.auth.OAuth2(
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/auth/google/callback'
+    GOOGLE_REDIRECT_URI
   );
 }
 
@@ -46,7 +49,10 @@ export function getTokensFromCode(code) {
   return new Promise((resolve, reject) => {
     const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
     const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-    const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/api/auth/google/callback';
+    const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 
+      (process.env.RENDER || process.env.NODE_ENV === 'production'
+        ? 'https://scribe-ai-1-5nqu.onrender.com/api/auth/google/callback'
+        : 'http://localhost:5000/api/auth/google/callback');
 
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
       return reject(new Error('Google OAuth credentials not configured in environment variables.'));
