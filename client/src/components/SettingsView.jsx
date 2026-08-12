@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, CheckCircle, ExternalLink, Save, UserCheck, Check, Lock, AlertTriangle } from 'lucide-react';
+import { Settings, Shield, CheckCircle, ExternalLink, Save, UserCheck, Check, Lock, AlertTriangle, Copy } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
 export function SettingsView() {
@@ -11,6 +11,7 @@ export function SettingsView() {
   });
 
   const [authUrl, setAuthUrl] = useState(null);
+  const [copiedUri, setCopiedUri] = useState(false);
 
   // User Signature Form State
   const [signature, setSignature] = useState({
@@ -31,6 +32,14 @@ export function SettingsView() {
   const [inputClientSecret, setInputClientSecret] = useState('');
   const [savingCreds, setSavingCreds] = useState(false);
   const [credsMsg, setCredsMsg] = useState('');
+
+  const EXACT_REDIRECT_URI = 'https://scribe-ai-1-5nqu.onrender.com/api/auth/google/callback';
+
+  const handleCopyUri = () => {
+    navigator.clipboard.writeText(EXACT_REDIRECT_URI);
+    setCopiedUri(true);
+    setTimeout(() => setCopiedUri(false), 3000);
+  };
 
   const handleSaveCredentials = async (e) => {
     e.preventDefault();
@@ -213,6 +222,42 @@ export function SettingsView() {
               </button>
             </div>
 
+            {/* Error 400: redirect_uri_mismatch Resolution Banner */}
+            <div className="p-5 rounded-2xl bg-red-50 border border-red-200 text-xs text-[#28321D] space-y-3 shadow-xs">
+              <div className="flex items-center gap-2 text-red-900 font-extrabold text-sm">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                Fixing "Error 400: redirect_uri_mismatch":
+              </div>
+              <p className="text-red-800 font-medium">
+                Google blocked sign-in because this exact Redirect URI is missing in your Google Cloud Console.
+              </p>
+
+              <div className="p-4 rounded-xl bg-white border border-red-200 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="font-bold text-[#3F4D2A]">Exact Required Redirect URI:</span>
+                  <button
+                    onClick={handleCopyUri}
+                    className="px-3 py-1 rounded-lg bg-[#667A45] hover:bg-[#3F4D2A] text-[#FAF8F1] font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    {copiedUri ? 'Copied ✓' : 'Copy Exact URI'}
+                  </button>
+                </div>
+                <code className="block p-2.5 rounded-lg bg-[#FAF8F1] border border-[#D8D1BC] font-mono text-[#28321D] text-xs break-all select-all font-bold">
+                  {EXACT_REDIRECT_URI}
+                </code>
+
+                <span className="font-bold text-[#3F4D2A] block pt-1">⚡ 60-Second Fix in Google Cloud Console:</span>
+                <ol className="list-decimal list-inside space-y-1.5 text-[#6F725F] leading-relaxed">
+                  <li>Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-[#667A45] font-bold underline">Google Cloud Credentials Console</a></li>
+                  <li>Click your <strong>OAuth 2.0 Web Client ID</strong> (or click the Pencil icon to edit)</li>
+                  <li>Under <strong>Authorized redirect URIs</strong>, click <strong>+ ADD URI</strong></li>
+                  <li>Paste: <code className="bg-[#E8DFC8] px-2 py-0.5 rounded text-[#28321D] font-mono text-[11px] font-bold">{EXACT_REDIRECT_URI}</code></li>
+                  <li>Click <strong>SAVE</strong> at the bottom of the page in Google Cloud Console.</li>
+                </ol>
+              </div>
+            </div>
+
             {/* Error 403: access_denied Resolution Banner */}
             <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-[#28321D] space-y-3 shadow-xs">
               <div className="flex items-center gap-2 text-amber-900 font-extrabold text-sm">
@@ -240,19 +285,6 @@ export function SettingsView() {
                   </p>
                 </div>
               </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs text-[#28321D] space-y-2">
-              <p className="font-bold text-[#28321D] flex items-center gap-1.5">
-                <Shield className="w-4 h-4 text-[#667A45]" />
-                Need your Google OAuth credentials? (60-second setup):
-              </p>
-              <ol className="list-decimal list-inside space-y-1 text-[#6F725F]">
-                <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-[#667A45] font-bold underline">console.cloud.google.com/apis/credentials</a></li>
-                <li>Click <strong>+ CREATE CREDENTIALS</strong> → Select <strong>OAuth client ID</strong> (Type: <em>Web application</em>)</li>
-                <li>Under <strong>Authorized redirect URIs</strong>, add: <code className="bg-[#E8DFC8] px-2 py-0.5 rounded text-[#28321D] font-mono text-[11px]">https://scribe-ai-1-5nqu.onrender.com/api/auth/google/callback</code></li>
-                <li>Copy your <strong>Client ID</strong> and <strong>Client Secret</strong> and paste them below!</li>
-              </ol>
             </div>
 
             <form onSubmit={handleSaveCredentials} className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#D8D1BC] space-y-4 shadow-sm">
