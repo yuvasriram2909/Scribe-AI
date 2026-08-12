@@ -47,62 +47,20 @@ export function getAuthUrl(state = '') {
 /**
  * Exchanges authorization code for access and refresh tokens reliably
  */
-export function getTokensFromCode(code) {
-  return new Promise((resolve, reject) => {
-    const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-    const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-    const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 
-      (process.env.RENDER || process.env.NODE_ENV === 'production'
-        ? 'https://scribe-ai-1-5nqu.onrender.com/api/auth/google/callback'
-        : 'http://localhost:5000/api/auth/google/callback');
+export async function getTokensFromCode(code) {
+  const oauth2Client = getOAuth2Client();
+  if (!oauth2Client) {
+    throw new Error('Google OAuth credentials (Client ID and Client Secret) are not configured.');
+  }
 
-    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      return reject(new Error('Google OAuth credentials not configured in environment variables.'));
-    }
-
-    const postData = querystring.stringify({
-      code,
-      client_id: GOOGLE_CLIENT_ID,
-      client_secret: GOOGLE_CLIENT_SECRET,
-      redirect_uri: GOOGLE_REDIRECT_URI,
-      grant_type: 'authorization_code'
-    });
-
-    const options = {
-      hostname: 'oauth2.googleapis.com',
-      port: 443,
-      path: '/token',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': Buffer.byteLength(postData),
-        'Connection': 'close' // Avoid socket premature close issue
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', (chunk) => { body += chunk; });
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(body);
-          if (res.statusCode >= 400 || parsed.error) {
-            return reject(new Error(parsed.error_description || parsed.error || `OAuth error HTTP ${res.statusCode}`));
-          }
-          resolve(parsed);
-        } catch (e) {
-          reject(new Error('Failed to parse Google OAuth token response: ' + e.message));
-        }
-      });
-    });
-
-    req.on('error', (err) => {
-      reject(new Error('Network error connecting to Google OAuth token endpoint: ' + err.message));
-    });
-
-    req.write(postData);
-    req.end();
-  });
+  try {
+    const { tokens } = await oauth2Client.getToken(code);
+    return tokens;
+  } catch (err) {
+    const errorDetails = err.response?.data?.error_description || err.response?.data?.error || err.message;
+    console.error('Google OAuth getToken error details:', err.response?.data || err.message);
+    throw new Error(errorDetails);
+  }
 }
 
 /**
