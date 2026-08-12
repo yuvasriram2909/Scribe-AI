@@ -278,8 +278,12 @@ router.post('/auth/google/credentials', async (req, res) => {
     if (!clientId || !clientSecret) {
       return res.status(400).json({ error: 'Client ID and Client Secret are required.' });
     }
-    process.env.GOOGLE_CLIENT_ID = clientId.trim();
-    process.env.GOOGLE_CLIENT_SECRET = clientSecret.trim();
+
+    const cleanClientId = clientId.trim().replace(/^["']|["']$/g, '').replace(/[\r\n]/g, '');
+    const cleanClientSecret = clientSecret.trim().replace(/^["']|["']$/g, '').replace(/[\r\n]/g, '');
+
+    process.env.GOOGLE_CLIENT_ID = cleanClientId;
+    process.env.GOOGLE_CLIENT_SECRET = cleanClientSecret;
 
     const user = await getAuthUser(req);
     const state = user ? Buffer.from(user.email).toString('base64') : '';
@@ -343,11 +347,54 @@ router.get('/auth/google/callback', async (req, res) => {
       }
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://scribe-ai-self.vercel.app';
     res.redirect(`${frontendUrl}?auth=success`);
   } catch (err) {
     console.error('OAuth Callback error:', err);
-    res.status(500).send('Google OAuth Authentication failed: ' + err.message);
+    const frontendUrl = process.env.FRONTEND_URL || 'https://scribe-ai-self.vercel.app';
+    const isInvalidSecret = err.message.toLowerCase().includes('client secret') || err.message.toLowerCase().includes('invalid_client');
+
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Google OAuth Configuration Error — Scribe AI</title>
+        <style>
+          body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: #F7F4EA; color: #28321D; margin: 0; padding: 40px 20px; display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+          .card { background: #FAF8F1; border: 1px solid #D8D1BC; border-radius: 24px; padding: 40px; max-width: 550px; width: 100%; box-shadow: 0 10px 30px rgba(40,50,29,0.08); text-align: center; }
+          .icon { width: 60px; height: 60px; background: #FDE8E8; color: #9B1C1C; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 28px; }
+          h1 { font-size: 20px; margin: 0 0 10px; color: #28321D; font-weight: 800; }
+          p { font-size: 13px; color: #6F725F; line-height: 1.6; margin: 0 0 20px; }
+          .box { background: #FFFFFF; border: 1px solid #D8D1BC; border-radius: 16px; padding: 16px; text-align: left; font-size: 12px; margin-bottom: 24px; color: #28321D; }
+          .box strong { color: #3F4D2A; }
+          .box ol { margin: 8px 0 0; padding-left: 20px; color: #6F725F; }
+          .box li { margin-bottom: 6px; }
+          .btn { display: inline-block; background: #667A45; color: #FAF8F1; text-decoration: none; padding: 14px 28px; border-radius: 14px; font-weight: 700; font-size: 13px; transition: all 0.2s ease; }
+          .btn:hover { background: #3F4D2A; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="icon">⚠️</div>
+          <h1>Google OAuth Authentication Error</h1>
+          <p>${err.message}</p>
+          ${isInvalidSecret ? `
+            <div class="box">
+              <strong>How to fix "The provided client secret is invalid":</strong>
+              <ol>
+                <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:#667A45;font-weight:bold;">Google Cloud Console Credentials</a></li>
+                <li>Find your OAuth 2.0 Web Client ID and click the Edit (Pencil) icon</li>
+                <li>Copy your <strong>Client Secret</strong> value directly from Google Cloud Console</li>
+                <li>Go back to Scribe AI Settings and paste the Client ID and Client Secret again</li>
+              </ol>
+            </div>
+          ` : ''}
+          <a href="${frontendUrl}" class="btn">⚙ Return to Scribe AI Settings</a>
+        </div>
+      </body>
+      </html>
+    `);
   }
 });
 
