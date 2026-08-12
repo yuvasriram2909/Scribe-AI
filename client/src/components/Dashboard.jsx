@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Mail, Send, AlertTriangle, Calendar, FileText, Briefcase, Sparkles, 
-  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check
+  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
@@ -25,7 +25,7 @@ const STATUS_FILTERS = [
   'Draft'
 ];
 
-export function Dashboard({ onStartCompose, onViewHistory }) {
+export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings }) {
   const [stats, setStats] = useState({
     totalEmails: 0,
     sentToday: 0,
@@ -35,6 +35,12 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
     official: 0,
     drafts: 0,
     pending: 0
+  });
+
+  const [connectionStatus, setConnectionStatus] = useState({
+    isConnected: false,
+    status: 'DISCONNECTED',
+    connectedEmail: null
   });
 
   const [recentEmails, setRecentEmails] = useState([]);
@@ -56,7 +62,34 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
 
   useEffect(() => {
     fetchDashboardData();
+    checkConnectionStatus();
   }, [selectedCategory, selectedStatus, searchQuery]);
+
+  const checkConnectionStatus = async () => {
+    try {
+      const res = await apiFetch('/api/auth/status');
+      if (res.ok) {
+        const data = await res.json();
+        setConnectionStatus(data);
+      }
+    } catch (err) {
+      console.error('Failed to check connection status:', err);
+    }
+  };
+
+  const handleConnectGmail = async () => {
+    try {
+      const res = await apiFetch('/api/auth/google/url');
+      const data = await res.json();
+      if (data && data.url) {
+        window.location.href = data.url;
+      } else if (onNavigateToSettings) {
+        onNavigateToSettings();
+      }
+    } catch (err) {
+      if (onNavigateToSettings) onNavigateToSettings();
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -171,7 +204,7 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
   const getCategoryBadgeClass = (category) => {
     if (!category) return 'badge-official';
     if (category.includes('Emergency')) return 'badge-emergency';
-    if (category.includes('Leave')) return 'badge-leave';
+    if (category.includes('Leave')) return 'badge-[#667A45]';
     if (category.includes('Resume')) return 'badge-resume';
     if (category.includes('Official')) return 'badge-official';
     if (category.includes('Casual')) return 'badge-casual';
@@ -182,6 +215,82 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
 
   return (
     <div className="space-y-8 animate-fadeIn">
+
+      {/* Gmail Connection Status Card */}
+      {!connectionStatus.isConnected || connectionStatus.status === 'DISCONNECTED' ? (
+        <div className="glass-panel p-6 rounded-3xl border border-[#D8D1BC] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#FAF8F1] shadow-xs">
+          <div className="space-y-1 text-center sm:text-left">
+            <div className="flex items-center justify-center sm:justify-start gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+              <h3 className="text-base font-extrabold text-[#28321D]">Connect Your Gmail</h3>
+              <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full">
+                ● Gmail Not Connected
+              </span>
+            </div>
+            <p className="text-xs text-[#6F725F] max-w-xl">
+              Connect your Gmail account to send emails directly from AI Smart Sender.
+            </p>
+          </div>
+
+          <button
+            onClick={handleConnectGmail}
+            className="px-6 py-3 rounded-2xl gradient-btn text-[#FAF8F1] font-extrabold text-xs inline-flex items-center gap-2 shadow-md hover:scale-[1.02] cursor-pointer shrink-0"
+          >
+            <ExternalLink className="w-4 h-4" />
+            ⚡ Connect Gmail
+          </button>
+        </div>
+      ) : connectionStatus.status === 'NEEDS_ATTENTION' ? (
+        <div className="glass-panel p-6 rounded-3xl border border-amber-300 bg-amber-50 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
+          <div className="space-y-1 text-center sm:text-left">
+            <div className="flex items-center justify-center sm:justify-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+              <h3 className="text-base font-extrabold text-[#28321D]">Gmail Connection Needs Attention</h3>
+              <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full">
+                ⚠️ Re-authorization Required
+              </span>
+            </div>
+            <p className="text-xs text-[#6F725F]">
+              Your Gmail connection needs to be renewed. Click reconnect to refresh permissions.
+            </p>
+          </div>
+
+          <button
+            onClick={handleConnectGmail}
+            className="px-6 py-3 rounded-2xl gradient-btn text-[#FAF8F1] font-extrabold text-xs inline-flex items-center gap-2 shadow-md hover:scale-[1.02] cursor-pointer shrink-0"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Reconnect Gmail
+          </button>
+        </div>
+      ) : (
+        <div className="glass-panel p-6 rounded-3xl border border-[#A8DADC] bg-[#E6F4EA] flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#667A45] text-[#FAF8F1] flex items-center justify-center font-extrabold shadow-sm shrink-0">
+              <CheckCircle className="w-5 h-5 text-[#FAF8F1]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-extrabold text-[#28321D]">✓ Gmail Connected</h3>
+                <span className="text-[10px] font-bold text-[#137333] bg-white border border-[#A8DADC] px-2 py-0.5 rounded-full">
+                  OAuth Active
+                </span>
+              </div>
+              <p className="text-xs font-mono text-[#137333] font-bold mt-0.5">
+                Connected account: {connectionStatus.connectedEmail}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onNavigateToSettings}
+            className="px-4 py-2.5 rounded-xl bg-white hover:bg-[#FAF8F1] text-[#3F4D2A] border border-[#A8DADC] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+          >
+            <Settings className="w-4 h-4 text-[#667A45]" />
+            Manage Connection
+          </button>
+        </div>
+      )}
       
       {/* Welcome & Quick Compose Section */}
       <div className="relative overflow-hidden rounded-3xl glass-panel p-8 border border-[#D8D1BC]">

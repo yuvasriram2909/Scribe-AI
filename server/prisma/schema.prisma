@@ -21,14 +21,18 @@ model User {
 }
 
 model GmailAccount {
-  id                    String   @id @default(uuid())
+  id                    String    @id @default(uuid())
   userId                String
   gmailEmail            String
   encryptedAccessToken  String?
   encryptedRefreshToken String?
   appPassword           String?
-  createdAt             DateTime @default(now())
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status                String    @default("CONNECTED") // "CONNECTED", "NEEDS_ATTENTION", "DISCONNECTED"
+  tokenExpiry           DateTime?
+  scope                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt @default(now())
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Contact {

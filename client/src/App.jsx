@@ -30,6 +30,22 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isGmailConnected, setIsGmailConnected] = useState(false);
 
+  const [toastMessage, setToastMessage] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('gmail') === 'connected' || params.get('auth') === 'success') {
+      setActiveTab('dashboard');
+      setToastMessage('✓ Gmail Connected Successfully!');
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => setToastMessage(''), 5000);
+    } else if (params.get('gmail') === 'cancelled') {
+      setToastMessage('⚠️ Gmail connection cancelled.');
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => setToastMessage(''), 5000);
+    }
+  }, []);
+
   useEffect(() => {
     const handlePopState = () => {
       setCurrentRoute(window.location.pathname);

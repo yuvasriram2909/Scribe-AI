@@ -257,7 +257,16 @@ router.post('/ai/generate', async (req, res) => {
 router.get('/auth/google/url', async (req, res) => {
   try {
     const user = await getAuthUser(req);
-    const state = user ? Buffer.from(user.email).toString('base64') : '';
+    const timestamp = Date.now();
+    const userIdStr = user ? user.id : 'guest';
+    const emailStr = user ? user.email : '';
+
+    // Create secure signed state payload (userId.email.timestamp.sig)
+    const payload = `${userIdStr}:${emailStr}:${timestamp}`;
+    const secret = process.env.JWT_SECRET || 'scribe_ai_oauth_secret';
+    const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    const state = Buffer.from(`${payload}:${sig}`).toString('base64url');
+
     const url = getAuthUrl(state);
 
     if (!url) {
@@ -286,7 +295,14 @@ router.post('/auth/google/credentials', async (req, res) => {
     process.env.GOOGLE_CLIENT_SECRET = cleanClientSecret;
 
     const user = await getAuthUser(req);
-    const state = user ? Buffer.from(user.email).toString('base64') : '';
+    const timestamp = Date.now();
+    const userIdStr = user ? user.id : 'guest';
+    const emailStr = user ? user.email : '';
+    const payload = `${userIdStr}:${emailStr}:${timestamp}`;
+    const secret = process.env.JWT_SECRET || 'scribe_ai_oauth_secret';
+    const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    const state = Buffer.from(`${payload}:${sig}`).toString('base64url');
+
     const url = getAuthUrl(state);
 
     res.json({
@@ -300,22 +316,46 @@ router.post('/auth/google/credentials', async (req, res) => {
 });
 
 router.get('/auth/google/callback', async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'https://scribe-ai-self.vercel.app';
   try {
-    const { code, state } = req.query;
+    const { code, state, error: oauthError } = req.query;
+
+    // Handle user cancellation or access denied gracefully
+    if (oauthError === 'access_denied' || oauthError === 'consent_required') {
+      return res.redirect(`${frontendUrl}?gmail=cancelled`);
+    }
+
     if (!code) return res.status(400).send('Authorization code missing.');
 
-    let targetEmail = null;
+    let stateUserId = null;
+    let stateEmail = null;
     if (state) {
       try {
-        targetEmail = Buffer.from(state, 'base64').toString('utf8');
+        const decoded = Buffer.from(state, 'base64url').toString('utf8');
+        const parts = decoded.split(':');
+        if (parts.length === 4) {
+          const [sUserId, sEmail, sTimestamp, sSig] = parts;
+          const payload = `${sUserId}:${sEmail}:${sTimestamp}`;
+          const secret = process.env.JWT_SECRET || 'scribe_ai_oauth_secret';
+          const expectedSig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+          // Validate HMAC signature and 15-minute expiration
+          if (sSig === expectedSig && (Date.now() - parseInt(sTimestamp, 10) < 15 * 60 * 1000)) {
+            if (sUserId !== 'guest') stateUserId = sUserId;
+            if (sEmail) stateEmail = sEmail;
+          }
+        }
       } catch (e) {
-        console.warn('State decode warning:', e.message);
+        console.warn('OAuth state decode notice:', e.message);
       }
     }
 
     let user = null;
-    if (targetEmail) {
-      user = await prisma.user.findUnique({ where: { email: targetEmail.toLowerCase() } });
+    if (stateUserId) {
+      user = await prisma.user.findUnique({ where: { id: stateUserId } });
+    }
+    if (!user && stateEmail) {
+      user = await prisma.user.findUnique({ where: { email: stateEmail.toLowerCase() } });
     }
     if (!user) {
       user = await getAuthUser(req);
@@ -336,6 +376,8 @@ router.get('/auth/google/callback', async (req, res) => {
       console.warn('UserInfo fetch warning:', e.message);
     }
 
+    const expiryDate = tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600 * 1000);
+
     // Store tokens strictly for THIS authenticated user
     await prisma.gmailAccount.deleteMany({ where: { userId: user.id } });
     await prisma.gmailAccount.create({
@@ -343,15 +385,16 @@ router.get('/auth/google/callback', async (req, res) => {
         userId: user.id,
         gmailEmail: authorizedEmail,
         encryptedAccessToken: tokens.access_token || '',
-        encryptedRefreshToken: tokens.refresh_token || ''
+        encryptedRefreshToken: tokens.refresh_token || '',
+        status: 'CONNECTED',
+        tokenExpiry: expiryDate,
+        scope: tokens.scope || null
       }
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://scribe-ai-self.vercel.app';
-    res.redirect(`${frontendUrl}?auth=success`);
+    res.redirect(`${frontendUrl}?gmail=connected`);
   } catch (err) {
     console.error('OAuth Callback error:', err);
-    const frontendUrl = process.env.FRONTEND_URL || 'https://scribe-ai-self.vercel.app';
     const isInvalidSecret = err.message.toLowerCase().includes('client secret') || err.message.toLowerCase().includes('invalid_client');
 
     return res.status(400).send(`
@@ -404,6 +447,7 @@ router.get('/auth/status', async (req, res) => {
     if (!user) {
       return res.json({
         isConnected: false,
+        status: 'DISCONNECTED',
         connectedEmail: null,
         authMethod: 'none',
         isGoogleConfigured: true,
@@ -415,16 +459,18 @@ router.get('/auth/status', async (req, res) => {
       where: { userId: user.id }
     });
     
-    const isConnected = !!gmailAccount;
+    const isConnected = !!gmailAccount && gmailAccount.status !== 'DISCONNECTED';
     const isAppPass = gmailAccount?.encryptedRefreshToken?.startsWith('APPPASSWORD:');
     const authMethod = gmailAccount ? (isAppPass ? 'app_password' : 'oauth') : 'none';
+    const status = gmailAccount ? (gmailAccount.status || 'CONNECTED') : 'DISCONNECTED';
 
     res.json({
       isConnected,
+      status,
       connectedEmail: gmailAccount ? gmailAccount.gmailEmail : null,
       authMethod,
       isGoogleConfigured: true,
-      mode: isConnected ? (isAppPass ? 'Direct App Password Connected ✓' : 'Google OAuth Connected ✓') : 'Not Connected'
+      mode: isConnected ? (status === 'NEEDS_ATTENTION' ? 'Gmail Connection Needs Attention ⚠️' : (isAppPass ? 'Direct App Password Connected ✓' : 'Google OAuth Connected ✓')) : 'Not Connected'
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
