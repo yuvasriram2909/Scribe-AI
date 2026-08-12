@@ -161,7 +161,12 @@ export function createRawMessage({ to, cc, bcc, subject, body, attachments = [] 
   messageParts.push(`To: ${to}`);
   if (cc && cc.trim()) messageParts.push(`Cc: ${cc}`);
   if (bcc && bcc.trim()) messageParts.push(`Bcc: ${bcc}`);
-  messageParts.push(`Subject: ${subject}`);
+  
+  // RFC 2822 standard headers for inbox deliverability
+  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject || '').toString('base64')}?=`;
+  messageParts.push(`Subject: ${encodedSubject}`);
+  messageParts.push(`Date: ${new Date().toUTCString()}`);
+  messageParts.push(`Message-ID: <${Date.now()}.${Math.random().toString(36).substring(2)}@scribe-ai>`);
   messageParts.push('MIME-Version: 1.0');
 
   if (attachments && attachments.length > 0) {
@@ -170,7 +175,7 @@ export function createRawMessage({ to, cc, bcc, subject, body, attachments = [] 
     messageParts.push('');
     messageParts.push(`--${boundary}`);
     messageParts.push('Content-Type: text/plain; charset="UTF-8"');
-    messageParts.push('Content-Transfer-Encoding: 7bit');
+    messageParts.push('Content-Transfer-Encoding: 8bit');
     messageParts.push('');
     messageParts.push(body);
     messageParts.push('');
@@ -192,7 +197,7 @@ export function createRawMessage({ to, cc, bcc, subject, body, attachments = [] 
     messageParts.push(`--${boundary}--`);
   } else {
     messageParts.push('Content-Type: text/plain; charset="UTF-8"');
-    messageParts.push('Content-Transfer-Encoding: 7bit');
+    messageParts.push('Content-Transfer-Encoding: 8bit');
     messageParts.push('');
     messageParts.push(body);
   }
