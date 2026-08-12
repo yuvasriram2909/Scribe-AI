@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, CheckCircle, ExternalLink, Save, UserCheck, Check, Lock } from 'lucide-react';
+import { Settings, Shield, CheckCircle, ExternalLink, Save, UserCheck, Check, Lock, AlertTriangle } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
 export function SettingsView() {
@@ -211,6 +211,35 @@ export function SettingsView() {
                 <ExternalLink className="w-4 h-4 text-[#FAF8F1]" />
                 ⚡ Connect Google Account Directly
               </button>
+            </div>
+
+            {/* Error 403: access_denied Resolution Banner */}
+            <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-[#28321D] space-y-3 shadow-xs">
+              <div className="flex items-center gap-2 text-amber-900 font-extrabold text-sm">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                Fixing "Error 403: access_denied / App not completed Google verification process":
+              </div>
+              <p className="text-[#6F725F]">
+                If Google shows <strong>"Access blocked: scribe-ai-1-5nqu.onrender.com has not completed the Google verification process"</strong>, follow one of these 2 quick solutions in Google Cloud Console:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="p-3 rounded-xl bg-white border border-amber-200 space-y-1">
+                  <span className="font-bold text-[#3F4D2A] block">⚡ Option A (30-second fix): Add Test User</span>
+                  <p className="text-[#6F725F] text-[11px] leading-relaxed">
+                    1. Open <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noreferrer" className="text-[#667A45] font-bold underline">OAuth Consent Screen</a><br/>
+                    2. Scroll down to <strong>Test Users</strong> → Click <strong>+ ADD USERS</strong><br/>
+                    3. Enter email: <code className="bg-[#E8DFC8] px-1 rounded text-[#28321D] font-mono">yuvasriram2909@gmail.com</code> → Save.
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-white border border-amber-200 space-y-1">
+                  <span className="font-bold text-[#3F4D2A] block">🌐 Option B: Publish App for all users</span>
+                  <p className="text-[#6F725F] text-[11px] leading-relaxed">
+                    1. Open <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noreferrer" className="text-[#667A45] font-bold underline">OAuth Consent Screen</a><br/>
+                    2. Under Publishing Status, click <strong>PUBLISH APP</strong>.<br/>
+                    3. Now any Google user can connect without 403!
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="p-4 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs text-[#28321D] space-y-2">
