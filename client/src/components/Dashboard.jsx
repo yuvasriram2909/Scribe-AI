@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Mail, Send, AlertTriangle, Calendar, FileText, Briefcase, Sparkles, 
-  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users
+  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
@@ -32,7 +32,9 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
     emergency: 0,
     leave: 0,
     resume: 0,
-    official: 0
+    official: 0,
+    drafts: 0,
+    pending: 0
   });
 
   const [recentEmails, setRecentEmails] = useState([]);
@@ -92,7 +94,7 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
 
   const handleDeleteEmail = async (e, id) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this email record?')) {
+    if (!window.confirm('Are you sure you want to move this email to trash?')) {
       return;
     }
 
@@ -136,31 +138,31 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
   const renderStatusBadge = (status, errorMessage) => {
     if (status === 'Sent') {
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-          <CheckCircle className="w-3 h-3 text-emerald-400" />
-          Sent
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#137333] bg-[#E6F4EA] border border-[#A8DADC] px-2.5 py-0.5 rounded-full">
+          <CheckCircle className="w-3 h-3 text-[#667A45]" />
+          ✓ Sent
         </span>
       );
     }
     if (status === 'Failed') {
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded-full" title={errorMessage || 'Sending failed'}>
-          <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full" title={errorMessage || 'Sending failed'}>
+          <AlertCircle className="w-3 h-3 text-red-600 shrink-0" />
           Failed
         </span>
       );
     }
     if (status === 'Sending') {
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 rounded-full animate-pulse">
-          <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin" />
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#3F4D2A] bg-[#FAF8F1] border border-[#D8D1BC] px-2.5 py-0.5 rounded-full animate-pulse">
+          <RefreshCw className="w-3 h-3 text-[#667A45] animate-spin" />
           Sending...
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full">
-        <Clock className="w-3 h-3 text-slate-400" />
+      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#6F725F] bg-[#F2EBDD] border border-[#D8D1BC] px-2.5 py-0.5 rounded-full">
+        <Clock className="w-3 h-3 text-[#6F725F]" />
         {status || 'Draft'}
       </span>
     );
@@ -173,182 +175,178 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
     if (category.includes('Resume')) return 'badge-resume';
     if (category.includes('Official')) return 'badge-official';
     if (category.includes('Casual')) return 'badge-casual';
-    if (category.includes('Occasion')) return 'badge-leave';
-    if (category.includes('Follow-up')) return 'badge-resume';
+    if (category.includes('Occasion')) return 'badge-celebration';
+    if (category.includes('Follow-up')) return 'badge-followup';
     return 'badge-official';
   };
 
   return (
     <div className="space-y-8 animate-fadeIn">
       
-      {/* Hero Welcome & Quick Compose Section */}
-      <div className="relative overflow-hidden rounded-2xl glass-panel p-8 border border-indigo-500/20">
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-0 left-1/3 -mb-8 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
-
-        <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold uppercase tracking-wider mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin-slow" />
+      {/* Welcome & Quick Compose Section */}
+      <div className="relative overflow-hidden rounded-3xl glass-panel p-8 border border-[#D8D1BC]">
+        <div className="relative z-10 max-w-3xl space-y-4">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#E8DFC8] border border-[#D8D1BC] text-[#3F4D2A] text-xs font-bold uppercase tracking-wider">
+            <Sparkles className="w-3.5 h-3.5 text-[#667A45]" />
             AI Smart Sender Real-Time Engine
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-3">
-            What do you want to send today?
-          </h1>
-          <p className="text-slate-400 text-sm sm:text-base mb-6">
-            Enter a single line instruction. AI classifies, generates, previews, and dispatches via Gmail with real-time status tracking.
-          </p>
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-[#28321D] tracking-tight">
+              Good morning! What do you want to send today?
+            </h1>
+            <p className="text-[#6F725F] text-xs sm:text-sm mt-1 font-medium">
+              Manage your emails intelligently. Enter a short instruction — AI classifies, generates, previews, and dispatches via Gmail.
+            </p>
+          </div>
 
           {/* Quick Compose Form */}
-          <form onSubmit={handleQuickSubmit} className="space-y-4">
+          <form onSubmit={handleQuickSubmit} className="space-y-3 pt-2">
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 relative">
                 <input
                   type="text"
-                  placeholder='e.g., "I am on leave for 3 days." or "Send my resume for developer position."'
+                  placeholder='e.g., "Inform manager I need emergency leave this afternoon for doctor appointment."'
                   value={quickInstruction}
                   onChange={(e) => setQuickInstruction(e.target.value)}
-                  className="w-full pl-4 pr-4 py-3.5 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500"
+                  className="w-full pl-4 pr-4 py-3.5 rounded-xl glass-input text-xs text-[#28321D] placeholder-[#6F725F] focus:ring-2 focus:ring-[#667A45]"
                 />
               </div>
               <div className="w-full sm:w-64 relative">
                 <input
                   type="email"
-                  placeholder="Recipient (e.g. manager@company.com)"
+                  placeholder="Recipient (e.g. manager@example.com)"
                   value={quickRecipient}
                   onChange={(e) => setQuickRecipient(e.target.value)}
-                  className="w-full px-4 py-3.5 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3.5 rounded-xl glass-input text-xs text-[#28321D] placeholder-[#6F725F] focus:ring-2 focus:ring-[#667A45]"
                 />
               </div>
               <button
                 type="submit"
-                className="px-6 py-3.5 rounded-xl gradient-btn text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                className="px-6 py-3.5 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer shrink-0"
               >
-                <Sparkles className="w-4 h-4 text-indigo-200" />
+                <Sparkles className="w-4 h-4 text-[#E8DFC8]" />
                 Generate Email
               </button>
             </div>
             
             {/* Quick Suggestions */}
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 pt-1">
-              <span className="text-slate-500 font-medium">Try:</span>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[#6F725F] pt-1">
+              <span className="text-[#3F4D2A] font-bold">Try:</span>
               <button
                 type="button"
-                onClick={() => setQuickInstruction('I am on leave for 3 days.')}
-                className="px-2.5 py-1 rounded-md bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 transition-colors border border-slate-700/50"
+                onClick={() => setQuickInstruction('I am on leave for 3 days due to illness.')}
+                className="px-2.5 py-1 rounded-lg bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] transition-colors border border-[#D8D1BC] cursor-pointer"
               >
-                🏖️ Leave for 3 days
+                🏖️ Sick leave 3 days
               </button>
               <button
                 type="button"
-                onClick={() => setQuickInstruction('I need emergency leave for 1 hour.')}
-                className="px-2.5 py-1 rounded-md bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 transition-colors border border-slate-700/50"
+                onClick={() => setQuickInstruction('I need emergency leave this afternoon because of a doctor appointment.')}
+                className="px-2.5 py-1 rounded-lg bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] transition-colors border border-[#D8D1BC] cursor-pointer"
               >
-                🚨 Emergency leave 1hr
+                🚨 Emergency leave today
               </button>
               <button
                 type="button"
-                onClick={() => setQuickInstruction('Send my resume for a software developer position.')}
-                className="px-2.5 py-1 rounded-md bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 transition-colors border border-slate-700/50"
+                onClick={() => setQuickInstruction('Send my resume for software developer position.')}
+                className="px-2.5 py-1 rounded-lg bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] transition-colors border border-[#D8D1BC] cursor-pointer"
               >
                 📄 Send Resume
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickInstruction('Tell my client that the project update is ready for review.')}
-                className="px-2.5 py-1 rounded-md bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 transition-colors border border-slate-700/50"
-              >
-                💼 Work status update
               </button>
             </div>
           </form>
         </div>
       </div>
 
-      {/* Metrics Counter Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="glass-panel p-4 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium">Total Emails</span>
-            <Mail className="w-4 h-4 text-indigo-400" />
+      {/* Elegant Summary Cards Grid (Beige Cards with Olive Icons) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        
+        <div className="glass-card p-5 rounded-2xl border border-[#D8D1BC] flex items-center justify-between shadow-xs">
+          <div>
+            <span className="text-xs font-bold text-[#6F725F] block">Emails Sent</span>
+            <p className="text-2xl font-extrabold text-[#28321D] mt-1">{stats.sentToday || stats.totalEmails}</p>
+            <span className="text-[10px] text-[#667A45] font-semibold">Active dispatch</span>
           </div>
-          <p className="text-2xl font-bold text-white">{stats.totalEmails}</p>
-          <span className="text-[10px] text-slate-500">Processed overall</span>
+          <div className="w-10 h-10 rounded-xl bg-[#667A45]/15 border border-[#879B62]/40 flex items-center justify-center text-[#667A45]">
+            <Send className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="glass-panel p-4 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium">Sent Today</span>
-            <Send className="w-4 h-4 text-emerald-400" />
+        <div className="glass-card p-5 rounded-2xl border border-[#D8D1BC] flex items-center justify-between shadow-xs">
+          <div>
+            <span className="text-xs font-bold text-[#6F725F] block">Drafts</span>
+            <p className="text-2xl font-extrabold text-[#28321D] mt-1">{stats.drafts || 0}</p>
+            <span className="text-[10px] text-[#6F725F] font-semibold">Saved drafts</span>
           </div>
-          <p className="text-2xl font-bold text-emerald-400">{stats.sentToday}</p>
-          <span className="text-[10px] text-emerald-500/80">Active dispatch</span>
+          <div className="w-10 h-10 rounded-xl bg-[#E8DFC8] border border-[#D8D1BC] flex items-center justify-center text-[#3F4D2A]">
+            <FileText className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="glass-panel p-4 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium">Emergency</span>
-            <AlertTriangle className="w-4 h-4 text-red-400" />
+        <div className="glass-card p-5 rounded-2xl border border-[#D8D1BC] flex items-center justify-between shadow-xs">
+          <div>
+            <span className="text-xs font-bold text-[#6F725F] block">Scheduled</span>
+            <p className="text-2xl font-extrabold text-[#28321D] mt-1">0</p>
+            <span className="text-[10px] text-[#6F725F] font-semibold">Queue ready</span>
           </div>
-          <p className="text-2xl font-bold text-red-400">{stats.emergency}</p>
-          <span className="text-[10px] text-red-500/80">High priority</span>
+          <div className="w-10 h-10 rounded-xl bg-[#E8DFC8] border border-[#D8D1BC] flex items-center justify-center text-[#667A45]">
+            <Clock className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="glass-panel p-4 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium">Leave</span>
-            <Calendar className="w-4 h-4 text-emerald-300" />
+        <div className="glass-card p-5 rounded-2xl border border-[#D8D1BC] flex items-center justify-between shadow-xs">
+          <div>
+            <span className="text-xs font-bold text-[#6F725F] block">Emergency</span>
+            <p className="text-2xl font-extrabold text-red-700 mt-1">{stats.emergency}</p>
+            <span className="text-[10px] text-red-600 font-semibold">High priority</span>
           </div>
-          <p className="text-2xl font-bold text-emerald-300">{stats.leave}</p>
-          <span className="text-[10px] text-slate-500">Holiday requests</span>
+          <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="glass-panel p-4 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium">Resume</span>
-            <FileText className="w-4 h-4 text-blue-400" />
+        <div className="glass-card p-5 rounded-2xl border border-[#D8D1BC] flex items-center justify-between shadow-xs">
+          <div>
+            <span className="text-xs font-bold text-[#6F725F] block">Pending Review</span>
+            <p className="text-2xl font-extrabold text-[#3F4D2A] mt-1">{stats.pending || 0}</p>
+            <span className="text-[10px] text-[#667A45] font-semibold">Awaiting confirm</span>
           </div>
-          <p className="text-2xl font-bold text-blue-400">{stats.resume}</p>
-          <span className="text-[10px] text-slate-500">Job applications</span>
+          <div className="w-10 h-10 rounded-xl bg-[#667A45]/15 border border-[#879B62]/40 flex items-center justify-center text-[#667A45]">
+            <CheckCircle className="w-5 h-5" />
+          </div>
         </div>
 
-        <div className="glass-panel p-4 rounded-xl border border-slate-800">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-medium">Official</span>
-            <Briefcase className="w-4 h-4 text-purple-400" />
-          </div>
-          <p className="text-2xl font-bold text-purple-400">{stats.official}</p>
-          <span className="text-[10px] text-slate-500">Client updates</span>
-        </div>
       </div>
 
-      {/* Real-Time Email Activity & Recent Emails System */}
-      <div className="glass-panel p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+      {/* Real-Time Email Activity Section */}
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6">
+        
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#D8D1BC] pb-4">
           <div>
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              <Mail className="w-5 h-5 text-indigo-400" />
-              Real-Time Email Activity
+            <h3 className="text-xl font-extrabold text-[#28321D] flex items-center gap-2">
+              <Mail className="w-5 h-5 text-[#667A45]" />
+              Recent Emails Activity
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">Live status tracking & activity log across all 8 supported categories</p>
+            <p className="text-xs text-[#6F725F] mt-0.5">Live status tracking & email log across all situations</p>
           </div>
 
           {/* Search & Status Filters */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative w-full sm:w-60">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+              <Search className="w-3.5 h-3.5 text-[#6F725F] absolute left-3 top-3" />
               <input
                 type="text"
                 placeholder="Search recipient, subject..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 rounded-xl glass-input text-xs text-white"
+                className="w-full pl-8 pr-3 py-2 rounded-xl glass-input text-xs text-[#28321D]"
               />
             </div>
 
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-2 rounded-xl glass-input text-xs text-slate-200 font-semibold"
+              className="px-3 py-2 rounded-xl glass-input text-xs text-[#28321D] font-bold"
             >
               {STATUS_FILTERS.map(st => (
                 <option key={st} value={st}>Status: {st}</option>
@@ -357,7 +355,7 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
 
             <button
               onClick={onViewHistory}
-              className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors ml-auto"
+              className="text-xs font-bold text-[#667A45] hover:text-[#3F4D2A] flex items-center gap-1 transition-colors ml-auto cursor-pointer"
             >
               All History <ArrowRight className="w-3.5 h-3.5" />
             </button>
@@ -370,10 +368,10 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat.id
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'bg-slate-800/60 text-slate-400 hover:bg-slate-700/60 hover:text-slate-200'
+                  ? 'bg-[#667A45] text-[#FAF8F1] shadow-xs'
+                  : 'bg-[#FAF8F1] text-[#3F4D2A] border border-[#D8D1BC] hover:bg-[#E8DFC8]'
               }`}
             >
               {cat.label}
@@ -381,17 +379,17 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
           ))}
         </div>
 
-        {/* Email Cards Grid */}
+        {/* Recent Email Cards Grid */}
         {loading ? (
-          <div className="text-center py-12 text-slate-500 animate-pulse">
-            <RefreshCw className="w-8 h-8 mx-auto mb-2 animate-spin text-indigo-400" />
-            <p className="text-xs font-medium">Syncing email status from server...</p>
+          <div className="text-center py-12 text-[#6F725F]">
+            <RefreshCw className="w-7 h-7 mx-auto mb-2 animate-spin text-[#667A45]" />
+            <p className="text-xs font-semibold">Syncing email status from server...</p>
           </div>
         ) : recentEmails.length === 0 ? (
-          <div className="text-center py-12 text-slate-500">
-            <Mail className="w-10 h-10 mx-auto mb-2 opacity-40 text-slate-400" />
-            <p className="text-sm font-semibold text-slate-300">No email activity matching your filter.</p>
-            <p className="text-xs text-slate-500 mt-1">Compose a new email or change category/status filter.</p>
+          <div className="text-center py-12 text-[#6F725F]">
+            <Mail className="w-10 h-10 mx-auto mb-2 opacity-50 text-[#879B62]" />
+            <p className="text-sm font-bold text-[#28321D]">No email activity matching your filter.</p>
+            <p className="text-xs text-[#6F725F] mt-1">Compose a new email or change category/status filter.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -399,77 +397,28 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
               <div
                 key={email.id}
                 onClick={() => setDetailModalEmail(email)}
-                className="p-5 rounded-2xl glass-card flex flex-col justify-between gap-4 border border-slate-800/80 hover:border-indigo-500/40 transition-all cursor-pointer group shadow-lg"
+                className="glass-card p-5 rounded-2xl space-y-3 cursor-pointer hover:scale-[1.01] transition-all flex flex-col justify-between border border-[#D8D1BC]"
               >
-                <div className="space-y-2 min-w-0">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${getCategoryBadgeClass(email.situation || email.category)}`}>
-                        {email.situation || email.category}
-                      </span>
-                      <span className="text-[10px] font-bold text-slate-300">
-                        {email.priority === 'High' ? '🔴 High' : email.priority === 'Medium' ? '🟡 Medium' : '🟢 Normal'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-1">
-                    <span className="text-[11px] font-mono text-indigo-300 block font-semibold truncate">
-                      To: {email.recipient}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${getCategoryBadgeClass(email.situation || email.category)}`}>
+                      {email.situation || email.category || '💼 Official'}
                     </span>
-                    {(email.cc || email.bcc) && (
-                      <span className="text-[10px] font-mono text-slate-500 block truncate">
-                        {email.cc && `CC: ${email.cc}`} {email.bcc && `BCC: ${email.bcc}`}
-                      </span>
-                    )}
+                    {renderStatusBadge(email.status, email.errorMessage)}
                   </div>
 
-                  <h4 className="text-sm font-bold text-slate-100 truncate group-hover:text-indigo-300 transition-colors">
+                  <h4 className="text-sm font-bold text-[#28321D] line-clamp-1">
                     {email.subject}
                   </h4>
-                  <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed font-sans">
-                    {email.body}
-                  </p>
 
-                  {email.errorMessage && (
-                    <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-[11px] flex items-center justify-between gap-2 mt-2">
-                      <span className="truncate">{email.errorMessage}</span>
-                      <button
-                        onClick={(e) => handleRetryEmail(e, email)}
-                        disabled={retryingId === email.id}
-                        className="px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] shrink-0 flex items-center gap-1 shadow"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${retryingId === email.id ? 'animate-spin' : ''}`} />
-                        Retry
-                      </button>
-                    </div>
-                  )}
+                  <p className="text-xs text-[#6F725F]">
+                    To: <span className="font-semibold text-[#3F4D2A]">{email.recipient}</span>
+                  </p>
                 </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-slate-800/60 text-xs">
-                  <span className="text-[10px] text-slate-500">
-                    {new Date(email.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    {email.status === 'Failed' && (
-                      <button
-                        onClick={(e) => handleRetryEmail(e, email)}
-                        disabled={retryingId === email.id}
-                        className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-semibold hover:bg-amber-500/30 flex items-center gap-1"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${retryingId === email.id ? 'animate-spin' : ''}`} /> Retry
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => handleDeleteEmail(e, email.id)}
-                      disabled={deletingId === email.id}
-                      className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                      title="Delete email record"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                <div className="pt-3 border-t border-[#D8D1BC] flex items-center justify-between text-[11px] text-[#6F725F]">
+                  <span className="font-semibold text-[#3F4D2A]">Priority: {email.priority || 'High'}</span>
+                  <span>{new Date(email.createdAt).toLocaleDateString()}</span>
                 </div>
               </div>
             ))}
@@ -477,109 +426,58 @@ export function Dashboard({ onStartCompose, onViewHistory }) {
         )}
       </div>
 
-      {/* FULL EMAIL DETAILS MODAL */}
+      {/* Email Detail Modal */}
       {detailModalEmail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="glass-panel max-w-2xl w-full p-6 sm:p-8 rounded-2xl border border-indigo-500/30 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <span className={`text-xs font-bold px-3 py-1 rounded-full ${getCategoryBadgeClass(detailModalEmail.category)}`}>
-                  {detailModalEmail.category}
+        <div className="fixed inset-0 z-50 bg-[#28321D]/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel max-w-2xl w-full p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6 max-h-[90vh] overflow-y-auto animate-fadeIn shadow-2xl">
+            <div className="flex items-start justify-between border-b border-[#D8D1BC] pb-4">
+              <div>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${getCategoryBadgeClass(detailModalEmail.situation || detailModalEmail.category)}`}>
+                  {detailModalEmail.situation || detailModalEmail.category}
                 </span>
-                {renderStatusBadge(detailModalEmail.status, detailModalEmail.errorMessage)}
+                <h3 className="text-lg font-bold text-[#28321D] mt-2">
+                  {detailModalEmail.subject}
+                </h3>
               </div>
-
               <button
                 onClick={() => setDetailModalEmail(null)}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                className="p-1 rounded-lg text-[#6F725F] hover:text-[#28321D] hover:bg-[#E8DFC8] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
-              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">To:</span>
-                  <span className="text-indigo-300 font-mono font-semibold">{detailModalEmail.recipient}</span>
-                </div>
-                {detailModalEmail.cc && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 font-medium">CC:</span>
-                    <span className="text-slate-300 font-mono">{detailModalEmail.cc}</span>
-                  </div>
-                )}
-                {detailModalEmail.bcc && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 font-medium">BCC:</span>
-                    <span className="text-slate-300 font-mono">{detailModalEmail.bcc}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">Date & Time:</span>
-                  <span className="text-slate-300">{new Date(detailModalEmail.createdAt).toLocaleString()}</span>
-                </div>
-                {detailModalEmail.sentAt && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 font-medium">Gmail Sent Timestamp:</span>
-                    <span className="text-emerald-400 font-mono">{new Date(detailModalEmail.sentAt).toLocaleString()}</span>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <span className="text-slate-500 font-medium block mb-1">Subject Line:</span>
-                <h3 className="text-sm font-bold text-white bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-                  {detailModalEmail.subject}
-                </h3>
-              </div>
-
-              <div>
-                <span className="text-slate-500 font-medium block mb-1">Email Body Prose:</span>
-                <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800 whitespace-pre-wrap text-slate-200 text-xs leading-relaxed min-h-[140px]">
-                  {detailModalEmail.body}
-                </div>
-              </div>
-
-              {detailModalEmail.errorMessage && (
-                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs space-y-2">
-                  <span className="font-bold flex items-center gap-1 text-red-400">
-                    <AlertCircle className="w-4 h-4" /> Failure Details:
-                  </span>
-                  <p>{detailModalEmail.errorMessage}</p>
-                </div>
-              )}
+            <div className="space-y-3 text-xs text-[#3F4D2A]">
+              <p><strong>To:</strong> {detailModalEmail.recipient}</p>
+              {detailModalEmail.cc && <p><strong>CC:</strong> {detailModalEmail.cc}</p>}
+              {detailModalEmail.bcc && <p><strong>BCC:</strong> {detailModalEmail.bcc}</p>}
+              <p><strong>Priority:</strong> {detailModalEmail.priority || 'Normal'}</p>
+              <p><strong>Tone:</strong> {detailModalEmail.tone || 'Professional'}</p>
+              <p><strong>Sent Date:</strong> {new Date(detailModalEmail.createdAt).toLocaleString()}</p>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
-              {detailModalEmail.status === 'Failed' ? (
+            <div className="p-4 rounded-2xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs text-[#28321D] whitespace-pre-wrap font-sans leading-relaxed">
+              {detailModalEmail.body}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              {detailModalEmail.status === 'Failed' && (
                 <button
                   onClick={(e) => handleRetryEmail(e, detailModalEmail)}
-                  disabled={retryingId === detailModalEmail.id}
-                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30"
+                  className="px-4 py-2 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-1.5 cursor-pointer"
                 >
-                  <RefreshCw className={`w-4 h-4 ${retryingId === detailModalEmail.id ? 'animate-spin' : ''}`} />
-                  Retry Sending Now
+                  <RefreshCw className="w-4 h-4" />
+                  Retry Email
                 </button>
-              ) : (
-                <div></div>
               )}
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={(e) => handleDeleteEmail(e, detailModalEmail.id)}
-                  className="px-4 py-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 text-xs font-semibold"
-                >
-                  Delete Record
-                </button>
-
-                <button
-                  onClick={() => setDetailModalEmail(null)}
-                  className="px-6 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold"
-                >
-                  Close
-                </button>
-              </div>
+              <button
+                onClick={(e) => handleDeleteEmail(e, detailModalEmail.id)}
+                className="px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                Move to Trash
+              </button>
             </div>
           </div>
         </div>

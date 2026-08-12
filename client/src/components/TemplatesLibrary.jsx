@@ -2,103 +2,110 @@ import React, { useState, useEffect } from 'react';
 import { Layout, Sparkles, ArrowRight, Calendar, FileText, Briefcase, Heart, AlertTriangle, RefreshCw } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
+const CANNED_TEMPLATES_LIST = [
+  { id: '1', title: 'Emergency Leave', category: 'Emergency', situation: '🚨 Emergency', tone: 'Urgent', defaultInstruction: 'I need emergency leave this afternoon due to an urgent personal appointment.' },
+  { id: '2', title: 'Sick Leave', category: 'Leave', situation: '📅 Leave / Holiday', tone: 'Professional', defaultInstruction: 'I am taking sick leave today as I am unwell and unable to work.' },
+  { id: '3', title: 'Casual Leave', category: 'Leave', situation: '📅 Leave / Holiday', tone: 'Professional', defaultInstruction: 'I would like to request casual leave for 2 days next week for personal work.' },
+  { id: '4', title: 'Vacation Leave', category: 'Leave', situation: '📅 Leave / Holiday', tone: 'Friendly', defaultInstruction: 'Requesting annual vacation leave for 5 business days.' },
+  { id: '5', title: 'Resume Submission', category: 'Resume', situation: '📄 Resume / Job Application', tone: 'Formal', defaultInstruction: 'Submitting my resume for the open Senior Developer position.' },
+  { id: '6', title: 'Job Application', category: 'Resume', situation: '📄 Resume / Job Application', tone: 'Formal', defaultInstruction: 'Applying for the Software Engineer role with attached resume and portfolio.' },
+  { id: '7', title: 'Internship Application', category: 'Resume', situation: '📄 Resume / Job Application', tone: 'Formal', defaultInstruction: 'Expressing interest in the Summer Technical Internship Program.' },
+  { id: '8', title: 'Project Update', category: 'Official', situation: '💼 Official / Professional', tone: 'Professional', defaultInstruction: 'Providing weekly status report and milestone update for the project.' },
+  { id: '9', title: 'Meeting Request', category: 'Official', situation: '💼 Official / Professional', tone: 'Professional', defaultInstruction: 'Requesting a 30-minute sync meeting to discuss project timeline.' },
+  { id: '10', title: 'Client Communication', category: 'Official', situation: '💼 Official / Professional', tone: 'Professional', defaultInstruction: 'Sending product proposal and technical specifications to client.' },
+  { id: '11', title: 'Follow-up Email', category: 'Follow-up', situation: '🔄 Follow-up', tone: 'Professional', defaultInstruction: 'Following up on our previous discussion regarding contract approval.' },
+  { id: '12', title: 'Payment Reminder', category: 'Official', situation: '💼 Official / Professional', tone: 'Formal', defaultInstruction: 'Friendly reminder regarding pending invoice payment.' },
+  { id: '13', title: 'Complaint Letter', category: 'Official', situation: '💼 Official / Professional', tone: 'Formal', defaultInstruction: 'Formally raising an issue regarding delayed service delivery.' },
+  { id: '14', title: 'Apology Email', category: 'Official', situation: '💼 Official / Professional', tone: 'Respectful', defaultInstruction: 'Sincere apology for the unexpected delay in project submission.' },
+  { id: '15', title: 'Thank You Note', category: 'Casual', situation: '💬 Casual', tone: 'Warm', defaultInstruction: 'Expressing gratitude for support during the recent product release.' },
+  { id: '16', title: 'Congratulations', category: 'Celebration', situation: '🎉 Celebration', tone: 'Warm', defaultInstruction: 'Congratulating colleague on recent promotion and achievement.' },
+  { id: '17', title: 'Birthday Wishes', category: 'Celebration', situation: '🎉 Celebration', tone: 'Friendly', defaultInstruction: 'Sending warm birthday wishes to team member.' },
+  { id: '18', title: 'Welcome Message', category: 'Casual', situation: '💬 Casual', tone: 'Warm', defaultInstruction: 'Welcoming new team member to the department.' },
+  { id: '19', title: 'Farewell Note', category: 'Casual', situation: '💬 Casual', tone: 'Warm', defaultInstruction: 'Sending farewell message on my last working day with the company.' }
+];
+
 const CATEGORY_TABS = [
-  { id: 'All', label: 'All Templates' },
-  { id: 'Leave/Holiday', label: '🏖️ Leave / Holiday' },
-  { id: 'Resume/Job Application', label: '📄 Resume' },
-  { id: 'Official/Professional', label: '💼 Official' },
-  { id: 'Occasion', label: '🎉 Occasion' },
-  { id: 'Emergency', label: '🚨 Emergency' }
+  'All',
+  'Emergency',
+  'Leave',
+  'Resume',
+  'Official',
+  'Follow-up',
+  'Celebration',
+  'Casual'
 ];
 
 export function TemplatesLibrary({ onSelectTemplate }) {
-  const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState('All');
 
-  useEffect(() => {
-    fetchTemplates();
-  }, []);
-
-  const fetchTemplates = async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch('/api/templates');
-      if (res.ok) setTemplates(await res.json());
-    } catch (err) {
-      console.error('Failed to load templates:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredTemplates = activeTab === 'All'
-    ? templates
-    : templates.filter(t => t.category.includes(activeTab.split('/')[0]));
+  const filtered = selectedCategory === 'All'
+    ? CANNED_TEMPLATES_LIST
+    : CANNED_TEMPLATES_LIST.filter(t => t.category === selectedCategory);
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+      {/* Top Header */}
+      <div className="glass-panel p-6 rounded-3xl border border-[#D8D1BC] space-y-4">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Layout className="w-6 h-6 text-indigo-400" />
-            Email Templates Library
+          <h2 className="text-xl font-extrabold text-[#28321D] flex items-center gap-2">
+            <Layout className="w-5 h-5 text-[#667A45]" />
+            Canned Email Templates Library
           </h2>
-          <p className="text-xs text-slate-400">Predefined template scenarios. AI customizes tone, structure, and details automatically.</p>
+          <p className="text-xs text-[#6F725F] mt-1">
+            19 predefined professional scenarios. Select any template to auto-populate email instructions.
+          </p>
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {CATEGORY_TABS.map(tab => (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {CATEGORY_TABS.map(cat => (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-all ${
-                activeTab === tab.id
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                  : 'bg-slate-800/70 text-slate-400 hover:text-white'
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                selectedCategory === cat
+                  ? 'bg-[#667A45] text-[#FAF8F1] shadow-xs'
+                  : 'bg-[#FAF8F1] text-[#3F4D2A] border border-[#D8D1BC] hover:bg-[#E8DFC8]'
               }`}
             >
-              {tab.label}
+              {cat}
             </button>
           ))}
         </div>
       </div>
 
-      {loading ? (
-        <div className="text-center py-16 text-slate-500">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 opacity-50" />
-          <p className="text-xs">Loading template library...</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredTemplates.map(template => (
-            <div
-              key={template.id}
-              className="glass-panel p-5 rounded-2xl border border-slate-800 hover:border-indigo-500/40 transition-all space-y-3 flex flex-col justify-between"
-            >
-              <div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">
-                  {template.category}
+      {/* Templates Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.map(t => (
+          <div key={t.id} className="glass-card p-5 rounded-2xl border border-[#D8D1BC] space-y-3 flex flex-col justify-between hover:scale-[1.01] transition-all">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#E8DFC8] text-[#3F4D2A] border border-[#D8D1BC]">
+                  {t.situation}
                 </span>
-                <h4 className="text-base font-bold text-white mt-2">{template.title}</h4>
-                <p className="text-xs text-slate-400 italic mt-1 line-clamp-2">"{template.instruction}"</p>
+                <span className="text-[10px] font-semibold text-[#6F725F]">Tone: {t.tone}</span>
               </div>
 
-              <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between">
-                <span className="text-[10px] text-slate-500">AI Personalization</span>
-                <button
-                  onClick={() => onSelectTemplate(template.instruction)}
-                  className="px-3.5 py-1.5 rounded-xl gradient-btn text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 hover:scale-[1.02] transition-transform"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Use Template
-                </button>
+              <h3 className="text-sm font-extrabold text-[#28321D]">
+                {t.title}
+              </h3>
+
+              <div className="p-3 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs text-[#28321D] font-mono leading-relaxed line-clamp-3">
+                "{t.defaultInstruction}"
               </div>
             </div>
-          ))}
-        </div>
-      )}
+
+            <div className="pt-3 border-t border-[#D8D1BC] flex items-center justify-end">
+              <button
+                onClick={() => onSelectTemplate && onSelectTemplate(t.defaultInstruction)}
+                className="px-4 py-2 rounded-xl bg-[#667A45] hover:bg-[#3F4D2A] text-[#FAF8F1] text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              >
+                Use Template <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

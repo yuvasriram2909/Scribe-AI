@@ -5,12 +5,13 @@ import { apiFetch } from '../utils/api';
 const CATEGORIES_FILTER = [
   'All',
   'Emergency',
+  'Important',
+  'Official',
   'Leave',
   'Resume',
-  'Official',
   'Follow-up',
-  'Occasion',
-  'Casual'
+  'Casual',
+  'Celebration'
 ];
 
 export function EmailHistory({ onReuseEmail }) {
@@ -53,7 +54,7 @@ export function EmailHistory({ onReuseEmail }) {
 
   const handleDeleteEmail = async (e, id) => {
     if (e) e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this email record?')) {
+    if (!window.confirm('Are you sure you want to move this email record to trash?')) {
       return;
     }
 
@@ -92,98 +93,52 @@ export function EmailHistory({ onReuseEmail }) {
   const renderStatusBadge = (status, errorMessage) => {
     if (status === 'Sent') {
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-          <CheckCircle className="w-3 h-3 text-emerald-400" />
-          Sent
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#137333] bg-[#E6F4EA] border border-[#A8DADC] px-2.5 py-0.5 rounded-full">
+          <CheckCircle className="w-3 h-3 text-[#667A45]" />
+          ✓ Sent
         </span>
       );
     }
     if (status === 'Failed') {
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded-full" title={errorMessage || 'Sending failed'}>
-          <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full" title={errorMessage || 'Sending failed'}>
+          <AlertCircle className="w-3 h-3 text-red-600 shrink-0" />
           Failed
         </span>
       );
     }
-    if (status === 'Sending') {
-      return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 rounded-full animate-pulse">
-          <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin" />
-          Sending...
-        </span>
-      );
-    }
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full">
-        <Clock className="w-3 h-3 text-slate-400" />
+      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#6F725F] bg-[#F2EBDD] border border-[#D8D1BC] px-2.5 py-0.5 rounded-full">
+        <Clock className="w-3 h-3 text-[#6F725F]" />
         {status || 'Draft'}
       </span>
     );
   };
 
-  const getBadgeClass = (category) => {
-    if (!category) return 'badge-other';
-    if (category.includes('Emergency')) return 'badge-emergency';
-    if (category.includes('Leave')) return 'badge-leave';
-    if (category.includes('Resume')) return 'badge-resume';
-    if (category.includes('Official')) return 'badge-official';
-    if (category.includes('Casual')) return 'badge-casual';
-    return 'badge-other';
-  };
-
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Header & Controls */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <Mail className="w-6 h-6 text-indigo-400" />
-              Sent Email History & Activity
-            </h2>
-            <p className="text-xs text-slate-400">Complete archive of generated and sent messages with real-time status</p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-2 rounded-xl glass-input text-xs text-slate-200 font-semibold"
-            >
-              <option value="All">All Statuses</option>
-              <option value="Sent">Sent</option>
-              <option value="Failed">Failed</option>
-              <option value="Sending">Sending</option>
-            </select>
-
-            {/* Search Box */}
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-              <input
-                type="text"
-                placeholder="Search recipient, subject..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl glass-input text-xs text-white"
-              />
-            </div>
-          </div>
+      {/* Header Bar */}
+      <div className="glass-panel p-6 rounded-3xl border border-[#D8D1BC] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-extrabold text-[#28321D] flex items-center gap-2">
+            <Mail className="w-5 h-5 text-[#667A45]" />
+            Sent Email History
+          </h2>
+          <p className="text-xs text-[#6F725F] mt-1">
+            Complete archive of generated and dispatched Gmail messages
+          </p>
         </div>
 
-        {/* Category Filters */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-2 scrollbar-none">
-          <span className="text-xs font-semibold text-slate-400 mr-1 flex items-center gap-1 shrink-0">
-            <Filter className="w-3.5 h-3.5" /> Category:
-          </span>
-          {CATEGORIES_FILTER.map((cat) => (
+        {/* Filter Badges */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
+          {CATEGORIES_FILTER.map(cat => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                  : 'bg-slate-800/70 text-slate-400 hover:text-white hover:bg-slate-700'
+                  ? 'bg-[#667A45] text-[#FAF8F1] shadow-xs'
+                  : 'bg-[#FAF8F1] text-[#3F4D2A] border border-[#D8D1BC] hover:bg-[#E8DFC8]'
               }`}
             >
               {cat}
@@ -192,179 +147,127 @@ export function EmailHistory({ onReuseEmail }) {
         </div>
       </div>
 
-      {/* Email History Table / List */}
-      <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden">
-        {loading ? (
-          <div className="text-center py-16 text-slate-500">
-            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 opacity-50" />
-            <p className="text-xs">Loading email archive...</p>
-          </div>
-        ) : emails.length === 0 ? (
-          <div className="text-center py-16 text-slate-500">
-            <Mail className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm font-semibold text-slate-400">No emails found</p>
-            <p className="text-xs text-slate-600 mt-1">Try clearing filters or search queries.</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-800/80">
-            {emails.map((email) => (
-              <div
-                key={email.id}
-                className="p-5 hover:bg-slate-800/30 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-              >
-                <div className="space-y-1.5 min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${getBadgeClass(email.category)}`}>
-                      {email.category}
-                    </span>
-                    {renderStatusBadge(email.status, email.errorMessage)}
-                    <span className="text-xs font-mono text-indigo-300 font-semibold">{email.recipient}</span>
-                  </div>
+      {/* Search Input */}
+      <div className="glass-panel p-4 rounded-2xl flex items-center gap-3 border border-[#D8D1BC]">
+        <Search className="w-4 h-4 text-[#667A45] shrink-0" />
+        <input
+          type="text"
+          placeholder="Search emails by recipient, subject, or content..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-transparent text-xs text-[#28321D] focus:outline-none placeholder-[#6F725F]"
+        />
+      </div>
 
-                  <h4 className="text-sm font-bold text-white truncate">{email.subject}</h4>
-                  <p className="text-xs text-slate-400 line-clamp-1">{email.body}</p>
-
-                  {email.errorMessage && (
-                    <p className="text-[11px] text-red-400 font-medium flex items-center gap-1 mt-1">
-                      <AlertCircle className="w-3 h-3" /> Error: {email.errorMessage}
-                    </p>
-                  )}
-
-                  {email.attachments && email.attachments.length > 0 && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-blue-400 pt-1">
-                      <Paperclip className="w-3 h-3" />
-                      <span>{email.attachments.length} Attachment ({email.attachments.map(a => a.filename).join(', ')})</span>
-                    </div>
-                  )}
+      {/* Cards List */}
+      {loading ? (
+        <div className="glass-panel p-12 text-center text-xs text-[#6F725F] rounded-3xl space-y-3 border border-[#D8D1BC]">
+          <RefreshCw className="w-6 h-6 animate-spin text-[#667A45] mx-auto" />
+          <p className="font-semibold">Loading email history...</p>
+        </div>
+      ) : emails.length === 0 ? (
+        <div className="glass-panel p-12 text-center text-xs text-[#6F725F] rounded-3xl space-y-3 border border-[#D8D1BC]">
+          <Mail className="w-8 h-8 text-[#879B62] mx-auto opacity-50" />
+          <p className="font-bold text-[#28321D]">No email history found</p>
+          <p className="text-[#6F725F]">No dispatched emails matching your criteria.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {emails.map(email => (
+            <div
+              key={email.id}
+              onClick={() => setSelectedEmail(email)}
+              className="glass-card p-5 rounded-2xl space-y-3 border border-[#D8D1BC] cursor-pointer hover:scale-[1.01] transition-all flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#3F4D2A] bg-[#E8DFC8] px-2.5 py-0.5 rounded-full border border-[#D8D1BC]">
+                    {email.category || 'Email'}
+                  </span>
+                  {renderStatusBadge(email.status, email.errorMessage)}
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0 sm:self-center">
-                  <span className="text-[10px] text-slate-500 font-mono">
-                    {new Date(email.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                <h3 className="text-sm font-bold text-[#28321D] line-clamp-1">
+                  {email.subject}
+                </h3>
+                <p className="text-xs text-[#6F725F]">
+                  To: <span className="font-semibold text-[#3F4D2A]">{email.recipient}</span>
+                </p>
+              </div>
 
-                  {email.status === 'Failed' && (
-                    <button
-                      onClick={(e) => handleRetryEmail(e, email)}
-                      disabled={retryingId === email.id}
-                      className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold hover:bg-amber-500/30 flex items-center gap-1"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${retryingId === email.id ? 'animate-spin' : ''}`} /> Retry
-                    </button>
-                  )}
+              <div className="pt-3 border-t border-[#D8D1BC] flex items-center justify-between gap-2">
+                <span className="text-[10px] text-[#6F725F]">
+                  {new Date(email.createdAt).toLocaleDateString()}
+                </span>
 
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setSelectedEmail(email)}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-                    title="View Email Details"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedEmail(email);
+                    }}
+                    className="p-1.5 rounded-lg bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] border border-[#D8D1BC] transition-colors cursor-pointer"
+                    title="View Email"
                   >
-                    <Eye className="w-4 h-4" />
+                    <Eye className="w-3.5 h-3.5" />
                   </button>
 
                   <button
                     onClick={(e) => handleDeleteEmail(e, email.id)}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
-                    title="Delete Email"
+                    className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-colors cursor-pointer"
+                    title="Move to Trash"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Email Detail Modal */}
+      {/* Detail Modal */}
       {selectedEmail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="glass-panel max-w-2xl w-full p-6 sm:p-8 rounded-2xl border border-slate-700 space-y-6 shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+        <div className="fixed inset-0 z-50 bg-[#28321D]/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel max-w-2xl w-full p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6 max-h-[90vh] overflow-y-auto animate-fadeIn shadow-2xl">
+            <div className="flex items-start justify-between border-b border-[#D8D1BC] pb-4">
               <div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${getBadgeClass(selectedEmail.category)}`}>
-                    {selectedEmail.category}
-                  </span>
-                  {renderStatusBadge(selectedEmail.status, selectedEmail.errorMessage)}
-                </div>
-                <h3 className="text-xl font-bold text-white mt-2">{selectedEmail.subject}</h3>
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#E8DFC8] text-[#3F4D2A]">
+                  {selectedEmail.category}
+                </span>
+                <h3 className="text-lg font-bold text-[#28321D] mt-2">
+                  {selectedEmail.subject}
+                </h3>
               </div>
               <button
                 onClick={() => setSelectedEmail(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                className="p-1 rounded-lg text-[#6F725F] hover:text-[#28321D] hover:bg-[#E8DFC8] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
-                <div>
-                  <span className="text-slate-500 block">To:</span>
-                  <span className="text-white font-mono font-medium">{selectedEmail.recipient}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Status:</span>
-                  <span className="text-white font-bold">{selectedEmail.status}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Created Date:</span>
-                  <span className="text-slate-300">
-                    {new Date(selectedEmail.createdAt).toLocaleString()}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Gmail Message ID:</span>
-                  <span className="text-indigo-300 font-mono">{selectedEmail.gmailMessageId || 'N/A'}</span>
-                </div>
-              </div>
-
-              <div>
-                <span className="text-slate-400 block font-medium mb-1">Message Body:</span>
-                <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 whitespace-pre-wrap text-slate-200 text-sm leading-relaxed max-h-60 overflow-y-auto">
-                  {selectedEmail.body}
-                </div>
-              </div>
-
-              {selectedEmail.errorMessage && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
-                  <span className="font-bold flex items-center gap-1 text-red-400 mb-1">
-                    <AlertCircle className="w-4 h-4" /> Failure Details:
-                  </span>
-                  <p>{selectedEmail.errorMessage}</p>
-                </div>
-              )}
+            <div className="space-y-3 text-xs text-[#3F4D2A]">
+              <p><strong>To:</strong> {selectedEmail.recipient}</p>
+              {selectedEmail.cc && <p><strong>CC:</strong> {selectedEmail.cc}</p>}
+              {selectedEmail.bcc && <p><strong>BCC:</strong> {selectedEmail.bcc}</p>}
+              <p><strong>Priority:</strong> {selectedEmail.priority || 'Normal'}</p>
+              <p><strong>Tone:</strong> {selectedEmail.tone || 'Professional'}</p>
+              <p><strong>Sent Date:</strong> {new Date(selectedEmail.createdAt).toLocaleString()}</p>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
-              {selectedEmail.status === 'Failed' ? (
-                <button
-                  onClick={(e) => handleRetryEmail(e, selectedEmail)}
-                  disabled={retryingId === selectedEmail.id}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg"
-                >
-                  <RefreshCw className={`w-4 h-4 ${retryingId === selectedEmail.id ? 'animate-spin' : ''}`} />
-                  Retry Sending Now
-                </button>
-              ) : (
-                <div></div>
-              )}
+            <div className="p-4 rounded-2xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs text-[#28321D] whitespace-pre-wrap font-sans leading-relaxed">
+              {selectedEmail.body}
+            </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={(e) => handleDeleteEmail(e, selectedEmail.id)}
-                  className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <Trash2 className="w-4 h-4" /> Delete Record
-                </button>
-
-                <button
-                  onClick={() => setSelectedEmail(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold"
-                >
-                  Close
-                </button>
-              </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={(e) => handleDeleteEmail(e, selectedEmail.id)}
+                className="px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                Move to Trash
+              </button>
             </div>
           </div>
         </div>
