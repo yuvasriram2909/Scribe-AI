@@ -173,10 +173,50 @@ export function SettingsView() {
           </div>
         ) : (
           <div className="space-y-6">
+            <div className="p-6 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-4 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <h4 className="text-base font-extrabold text-white flex items-center justify-center sm:justify-start gap-2">
+                  <Shield className="w-5 h-5 text-indigo-400" />
+                  Connect Real Gmail Account via Google OAuth
+                </h4>
+                <p className="text-xs text-slate-300 mt-1 max-w-xl">
+                  Click the button to sign in securely with your Google account and grant 1-click Gmail sending permissions for real client dispatches.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (authUrl) {
+                    window.location.href = authUrl;
+                    return;
+                  }
+                  try {
+                    const res = await apiFetch('/api/auth/google/url');
+                    const data = await res.json();
+                    if (data && data.url) {
+                      setAuthUrl(data.url);
+                      window.location.href = data.url;
+                    } else {
+                      setShowCredentialsModal(true);
+                      alert('Please enter your Google Client ID & Secret below to connect Google OAuth.');
+                    }
+                  } catch (e) {
+                    setShowCredentialsModal(true);
+                    alert('Please enter your Google Client ID & Secret below to connect Google OAuth.');
+                  }
+                }}
+                className="px-8 py-4 rounded-2xl gradient-btn text-white font-extrabold text-sm inline-flex items-center gap-2.5 shadow-2xl shadow-indigo-500/35 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shrink-0"
+              >
+                <ExternalLink className="w-5 h-5 text-white" />
+                ⚡ Connect Google Account Directly
+              </button>
+            </div>
+
             <div className="p-4 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-indigo-200 space-y-2">
               <p className="font-bold text-white flex items-center gap-1.5">
                 <Shield className="w-4 h-4 text-indigo-400" />
-                How to get your Google OAuth 2.0 Client ID & Secret in 60 seconds:
+                Need your Google OAuth credentials? (60-second setup):
               </p>
               <ol className="list-decimal list-inside space-y-1 text-slate-300">
                 <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-indigo-300 font-bold underline">console.cloud.google.com/apis/credentials</a></li>
