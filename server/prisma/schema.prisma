@@ -115,3 +115,9 @@ model Template {
   sampleText  String
   isDefault   Boolean  @default(true)
 }
+
+model SystemConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @default(now())
+}

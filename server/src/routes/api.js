@@ -251,11 +251,25 @@ router.post('/ai/generate', async (req, res) => {
   }
 });
 
+async function loadOAuthFromConfig() {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    try {
+      const cid = await prisma.systemConfig.findUnique({ where: { key: 'GOOGLE_CLIENT_ID' } });
+      const csec = await prisma.systemConfig.findUnique({ where: { key: 'GOOGLE_CLIENT_SECRET' } });
+      if (cid?.value) process.env.GOOGLE_CLIENT_ID = cid.value;
+      if (csec?.value) process.env.GOOGLE_CLIENT_SECRET = csec.value;
+    } catch (e) {
+      console.warn('SystemConfig lookup warning:', e.message);
+    }
+  }
+}
+
 // ----------------------------------------------------
 // 3. Gmail OAuth & Status Endpoints
 // ----------------------------------------------------
 router.get('/auth/google/url', async (req, res) => {
   try {
+    await loadOAuthFromConfig();
     const user = await getAuthUser(req);
     const timestamp = Date.now();
     const userIdStr = user ? user.id : 'guest';
@@ -293,6 +307,17 @@ router.post('/auth/google/credentials', async (req, res) => {
 
     process.env.GOOGLE_CLIENT_ID = cleanClientId;
     process.env.GOOGLE_CLIENT_SECRET = cleanClientSecret;
+
+    await prisma.systemConfig.upsert({
+      where: { key: 'GOOGLE_CLIENT_ID' },
+      update: { value: cleanClientId },
+      create: { key: 'GOOGLE_CLIENT_ID', value: cleanClientId }
+    });
+    await prisma.systemConfig.upsert({
+      where: { key: 'GOOGLE_CLIENT_SECRET' },
+      update: { value: cleanClientSecret },
+      create: { key: 'GOOGLE_CLIENT_SECRET', value: cleanClientSecret }
+    });
 
     const user = await getAuthUser(req);
     const timestamp = Date.now();

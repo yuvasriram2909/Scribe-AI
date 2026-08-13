@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, CheckCircle, ExternalLink, Save, UserCheck, Check, Lock } from 'lucide-react';
+import { Settings, Shield, CheckCircle, ExternalLink, Save, UserCheck, Check, Lock, X } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
 export function SettingsView() {
@@ -11,6 +11,10 @@ export function SettingsView() {
   });
 
   const [authUrl, setAuthUrl] = useState(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [clientIdInput, setClientIdInput] = useState('');
+  const [clientSecretInput, setClientSecretInput] = useState('');
+  const [savingCreds, setSavingCreds] = useState(false);
 
   // User Signature Form State
   const [signature, setSignature] = useState({
@@ -98,10 +102,34 @@ export function SettingsView() {
         setAuthUrl(data.url);
         window.location.href = data.url;
       } else {
-        alert('Google OAuth service is currently unavailable. Please try again later.');
+        setShowConfigModal(true);
       }
     } catch (e) {
-      alert('Unable to connect to Google OAuth endpoint. Please check your network connection.');
+      setShowConfigModal(true);
+    }
+  };
+
+  const handleSaveOAuthCredentials = async (e) => {
+    e.preventDefault();
+    if (!clientIdInput.trim() || !clientSecretInput.trim()) return;
+    setSavingCreds(true);
+    try {
+      const res = await apiFetch('/api/auth/google/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: clientIdInput.trim(), clientSecret: clientSecretInput.trim() })
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setAuthUrl(data.url);
+        window.location.href = data.url;
+      } else {
+        alert(data.error || 'Failed to initialize Google OAuth.');
+      }
+    } catch (err) {
+      alert('Error connecting to OAuth endpoint: ' + err.message);
+    } finally {
+      setSavingCreds(false);
     }
   };
 
@@ -179,6 +207,70 @@ export function SettingsView() {
           </div>
         )}
       </div>
+
+      {/* Configuration Modal if credentials need initializing */}
+      {showConfigModal && (
+        <div className="fixed inset-0 z-50 bg-[#28321D]/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel max-w-lg w-full p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-5 animate-fadeIn shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#D8D1BC] pb-3">
+              <h3 className="text-sm font-extrabold text-[#28321D] flex items-center gap-2">
+                <Shield className="w-4 h-4 text-[#667A45]" />
+                Initialize Google OAuth Credentials
+              </h3>
+              <button onClick={() => setShowConfigModal(false)} className="text-[#6F725F] hover:text-[#28321D]">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#6F725F]">
+              Enter your Google OAuth Client ID & Secret to activate direct Google Cloud OAuth sign-in.
+            </p>
+
+            <form onSubmit={handleSaveOAuthCredentials} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-[#28321D] block mb-1">Google Client ID</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 123456789-abc.apps.googleusercontent.com"
+                  value={clientIdInput}
+                  onChange={(e) => setClientIdInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#28321D] block mb-1">Google Client Secret</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="e.g. GOCSPX-xxxxxxxxxxxx"
+                  value={clientSecretInput}
+                  onChange={(e) => setClientSecretInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowConfigModal(false)}
+                  className="px-4 py-2 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs font-bold text-[#6F725F]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingCreds}
+                  className="px-6 py-2 rounded-xl gradient-btn text-[#FAF8F1] text-xs font-bold"
+                >
+                  {savingCreds ? 'Saving & Launching...' : '⚡ Save & Launch Google Sign-In'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* 2. User Signature Settings */}
       <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6">
