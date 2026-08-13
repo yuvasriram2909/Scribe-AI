@@ -413,17 +413,29 @@ router.get('/auth/google/callback', async (req, res) => {
 
     // Store tokens strictly for THIS authenticated user
     await prisma.gmailAccount.deleteMany({ where: { userId: user.id } });
-    await prisma.gmailAccount.create({
-      data: {
-        userId: user.id,
-        gmailEmail: authorizedEmail,
-        encryptedAccessToken: tokens.access_token || '',
-        encryptedRefreshToken: tokens.refresh_token || '',
-        status: 'CONNECTED',
-        tokenExpiry: expiryDate,
-        scope: tokens.scope || null
-      }
-    });
+    
+    const baseAccountData = {
+      userId: user.id,
+      gmailEmail: authorizedEmail,
+      encryptedAccessToken: tokens.access_token || '',
+      encryptedRefreshToken: tokens.refresh_token || ''
+    };
+
+    try {
+      await prisma.gmailAccount.create({
+        data: {
+          ...baseAccountData,
+          status: 'CONNECTED',
+          tokenExpiry: expiryDate,
+          scope: tokens.scope || null
+        }
+      });
+    } catch (createErr) {
+      console.warn('Prisma client schema fallback notice:', createErr.message);
+      await prisma.gmailAccount.create({
+        data: baseAccountData
+      });
+    }
 
     res.redirect(`${frontendUrl}?gmail=connected`);
   } catch (err) {
