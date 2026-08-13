@@ -226,6 +226,19 @@ export function SettingsView() {
               Enter your Google OAuth Client ID & Secret to activate direct Google Cloud OAuth sign-in.
             </p>
 
+            <div className="p-3.5 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs text-[#28321D] flex items-center justify-between gap-2">
+              <span className="text-[#6F725F] text-[11px] font-medium">Find your OAuth Credentials:</span>
+              <a
+                href="https://console.cloud.google.com/apis/credentials"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[#667A45] hover:text-[#3F4D2A] font-extrabold text-[11px] underline inline-flex items-center gap-1 shrink-0"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Google Cloud Credentials Console ↗
+              </a>
+            </div>
+
             <form onSubmit={handleSaveOAuthCredentials} className="space-y-3">
               <div>
                 <label className="text-xs font-bold text-[#28321D] block mb-1">Google Client ID</label>
