@@ -239,6 +239,28 @@ export function SettingsView() {
               </a>
             </div>
 
+            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-[#28321D] space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="font-bold text-amber-900 text-[11px]">⚠️ Required Redirect URI for this Client ID:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText('https://scribe-ai-1-5nqu.onrender.com/api/auth/google/callback');
+                    alert('Copied Redirect URI to clipboard!');
+                  }}
+                  className="px-2.5 py-1 rounded bg-[#667A45] hover:bg-[#3F4D2A] text-[#FAF8F1] font-bold text-[10px] cursor-pointer"
+                >
+                  Copy Redirect URI
+                </button>
+              </div>
+              <code className="block p-2 rounded bg-white border border-amber-200 font-mono text-[11px] text-[#28321D] break-all select-all font-bold">
+                https://scribe-ai-1-5nqu.onrender.com/api/auth/google/callback
+              </code>
+              <p className="text-[10px] text-amber-800 leading-tight">
+                Make sure this exact URI is listed under <strong>Authorized redirect URIs</strong> in Google Cloud Console for your Client ID.
+              </p>
+            </div>
+
             <form onSubmit={handleSaveOAuthCredentials} className="space-y-3">
               <div>
                 <label className="text-xs font-bold text-[#28321D] block mb-1">Google Client ID</label>
