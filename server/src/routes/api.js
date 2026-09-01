@@ -21,19 +21,14 @@ import fs from 'fs';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../db.js';
 import { categorizeInstruction, generateEmail } from '../aiService.js';
 import { sendGmailMessage, getAuthUrl, getTokensFromCode, getUserInfo } from '../gmailService.js';
 import { sendLoginSecurityAlert } from '../securityService.js';
 import { sendLoginPushNotification, getVapidPublicKey } from '../pushService.js';
 import { encryptToken, decryptToken } from '../cryptoUtils.js';
 
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = "file:./dev.db";
-}
-
 const router = express.Router();
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'scribe_ai_production_jwt_secret_2026';
 
 // Configure Multer for attachments upload

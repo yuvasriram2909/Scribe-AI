@@ -20,7 +20,10 @@ model User {
   emails            Email[]
   notifications     Notification[]
   signature         UserSignature?
+  templates         Template[]
   pushSubscriptions PushSubscription[]
+
+  @@index([email])
 }
 
 model GmailAccount {
@@ -37,6 +40,8 @@ model GmailAccount {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt @default(now())
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Contact {
@@ -47,6 +52,8 @@ model Contact {
   relationship String   // Client, Manager, HR, Friend, Colleague, Other
   createdAt    DateTime @default(now())
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Email {
@@ -72,6 +79,9 @@ model Email {
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   attachments       Attachment[]
   notifications     Notification[]
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Attachment {
@@ -82,6 +92,8 @@ model Attachment {
   fileType  String
   createdAt DateTime @default(now())
   email     Email    @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@index([emailId])
 }
 
 model Notification {
@@ -95,6 +107,9 @@ model Notification {
   createdAt        DateTime @default(now())
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   email            Email?   @relation(fields: [emailId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([read])
 }
 
 model UserSignature {
@@ -113,11 +128,17 @@ model UserSignature {
 
 model Template {
   id          String   @id @default(uuid())
+  userId      String?
   category    String   // Leave, Resume, Official, Follow-up, Occasion, Emergency
   title       String
   instruction String
   sampleText  String
   isDefault   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([category])
 }
 
 model SystemConfig {
@@ -135,4 +156,6 @@ model PushSubscription {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

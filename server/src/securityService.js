@@ -1,7 +1,5 @@
 import nodemailer from 'nodemailer';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from './db.js';
 
 /**
  * Creates an SMTP transport for transactional security mailings

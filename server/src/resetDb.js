@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from './db.js';
 
 async function resetDb() {
   console.log('Clearing all dummy seed data from database...');
