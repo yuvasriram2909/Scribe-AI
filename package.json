@@ -2,19 +2,34 @@
   "name": "ai-smart-email-sender",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "AI-powered Gmail automation web application",
   "scripts": {
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && npm run dev",
     "client": "cd client && npm run dev",
     "db:push": "cd server && npx prisma db push",
     "db:seed": "cd server && node src/seed.js",
-    "build": "cd client && npm run build",
-    "build:server": "cd server && npm install && npx prisma generate && npx prisma db push",
-    "start:server": "cd server && npm start"
+    "build": "cd client && npm install && npm run build",
+    "vercel-build": "cd client && npm install && npm run build && cd ../server && npm install && npx prisma generate",
+    "postinstall": "cd server && npm install && npx prisma generate"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.11.0",
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "googleapis": "^137.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^9.0.5",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "prisma": "^5.22.0"
   }
 }

@@ -86,6 +86,10 @@ export function LoginPage({ onLoginSuccess }) {
           throw new Error(data.error || 'Invalid email or password.');
         }
 
+        if (!data || !data.user || !data.user.email) {
+          throw new Error('Authentication response invalid. Please verify your backend server and database connection.');
+        }
+
         localStorage.setItem('userEmail', data.user.email);
         localStorage.setItem('userName', data.user.name || data.user.email.split('@')[0]);
         if (data.token) {

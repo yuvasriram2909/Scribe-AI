@@ -74,10 +74,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(`🤖 Scribe AI Server active on port ${PORT}`);
-  console.log(`🔗 API Base: http://localhost:${PORT}/api`);
-  console.log(`📦 Database: Supabase PostgreSQL via Prisma`);
-  console.log(`====================================================`);
-});
+export default app;
+
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(`🤖 Scribe AI Server active on port ${PORT}`);
+    console.log(`🔗 API Base: http://localhost:${PORT}/api`);
+    console.log(`📦 Database: Supabase PostgreSQL via Prisma`);
+    console.log(`====================================================`);
+  });
+}
