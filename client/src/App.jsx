@@ -1,3 +1,14 @@
+/**
+ * ============================================================================
+ * Scribe-AI — Main Application Component (App.jsx)
+ * ============================================================================
+ * Core Single-Page Application router and state coordinator:
+ * - Multi-user authentication & session management
+ * - View switching (Dashboard, Compose, History, Contacts, Templates, Settings)
+ * - Real-time notification counters & toast triggers
+ * - Unauthenticated landing page & legal compliance routing
+ */
+
 import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, Mail, Bell, LayoutDashboard, History, Settings, 
@@ -100,7 +111,10 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {}
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userName');
     localStorage.removeItem('authToken');

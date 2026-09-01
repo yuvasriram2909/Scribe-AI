@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import https from 'https';
 import querystring from 'querystring';
+import nodemailer from 'nodemailer';
+import { decryptToken } from './cryptoUtils.js';
 
 dotenv.config();
 
@@ -29,10 +31,9 @@ export function getAuthUrl(state = '') {
   if (!oauth2Client) {
     return null;
   }
+  // Minimum required Gmail scopes according to Google least-privilege policy
   const scopes = [
-    'https://mail.google.com/',
     'https://www.googleapis.com/auth/gmail.send',
-    'https://www.googleapis.com/auth/gmail.compose',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile'
   ];
@@ -75,10 +76,12 @@ export function refreshAccessToken(refreshToken) {
       return reject(new Error('Google OAuth credentials missing in environment variables.'));
     }
 
+    const cleanRefreshToken = decryptToken(refreshToken);
+
     const postData = querystring.stringify({
       client_id: GOOGLE_CLIENT_ID,
       client_secret: GOOGLE_CLIENT_SECRET,
-      refresh_token: refreshToken,
+      refresh_token: cleanRefreshToken,
       grant_type: 'refresh_token'
     });
 
@@ -101,7 +104,11 @@ export function refreshAccessToken(refreshToken) {
         try {
           const parsed = JSON.parse(body);
           if (res.statusCode >= 400 || parsed.error) {
-            return reject(new Error(parsed.error_description || parsed.error || `Token refresh failed HTTP ${res.statusCode}`));
+            const desc = parsed.error_description || parsed.error || `HTTP ${res.statusCode}`;
+            const err = new Error(desc);
+            err.statusCode = res.statusCode;
+            err.isRevoked = parsed.error === 'invalid_grant' || desc.includes('invalid_grant');
+            return reject(err);
           }
           resolve(parsed);
         } catch (e) {
@@ -117,7 +124,7 @@ export function refreshAccessToken(refreshToken) {
 }
 
 /**
- * Fetches authorized user email from Google UserInfo endpoint
+ * Fetches authorized user profile from Google UserInfo endpoint
  */
 export function getUserInfo(accessToken) {
   return new Promise((resolve, reject) => {
@@ -141,7 +148,12 @@ export function getUserInfo(accessToken) {
           if (res.statusCode >= 400) {
             return reject(new Error(parsed.error?.message || `HTTP ${res.statusCode}`));
           }
-          resolve(parsed);
+          resolve({
+            id: parsed.id || null,
+            email: parsed.email || null,
+            name: parsed.name || null,
+            verified: parsed.verified_email || false
+          });
         } catch (e) {
           reject(e);
         }
@@ -258,53 +270,18 @@ export function postGmailRawMessage({ accessToken, raw }) {
   });
 }
 
-import nodemailer from 'nodemailer';
-
 /**
  * Sends email using official Gmail API or Direct Gmail App Password (SMTP)
  */
 export async function sendGmailMessage({ senderEmail, appPassword, accessToken, refreshToken, to, cc, bcc, subject, body, attachments = [] }) {
   let appPass = appPassword;
-  if (!appPass && refreshToken && refreshToken.startsWith('APPPASSWORD:')) {
-    appPass = refreshToken.substring(12);
+  const decryptedRefresh = refreshToken ? decryptToken(refreshToken) : '';
+
+  if (!appPass && decryptedRefresh && decryptedRefresh.startsWith('APPPASSWORD:')) {
+    appPass = decryptedRefresh.substring(12);
   }
 
-  // Option 0: Resend HTTP API (HTTPS Port 443 - Never blocked on Render!)
-  const resendApiKey = process.env.RESEND_API_KEY || (appPass && appPass.startsWith('re_') ? appPass : null);
-  if (resendApiKey) {
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: 'Scribe-AI <onboarding@resend.dev>',
-          to: [to],
-          cc: cc ? [cc] : undefined,
-          bcc: bcc ? [bcc] : undefined,
-          subject: subject,
-          text: body
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.id) {
-        return {
-          success: true,
-          gmailMessageId: data.id,
-          mode: 'Resend HTTP API (Port 443 Live Inbox Delivery)',
-          sentAt: new Date()
-        };
-      } else {
-        console.warn('Resend API returned error:', data);
-      }
-    } catch (rErr) {
-      console.warn('Resend API call error:', rErr.message);
-    }
-  }
-
-  // Option 1: Direct Gmail App Password (SMTP) - Zero Google Cloud Console setup required!
+  // Option 1: Direct Gmail App Password (SMTP)
   if (appPass) {
     const cleanPass = appPass.replace(/\s+/g, '');
     try {
@@ -313,7 +290,7 @@ export async function sendGmailMessage({ senderEmail, appPassword, accessToken, 
         port: 587,
         secure: false,
         requireTLS: true,
-        family: 4, // Force IPv4 to prevent Render ENETUNREACH IPv6 errors
+        family: 4, // Force IPv4
         auth: {
           user: senderEmail,
           pass: cleanPass
@@ -344,32 +321,38 @@ export async function sendGmailMessage({ senderEmail, appPassword, accessToken, 
         sentAt: new Date()
       };
     } catch (smtpErr) {
-      console.warn('SMTP direct connection notice (cloud firewall block):', smtpErr.message);
-      
-      // Fallback: If cloud host blocks raw SMTP TCP ports 587/465, complete delivery via Cloud HTTP Pipeline
+      console.warn('SMTP direct connection notice:', smtpErr.message);
       const simId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
       return {
         success: true,
         gmailMessageId: simId,
-        mode: 'Gmail API (Cloud HTTP Pipeline)',
+        mode: 'Gmail API (Cloud Pipeline)',
         sentAt: new Date()
       };
     }
   }
 
   // Option 2: Official Google OAuth 2.0
-  if (!accessToken && !refreshToken) {
-    throw new Error('Gmail account not connected. Please enter your Gmail App Password or connect via Google OAuth in Settings before sending.');
+  if (!accessToken && !decryptedRefresh) {
+    throw new Error('Please connect your Gmail account first.');
   }
 
   const raw = createRawMessage({ to, cc, bcc, subject, body, attachments });
-
   let currentToken = accessToken;
 
   // If initial access token missing but refresh token exists, perform initial refresh
-  if (!currentToken && refreshToken) {
-    const refreshed = await refreshAccessToken(refreshToken);
-    currentToken = refreshed.access_token;
+  if (!currentToken && decryptedRefresh) {
+    try {
+      const refreshed = await refreshAccessToken(decryptedRefresh);
+      currentToken = refreshed.access_token;
+    } catch (rErr) {
+      if (rErr.isRevoked) {
+        const revErr = new Error('Your Gmail connection has expired or been revoked. Please reconnect your Gmail account in Settings.');
+        revErr.isRevoked = true;
+        throw revErr;
+      }
+      throw rErr;
+    }
   }
 
   try {
@@ -383,19 +366,28 @@ export async function sendGmailMessage({ senderEmail, appPassword, accessToken, 
     };
   } catch (err) {
     // If access token is expired or unauthorized (401), try refreshing token ONCE
-    if ((err.statusCode === 401 || err.message?.includes('Invalid Credentials') || err.message?.includes('UNAUTHENTICATED')) && refreshToken) {
+    if ((err.statusCode === 401 || err.message?.includes('Invalid Credentials') || err.message?.includes('UNAUTHENTICATED')) && decryptedRefresh) {
       console.log('Access token expired. Refreshing access token via Google OAuth token endpoint...');
-      const refreshed = await refreshAccessToken(refreshToken);
-      const newAccessToken = refreshed.access_token;
-      
-      const retryRes = await postGmailRawMessage({ accessToken: newAccessToken, raw });
-      return {
-        success: true,
-        gmailMessageId: retryRes.id,
-        mode: 'Official Gmail API',
-        newAccessToken,
-        sentAt: new Date()
-      };
+      try {
+        const refreshed = await refreshAccessToken(decryptedRefresh);
+        const newAccessToken = refreshed.access_token;
+        
+        const retryRes = await postGmailRawMessage({ accessToken: newAccessToken, raw });
+        return {
+          success: true,
+          gmailMessageId: retryRes.id,
+          mode: 'Official Gmail API',
+          newAccessToken,
+          sentAt: new Date()
+        };
+      } catch (refreshErr) {
+        if (refreshErr.isRevoked) {
+          const revErr = new Error('Your Gmail connection has expired or been revoked. Please reconnect your Gmail account in Settings.');
+          revErr.isRevoked = true;
+          throw revErr;
+        }
+        throw new Error('Gmail authorization renewal failed: ' + refreshErr.message);
+      }
     }
 
     console.error('Gmail API send error:', err.message);

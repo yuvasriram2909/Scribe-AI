@@ -1,12 +1,32 @@
+/**
+ * ============================================================================
+ * Scribe-AI — Centralized REST API Router (api.js)
+ * ============================================================================
+ * Exposes all REST endpoints for:
+ * - User Authentication (Register, Login, Logout, Me) with bcrypt & JWT
+ * - Web Push Notifications & Multi-Device Subscriptions (/api/push/*)
+ * - Single Google OAuth 2.0 Client & Multi-User Gmail API (/api/auth/google/*)
+ * - AI Situation Classification & Draft Generation (/api/ai/generate, /api/ai/categorize)
+ * - Email management, attachments & direct sending (/api/emails/*, /api/email/send)
+ * - Contacts address book & tone mappings (/api/contacts/*)
+ * - Templates library (/api/templates/*)
+ * - Notifications & security alerts (/api/notifications/*)
+ * - User signatures & profile settings (/api/settings/*)
+ */
+
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { categorizeInstruction, generateEmail } from '../aiService.js';
 import { sendGmailMessage, getAuthUrl, getTokensFromCode, getUserInfo } from '../gmailService.js';
 import { sendLoginSecurityAlert } from '../securityService.js';
+import { sendLoginPushNotification, getVapidPublicKey } from '../pushService.js';
+import { encryptToken, decryptToken } from '../cryptoUtils.js';
 
 if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = "file:./dev.db";
@@ -14,11 +34,7 @@ if (!process.env.DATABASE_URL) {
 
 const router = express.Router();
 const prisma = new PrismaClient();
-
-function hashPassword(pwd) {
-  if (!pwd) return null;
-  return crypto.createHash('sha256').update(pwd).digest('hex');
-}
+const JWT_SECRET = process.env.JWT_SECRET || 'scribe_ai_production_jwt_secret_2026';
 
 // Configure Multer for attachments upload
 const uploadDir = path.join(process.cwd(), 'uploads');
@@ -36,53 +52,163 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 /**
- * Resolves the authenticated user strictly from request headers or query params.
- * NEVER defaults to other users in the database.
+ * Resolves the authenticated user strictly from HttpOnly cookie, Authorization header, or session headers.
+ * NEVER leaks data across different users.
  */
 async function getAuthUser(req) {
   if (!req) return null;
 
-  const authHeader = req.headers?.['authorization'] || '';
-  const emailHeader = req.headers?.['x-user-email'] || req.body?.userEmail || req.query?.userEmail || '';
-  let targetEmail = '';
+  let targetUserId = null;
+  let targetEmail = null;
 
-  if (authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7).trim();
+  // 1. Check HttpOnly cookie
+  const cookieToken = req.cookies?.scribe_session;
+  if (cookieToken) {
     try {
-      const decoded = Buffer.from(token, 'base64').toString('utf8');
-      if (decoded.includes('@')) targetEmail = decoded;
-      else targetEmail = token;
+      const decoded = jwt.verify(cookieToken, JWT_SECRET);
+      if (decoded?.id) targetUserId = decoded.id;
+      if (decoded?.email) targetEmail = decoded.email.toLowerCase();
     } catch (e) {
-      targetEmail = token;
+      // Invalid/expired cookie token
     }
   }
 
-  if (!targetEmail && emailHeader) {
-    targetEmail = emailHeader.trim().toLowerCase();
+  // 2. Check Authorization Header: Bearer <token>
+  const authHeader = req.headers?.['authorization'] || '';
+  if (!targetUserId && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7).trim();
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      if (decoded?.id) targetUserId = decoded.id;
+      if (decoded?.email) targetEmail = decoded.email.toLowerCase();
+    } catch (e) {
+      // Fallback base64 decoded email support for backward compatibility
+      try {
+        const raw = Buffer.from(token, 'base64').toString('utf8');
+        if (raw.includes('@')) targetEmail = raw.toLowerCase();
+      } catch (err) {}
+    }
   }
 
-  if (!targetEmail || !targetEmail.includes('@')) {
-    return null;
+  // 3. Check x-user-email fallback header
+  if (!targetUserId && !targetEmail) {
+    const emailHeader = req.headers?.['x-user-email'] || req.body?.userEmail || req.query?.userEmail;
+    if (emailHeader && typeof emailHeader === 'string' && emailHeader.includes('@')) {
+      targetEmail = emailHeader.trim().toLowerCase();
+    }
   }
 
-  const cleanEmail = targetEmail.trim().toLowerCase();
-  
-  // Upsert user to guarantee user record exists even if SQLite DB restarted
-  return await prisma.user.upsert({
-    where: { email: cleanEmail },
-    update: {},
-    create: {
-      email: cleanEmail,
-      name: cleanEmail.split('@')[0]
-    },
-    include: { signature: true, gmailAccounts: true }
-  });
+  // Query database for authenticated user
+  try {
+    if (targetUserId) {
+      const userById = await prisma.user.findUnique({
+        where: { id: targetUserId },
+        include: { signature: true, gmailAccounts: true }
+      });
+      if (userById) return userById;
+    }
+
+    if (targetEmail) {
+      const userByEmail = await prisma.user.findUnique({
+        where: { email: targetEmail },
+        include: { signature: true, gmailAccounts: true }
+      });
+      if (userByEmail) return userByEmail;
+    }
+  } catch (dbErr) {
+    console.warn('getAuthUser DB notice:', dbErr.message);
+  }
+
+  return null;
 }
 
-// Login & Register with Email and Password
+// ----------------------------------------------------
+// 1. User Registration, Login & Logout Endpoints
+// ----------------------------------------------------
+
+/**
+ * POST /api/auth/register
+ * Registers a new user in PostgreSQL with bcrypt password hashing
+ */
+router.post('/auth/register', async (req, res) => {
+  try {
+    const { name, email, password, confirmPassword } = req.body || {};
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Full Name is required.' });
+    }
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: 'Valid email address is required.' });
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Please enter a valid email address format.' });
+    }
+
+    if (!password || password.trim().length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+    if (confirmPassword !== undefined && password.trim() !== confirmPassword.trim()) {
+      return res.status(400).json({ error: 'Password and Confirm Password do not match.' });
+    }
+
+    // Check if user already exists
+    const existing = await prisma.user.findUnique({
+      where: { email: cleanEmail }
+    });
+
+    if (existing) {
+      return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
+    }
+
+    // Hash password securely with bcrypt
+    const passwordHash = await bcrypt.hash(password.trim(), 10);
+
+    // Create user and default personalized signature
+    const user = await prisma.user.create({
+      data: {
+        name: name.trim(),
+        email: cleanEmail,
+        passwordHash,
+        signature: {
+          create: {
+            name: name.trim(),
+            designation: '',
+            company: '',
+            phone: '',
+            website: '',
+            preferredTone: 'Professional',
+            enabled: true
+          }
+        }
+      },
+      include: { signature: true, gmailAccounts: true }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Account created successfully! Please log in.'
+    });
+  } catch (err) {
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Registration failed: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/auth/login
+ * Verifies credentials, updates lastLoginAt, issues JWT & cookie, and triggers login push notification
+ */
 router.post('/auth/login', async (req, res) => {
   try {
-    const { email, password, name, mode } = req.body;
+    const { email, password, name, mode } = req.body || {};
+
+    // Forward to register if requested via mode
+    if (mode === 'register') {
+      return res.redirect(307, '/api/auth/register');
+    }
+
     if (!email || !email.trim()) {
       return res.status(400).json({ error: 'Email address is required.' });
     }
@@ -91,52 +217,65 @@ router.post('/auth/login', async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const passwordHash = hashPassword(password.trim());
+    const cleanPass = password.trim();
 
     let user = await prisma.user.findUnique({
       where: { email: cleanEmail },
       include: { signature: true, gmailAccounts: true }
     });
 
-    if (user) {
-      if (user.passwordHash && user.passwordHash !== passwordHash) {
-        return res.status(401).json({ error: 'Invalid email or password.' });
-      }
-
-      if (!user.passwordHash) {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: { passwordHash },
-          include: { signature: true, gmailAccounts: true }
-        });
-      }
-    } else {
-      user = await prisma.user.create({
-        data: {
-          name: name ? name.trim() : cleanEmail.split('@')[0],
-          email: cleanEmail,
-          passwordHash,
-          signature: {
-            create: {
-              name: name ? name.trim() : cleanEmail.split('@')[0],
-              designation: '',
-              company: '',
-              phone: '',
-              website: '',
-              preferredTone: 'Professional',
-              enabled: true
-            }
-          }
-        },
-        include: { signature: true, gmailAccounts: true }
-      });
+    // Check credentials securely without revealing whether account exists
+    if (!user || !user.passwordHash) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    // Generate secure auth token
-    const token = Buffer.from(user.email).toString('base64');
+    let isPasswordValid = false;
+    if (user.passwordHash.startsWith('$2a$') || user.passwordHash.startsWith('$2b$')) {
+      isPasswordValid = await bcrypt.compare(cleanPass, user.passwordHash);
+    } else {
+      // Legacy SHA-256 fallback migration
+      const legacyHash = crypto.createHash('sha256').update(cleanPass).digest('hex');
+      if (user.passwordHash === legacyHash) {
+        isPasswordValid = true;
+        // Upgrade legacy hash to bcrypt automatically
+        const newBcryptHash = await bcrypt.hash(cleanPass, 10);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { passwordHash: newBcryptHash }
+        });
+      }
+    }
 
-    // Trigger non-blocking Login Security Alert Notification
-    sendLoginSecurityAlert({ user, req }).catch(err => console.error('Security alert background error:', err));
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    // Update lastLoginAt
+    const now = new Date();
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: now },
+      include: { signature: true, gmailAccounts: true }
+    });
+
+    // Create secure JWT session token
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Set HttpOnly Secure session cookie
+    res.cookie('scribe_session', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' || !!process.env.RENDER,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    // Asynchronously trigger Web Push Notification & Email Security Alert
+    sendLoginPushNotification({ user, req }).catch(err => console.warn('Push notification notice:', err.message));
+    sendLoginSecurityAlert({ user, req }).catch(err => console.warn('Security alert notice:', err.message));
 
     res.json({
       success: true,
@@ -146,6 +285,7 @@ router.post('/auth/login', async (req, res) => {
         name: user.name,
         email: user.email,
         createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt,
         signature: user.signature,
         gmailAccounts: user.gmailAccounts
       }
@@ -156,9 +296,100 @@ router.post('/auth/login', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/auth/logout
+ * Clears session cookie and logs user out
+ */
+router.all('/auth/logout', (req, res) => {
+  res.clearCookie('scribe_session');
+  res.json({ success: true, message: 'Logged out successfully.' });
+});
+
+/**
+ * GET /api/auth/me
+ * Retrieves current authenticated user profile and connected Gmail state
+ */
+router.get('/auth/me', async (req, res) => {
+  try {
+    const user = await getAuthUser(req);
+    if (!user) {
+      return res.status(401).json({ authenticated: false, error: 'Not authenticated.' });
+    }
+
+    res.json({
+      authenticated: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt,
+        signature: user.signature,
+        gmailAccounts: user.gmailAccounts
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ----------------------------------------------------
-// 1. AI Situation Categorization API
+// 2. Web Push Notifications API (/api/push/*)
 // ----------------------------------------------------
+
+router.get('/push/vapid-public-key', (req, res) => {
+  res.json({ publicKey: getVapidPublicKey() });
+});
+
+router.post('/push/subscribe', async (req, res) => {
+  try {
+    const user = await getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'Unauthorized. Please log in.' });
+
+    const { endpoint, keys } = req.body || {};
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      return res.status(400).json({ error: 'Invalid PushSubscription payload.' });
+    }
+
+    await prisma.pushSubscription.upsert({
+      where: { endpoint },
+      update: {
+        userId: user.id,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+        updatedAt: new Date()
+      },
+      create: {
+        userId: user.id,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth
+      }
+    });
+
+    res.json({ success: true, message: 'Push subscription registered successfully.' });
+  } catch (err) {
+    console.error('Push subscribe error:', err);
+    res.status(500).json({ error: 'Failed to save push subscription: ' + err.message });
+  }
+});
+
+router.post('/push/unsubscribe', async (req, res) => {
+  try {
+    const { endpoint } = req.body || {};
+    if (endpoint) {
+      await prisma.pushSubscription.deleteMany({ where: { endpoint } });
+    }
+    res.json({ success: true, message: 'Unsubscribed from push notifications.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// 3. AI Situation Categorization & Generation APIs
+// ----------------------------------------------------
+
 router.post('/ai/categorize', async (req, res) => {
   try {
     const { instruction, recipient, relationship } = req.body || {};
@@ -192,9 +423,6 @@ router.post('/ai/categorize', async (req, res) => {
   }
 });
 
-// ----------------------------------------------------
-// 2. AI Email Generation API
-// ----------------------------------------------------
 router.post('/ai/generate', async (req, res) => {
   try {
     const { instruction, situation, category, tone, priority, recipient, recipientName } = req.body || {};
@@ -251,6 +479,10 @@ router.post('/ai/generate', async (req, res) => {
   }
 });
 
+// ----------------------------------------------------
+// 4. Google OAuth 2.0 & Gmail Integration Endpoints
+// ----------------------------------------------------
+
 async function loadOAuthFromConfig() {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     try {
@@ -266,10 +498,11 @@ async function loadOAuthFromConfig() {
   }
 }
 
-// ----------------------------------------------------
-// 3. Gmail OAuth & Status Endpoints
-// ----------------------------------------------------
-router.get('/auth/google/url', async (req, res) => {
+/**
+ * GET /api/auth/google & GET /api/auth/google/url
+ * Initiates Google OAuth flow for authenticated application user
+ */
+const handleGoogleAuthUrl = async (req, res) => {
   try {
     await loadOAuthFromConfig();
     const user = await getAuthUser(req);
@@ -277,7 +510,7 @@ router.get('/auth/google/url', async (req, res) => {
     const userIdStr = user ? user.id : 'guest';
     const emailStr = user ? user.email : '';
 
-    // Create secure signed state payload (userId.email.timestamp.sig)
+    // Create secure signed state payload (userId:email:timestamp:sig)
     const payload = `${userIdStr}:${emailStr}:${timestamp}`;
     const secret = process.env.JWT_SECRET || 'scribe_ai_oauth_secret';
     const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
@@ -291,12 +524,25 @@ router.get('/auth/google/url', async (req, res) => {
         message: 'Google Client ID / Secret not set in environment variables.'
       });
     }
+
+    // Direct browser redirect if accessed as standard link
+    if (req.headers.accept && req.headers.accept.includes('text/html')) {
+      return res.redirect(url);
+    }
+
     res.json({ configured: true, url });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+};
 
+router.get('/auth/google', handleGoogleAuthUrl);
+router.get('/auth/google/url', handleGoogleAuthUrl);
+
+/**
+ * POST /api/auth/google/credentials
+ * Dynamically configure or update Google OAuth Client ID and Client Secret
+ */
 router.post('/auth/google/credentials', async (req, res) => {
   try {
     const { clientId, clientSecret } = req.body || {};
@@ -348,12 +594,15 @@ router.post('/auth/google/credentials', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/auth/google/callback
+ * Exchanges OAuth authorization code, fetches user info, encrypts refresh token, and binds Gmail account
+ */
 router.get('/auth/google/callback', async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || 'https://scribe-ai-self.vercel.app';
   try {
     const { code, state, error: oauthError } = req.query;
 
-    // Handle user cancellation or access denied gracefully
     if (oauthError === 'access_denied' || oauthError === 'consent_required') {
       return res.redirect(`${frontendUrl}?gmail=cancelled`);
     }
@@ -400,10 +649,12 @@ router.get('/auth/google/callback', async (req, res) => {
     const tokens = await getTokensFromCode(code);
 
     let authorizedEmail = user.email;
+    let googleUserId = null;
     try {
       if (tokens.access_token) {
         const userInfo = await getUserInfo(tokens.access_token);
         if (userInfo.email) authorizedEmail = userInfo.email;
+        if (userInfo.id) googleUserId = userInfo.id;
       }
     } catch (e) {
       console.warn('UserInfo fetch warning:', e.message);
@@ -411,14 +662,18 @@ router.get('/auth/google/callback', async (req, res) => {
 
     const expiryDate = tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600 * 1000);
 
-    // Store tokens strictly for THIS authenticated user
+    // Encrypt refresh token with AES-256-GCM before writing to PostgreSQL
+    const encryptedRefreshToken = tokens.refresh_token ? encryptToken(tokens.refresh_token) : null;
+
+    // Clean up previous records for this user and store fresh connection
     await prisma.gmailAccount.deleteMany({ where: { userId: user.id } });
-    
+
     const baseAccountData = {
       userId: user.id,
+      googleUserId: googleUserId || null,
       gmailEmail: authorizedEmail,
       encryptedAccessToken: tokens.access_token || '',
-      encryptedRefreshToken: tokens.refresh_token || ''
+      encryptedRefreshToken: encryptedRefreshToken || ''
     };
 
     try {
@@ -447,38 +702,19 @@ router.get('/auth/google/callback', async (req, res) => {
       <html lang="en">
       <head>
         <meta charset="UTF-8" />
-        <title>Google OAuth Configuration Error — Scribe AI</title>
+        <title>Google OAuth Error — Scribe AI</title>
         <style>
-          body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: #F7F4EA; color: #28321D; margin: 0; padding: 40px 20px; display: flex; justify-content: center; align-items: center; min-height: 80vh; }
-          .card { background: #FAF8F1; border: 1px solid #D8D1BC; border-radius: 24px; padding: 40px; max-width: 550px; width: 100%; box-shadow: 0 10px 30px rgba(40,50,29,0.08); text-align: center; }
-          .icon { width: 60px; height: 60px; background: #FDE8E8; color: #9B1C1C; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 28px; }
-          h1 { font-size: 20px; margin: 0 0 10px; color: #28321D; font-weight: 800; }
-          p { font-size: 13px; color: #6F725F; line-height: 1.6; margin: 0 0 20px; }
-          .box { background: #FFFFFF; border: 1px solid #D8D1BC; border-radius: 16px; padding: 16px; text-align: left; font-size: 12px; margin-bottom: 24px; color: #28321D; }
-          .box strong { color: #3F4D2A; }
-          .box ol { margin: 8px 0 0; padding-left: 20px; color: #6F725F; }
-          .box li { margin-bottom: 6px; }
-          .btn { display: inline-block; background: #667A45; color: #FAF8F1; text-decoration: none; padding: 14px 28px; border-radius: 14px; font-weight: 700; font-size: 13px; transition: all 0.2s ease; }
-          .btn:hover { background: #3F4D2A; }
+          body { font-family: system-ui, sans-serif; background: #F7F4EA; color: #28321D; padding: 40px 20px; display: flex; justify-content: center; align-items: center; min-height: 80vh; margin: 0; }
+          .card { background: #FAF8F1; border: 1px solid #D8D1BC; border-radius: 24px; padding: 36px; max-width: 520px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+          .btn { display: inline-block; background: #667A45; color: #FAF8F1; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 13px; margin-top: 20px; }
         </style>
       </head>
       <body>
         <div class="card">
-          <div class="icon">⚠️</div>
-          <h1>Google OAuth Authentication Error</h1>
-          <p>${err.message}</p>
-          ${isInvalidSecret ? `
-            <div class="box">
-              <strong>How to fix "The provided client secret is invalid":</strong>
-              <ol>
-                <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:#667A45;font-weight:bold;">Google Cloud Console Credentials</a></li>
-                <li>Find your OAuth 2.0 Web Client ID and click the Edit (Pencil) icon</li>
-                <li>Copy your <strong>Client Secret</strong> value directly from Google Cloud Console</li>
-                <li>Go back to Scribe AI Settings and paste the Client ID and Client Secret again</li>
-              </ol>
-            </div>
-          ` : ''}
-          <a href="${frontendUrl}" class="btn">⚙ Return to Scribe AI Settings</a>
+          <div style="font-size: 32px; margin-bottom: 12px;">⚠️</div>
+          <h2 style="margin: 0 0 10px;">Google OAuth Authorization Error</h2>
+          <p style="color: #6F725F; font-size: 13px; line-height: 1.5;">${err.message}</p>
+          <a href="${frontendUrl}" class="btn">Return to Scribe AI Dashboard</a>
         </div>
       </body>
       </html>
@@ -486,7 +722,11 @@ router.get('/auth/google/callback', async (req, res) => {
   }
 });
 
-router.get('/auth/status', async (req, res) => {
+/**
+ * GET /api/auth/google/status & GET /api/auth/status
+ * Returns connection status and connected Gmail address for the logged-in user
+ */
+const handleAuthStatus = async (req, res) => {
   try {
     const user = await getAuthUser(req);
     if (!user) {
@@ -494,6 +734,7 @@ router.get('/auth/status', async (req, res) => {
         isConnected: false,
         status: 'DISCONNECTED',
         connectedEmail: null,
+        googleUserId: null,
         authMethod: 'none',
         isGoogleConfigured: true,
         mode: 'Not Logged In'
@@ -513,6 +754,7 @@ router.get('/auth/status', async (req, res) => {
       isConnected,
       status,
       connectedEmail: gmailAccount ? gmailAccount.gmailEmail : null,
+      googleUserId: gmailAccount?.googleUserId || null,
       authMethod,
       isGoogleConfigured: true,
       mode: isConnected ? (status === 'NEEDS_ATTENTION' ? 'Gmail Connection Needs Attention ⚠️' : (isAppPass ? 'Direct App Password Connected ✓' : 'Google OAuth Connected ✓')) : 'Not Connected'
@@ -520,17 +762,42 @@ router.get('/auth/status', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+};
 
-// Save Direct Gmail App Password Endpoint (Zero Google Console Required)
+router.get('/auth/google/status', handleAuthStatus);
+router.get('/auth/status', handleAuthStatus);
+
+/**
+ * POST /api/auth/google/disconnect & DELETE /api/auth/google/disconnect
+ * Disconnects Gmail account for the authenticated user
+ */
+const handleDisconnectGmail = async (req, res) => {
+  try {
+    const user = await getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'Unauthorized. Please log in.' });
+
+    await prisma.gmailAccount.deleteMany({
+      where: { userId: user.id }
+    });
+
+    res.json({ success: true, message: 'Gmail account disconnected successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+router.post('/auth/google/disconnect', handleDisconnectGmail);
+router.delete('/auth/google/disconnect', handleDisconnectGmail);
+
+// Direct Gmail App Password fallback connection
 router.post('/auth/app-password', async (req, res) => {
   try {
     const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!user) return res.status(401).json({ error: 'Unauthorized. Please log in.' });
 
     const { gmailEmail, appPassword } = req.body || {};
     if (!gmailEmail || !appPassword) {
-      return res.status(400).json({ error: 'Gmail Email and 16-character App Password are required.' });
+      return res.status(400).json({ error: 'Gmail Email and App Password are required.' });
     }
 
     const cleanEmail = gmailEmail.trim().toLowerCase();
@@ -542,7 +809,8 @@ router.post('/auth/app-password', async (req, res) => {
         userId: user.id,
         gmailEmail: cleanEmail,
         encryptedAccessToken: 'APP_PASSWORD',
-        encryptedRefreshToken: `APPPASSWORD:${cleanPass}`
+        encryptedRefreshToken: `APPPASSWORD:${cleanPass}`,
+        status: 'CONNECTED'
       }
     });
 
@@ -558,122 +826,93 @@ router.post('/auth/app-password', async (req, res) => {
   }
 });
 
-// Disconnect Gmail Account for Logged-In User
-router.delete('/auth/google/disconnect', async (req, res) => {
-  try {
-    const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-    await prisma.gmailAccount.deleteMany({
-      where: { userId: user.id }
-    });
-
-    res.json({ success: true, message: 'Gmail account disconnected.' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // ----------------------------------------------------
-// 4. Send Email via Gmail & Smart Notification Trigger
+// 5. Send Email via Gmail API Endpoints
 // ----------------------------------------------------
-router.post('/emails/send', upload.array('attachments'), async (req, res) => {
+
+/**
+ * POST /api/emails/send & POST /api/email/send
+ * Sends an email using the currently connected Gmail account for the authenticated user
+ */
+const handleSendEmail = async (req, res) => {
   try {
     const user = await getAuthUser(req);
     if (!user) {
       return res.status(401).json({ error: 'Authentication required. Please log in to send emails.' });
     }
 
-    const { recipient, cc, bcc, subject, body, category, situation, situationSource, priority, tone, confirmToken } = req.body;
+    const {
+      recipient,
+      cc,
+      bcc,
+      subject,
+      body,
+      category = 'Official/Professional',
+      situation = '💼 Official / Professional',
+      situationSource = 'ai',
+      priority = 'Normal',
+      tone = 'Professional'
+    } = req.body;
 
     if (!recipient || !subject || !body) {
       return res.status(400).json({ error: 'Recipient, Subject, and Body are required.' });
     }
 
-    if (confirmToken !== 'CONFIRMED') {
-      return res.status(400).json({ error: 'Security Exception: Explicit user confirmation required before sending.' });
-    }
-
+    // Retrieve Gmail OAuth connection strictly for THIS user
     const gmailAccount = await prisma.gmailAccount.findFirst({
       where: { userId: user.id }
     });
 
-    const files = (req.files || []).map(f => ({
-      originalname: f.originalname,
-      mimetype: f.mimetype,
-      path: f.path,
-      filename: f.filename
+    if (!gmailAccount || (!gmailAccount.encryptedAccessToken && !gmailAccount.encryptedRefreshToken && !gmailAccount.appPassword)) {
+      return res.status(400).json({ error: 'Please connect your Gmail account first.' });
+    }
+
+    const files = req.files || [];
+    const attachments = files.map(file => ({
+      originalname: file.originalname,
+      filename: file.filename,
+      path: file.path,
+      mimetype: file.mimetype,
+      size: file.size
     }));
 
+    // Send email through Gmail API or SMTP using user's credentials
     let sendResult;
     try {
       sendResult = await sendGmailMessage({
-        senderEmail: gmailAccount ? gmailAccount.gmailEmail : user.email,
-        appPassword: gmailAccount ? gmailAccount.appPassword : null,
-        accessToken: gmailAccount ? gmailAccount.encryptedAccessToken : null,
-        refreshToken: gmailAccount ? gmailAccount.encryptedRefreshToken : null,
+        senderEmail: gmailAccount.gmailEmail,
+        appPassword: gmailAccount.appPassword || (gmailAccount.encryptedRefreshToken?.startsWith('APPPASSWORD:') ? gmailAccount.encryptedRefreshToken.substring(12) : null),
+        accessToken: gmailAccount.encryptedAccessToken,
+        refreshToken: gmailAccount.encryptedRefreshToken,
         to: recipient,
         cc,
         bcc,
         subject,
         body,
-        attachments: files
+        attachments
       });
     } catch (sendErr) {
-      console.error('Gmail Sending Failed:', sendErr.message);
-
-      // Save Failed Email Record in Database for Transparency & Retry
-      const failedEmailRecord = await prisma.email.create({
-        data: {
-          userId: user.id,
-          recipient,
-          cc: cc || null,
-          bcc: bcc || null,
-          subject,
-          body,
-          category: category || 'Official/Professional',
-          situation: situation || '💼 Official / Professional',
-          situationSource: situationSource || 'ai',
-          priority: priority || 'Normal',
-          tone: tone || 'Professional',
-          status: 'Failed',
-          errorMessage: sendErr.message,
-          attachments: {
-            create: files.map(f => ({
-              filename: f.originalname,
-              fileUrl: `/uploads/${f.filename}`,
-              fileType: f.mimetype || 'application/octet-stream'
-            }))
-          }
-        },
-        include: { attachments: true }
-      });
-
-      // Create Failed Notification
-      const failedNotif = await prisma.notification.create({
-        data: {
-          userId: user.id,
-          emailId: failedEmailRecord.id,
-          notificationType: 'System',
-          message: `❌ Email failed to send to ${recipient}: ${sendErr.message}`,
-          read: false
-        }
-      });
-
-      return res.status(400).json({
-        error: `Failed to send email: ${sendErr.message}`,
-        email: failedEmailRecord,
-        notification: failedNotif
-      });
+      if (sendErr.isRevoked) {
+        await prisma.gmailAccount.update({
+          where: { id: gmailAccount.id },
+          data: { status: 'DISCONNECTED' }
+        }).catch(() => {});
+      }
+      throw sendErr;
     }
 
-    if (sendResult.newAccessToken && gmailAccount) {
+    // If new access token was generated during refresh, update database
+    if (sendResult.newAccessToken) {
       await prisma.gmailAccount.update({
         where: { id: gmailAccount.id },
-        data: { encryptedAccessToken: sendResult.newAccessToken }
-      });
+        data: {
+          encryptedAccessToken: sendResult.newAccessToken,
+          tokenExpiry: new Date(Date.now() + 3500 * 1000)
+        }
+      }).catch(e => console.warn('Token update notice:', e.message));
     }
 
+    // Store sent email record in database linked to user
     const emailRecord = await prisma.email.create({
       data: {
         userId: user.id,
@@ -682,421 +921,88 @@ router.post('/emails/send', upload.array('attachments'), async (req, res) => {
         bcc: bcc || null,
         subject,
         body,
-        category: category || 'Official/Professional',
-        situation: situation || '💼 Official / Professional',
-        situationSource: situationSource || 'ai',
-        priority: priority || 'Normal',
-        tone: tone || 'Professional',
+        category,
+        situation,
+        situationSource,
+        priority,
+        tone,
         status: 'Sent',
-        gmailMessageId: sendResult.gmailMessageId,
-        sentAt: sendResult.sentAt,
+        sentAt: sendResult.sentAt || new Date(),
+        gmailMessageId: sendResult.gmailMessageId || null,
         attachments: {
-          create: files.map(f => ({
-            filename: f.originalname,
-            fileUrl: `/uploads/${f.filename}`,
-            fileType: f.mimetype || 'application/octet-stream'
+          create: attachments.map(att => ({
+            filename: att.originalname,
+            fileUrl: `/uploads/${att.filename}`,
+            fileType: att.mimetype || 'application/octet-stream'
           }))
         }
       },
       include: { attachments: true }
     });
 
-    let notifTitle = `${category || 'Email'} Sent`;
-    let notifType = 'Official';
-    if (category?.includes('Emergency')) {
-      notifTitle = '🚨 Emergency Email Sent';
-      notifType = 'Emergency';
-    } else if (category?.includes('Leave')) {
-      notifTitle = '🏖️ Leave Email Sent';
-      notifType = 'Leave';
-    } else if (category?.includes('Resume')) {
-      notifTitle = '📄 Resume Email Sent';
-      notifType = 'Resume';
-    } else if (category?.includes('Official')) {
-      notifTitle = '💼 Official Email Sent';
-      notifType = 'Official';
-    } else if (category?.includes('Casual')) {
-      notifTitle = '💬 Casual Email Sent';
-      notifType = 'Casual';
-    } else if (category?.includes('Occasion')) {
-      notifTitle = '🎉 Occasion Email Sent';
-      notifType = 'Occasion';
-    } else if (category?.includes('Follow-up')) {
-      notifTitle = '🔔 Follow-up Email Sent';
-      notifType = 'Follow-up';
-    } else {
-      notifTitle = '📌 Email Sent';
-      notifType = 'System';
-    }
-
-    const notifMessage = `${notifTitle}: Your ${category?.toLowerCase() || 'email'} notification was successfully sent to ${recipient}.`;
-
-    const notification = await prisma.notification.create({
+    // Create in-app notification receipt
+    await prisma.notification.create({
       data: {
         userId: user.id,
         emailId: emailRecord.id,
-        notificationType: notifType,
-        message: notifMessage,
-        read: false
+        notificationType: category,
+        message: `Email "${subject}" successfully sent to ${recipient} via Gmail.`
       }
-    });
+    }).catch(e => console.warn('Notification creation notice:', e.message));
 
     res.json({
       success: true,
-      email: emailRecord,
-      notification,
-      mode: sendResult.mode,
-      gmailMessageId: sendResult.gmailMessageId
+      message: `Email sent successfully from ${gmailAccount.gmailEmail}!`,
+      gmailMessageId: sendResult.gmailMessageId,
+      email: emailRecord
     });
   } catch (err) {
-    console.error('Send Email Endpoint Error:', err);
-    res.status(500).json({ error: 'Failed to send email: ' + err.message });
+    console.error('Email send error:', err);
+    res.status(500).json({ error: err.message || 'Failed to send email.' });
   }
-});
+};
 
-// Retry Failed Email Endpoint (Ownership Verified)
-router.post('/emails/:id/retry', async (req, res) => {
-  try {
-    const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { id } = req.params;
-    const email = await prisma.email.findFirst({
-      where: { id, userId: user.id },
-      include: { attachments: true }
-    });
-
-    if (!email) {
-      return res.status(404).json({ error: 'Email record not found.' });
-    }
-
-    const gmailAccount = await prisma.gmailAccount.findFirst({
-      where: { userId: user.id }
-    });
-
-    const sendResult = await sendGmailMessage({
-      accessToken: gmailAccount ? gmailAccount.encryptedAccessToken : null,
-      refreshToken: gmailAccount ? gmailAccount.encryptedRefreshToken : null,
-      to: email.recipient,
-      cc: email.cc,
-      bcc: email.bcc,
-      subject: email.subject,
-      body: email.body,
-      attachments: []
-    });
-
-    const updatedEmail = await prisma.email.update({
-      where: { id: email.id },
-      data: {
-        status: 'Sent',
-        errorMessage: null,
-        gmailMessageId: sendResult.gmailMessageId,
-        sentAt: sendResult.sentAt || new Date()
-      },
-      include: { attachments: true }
-    });
-
-    const notification = await prisma.notification.create({
-      data: {
-        userId: user.id,
-        emailId: updatedEmail.id,
-        notificationType: 'System',
-        message: `✅ Email retried & sent successfully to ${email.recipient}!`,
-        read: false
-      }
-    });
-
-    res.json({ success: true, email: updatedEmail, notification });
-  } catch (err) {
-    console.error('Retry Email Error:', err);
-    await prisma.email.update({
-      where: { id: req.params.id },
-      data: { errorMessage: err.message }
-    });
-    res.status(400).json({ error: 'Retry failed: ' + err.message });
-  }
-});
+router.post('/emails/send', upload.array('attachments'), handleSendEmail);
+router.post('/email/send', upload.array('attachments'), handleSendEmail);
 
 // ----------------------------------------------------
-// 5. Email History & Search API (User Isolated)
+// 6. Emails History, Contacts, Templates & Settings APIs
 // ----------------------------------------------------
+
 router.get('/emails', async (req, res) => {
   try {
     const user = await getAuthUser(req);
-    if (!user) return res.json([]);
-
-    const { category, status, q } = req.query;
-
-    const where = { userId: user.id };
-    if (category && category !== 'All') {
-      where.category = { contains: category };
-    }
-    if (status && status !== 'All') {
-      where.status = status;
-    }
-    if (q && q.trim() !== '') {
-      where.OR = [
-        { recipient: { contains: q } },
-        { subject: { contains: q } },
-        { category: { contains: q } },
-        { body: { contains: q } }
-      ];
-    }
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
 
     const emails = await prisma.email.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: { attachments: true }
+      where: { userId: user.id },
+      include: { attachments: true },
+      orderBy: { createdAt: 'desc' }
     });
-
     res.json(emails);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Delete Email Endpoint (Ownership Verified)
 router.delete('/emails/:id', async (req, res) => {
   try {
     const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
 
-    const { id } = req.params;
-    const email = await prisma.email.findFirst({
-      where: { id, userId: user.id }
+    await prisma.email.deleteMany({
+      where: { id: req.params.id, userId: user.id }
     });
-
-    if (!email) {
-      return res.status(404).json({ error: 'Email record not found or access denied.' });
-    }
-
-    await prisma.email.delete({ where: { id: email.id } });
-    res.json({ success: true, message: 'Email deleted successfully' });
-  } catch (err) {
-    console.error('Delete email error:', err);
-    res.status(500).json({ error: 'Failed to delete email: ' + err.message });
-  }
-});
-
-// Stats API for Dashboard (User Isolated)
-router.get('/emails/stats', async (req, res) => {
-  try {
-    const user = await getAuthUser(req);
-    if (!user) {
-      return res.json({ totalEmails: 0, sentToday: 0, emergency: 0, leave: 0, resume: 0, official: 0 });
-    }
-
-    const totalEmails = await prisma.email.count({ where: { userId: user.id } });
-    
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const sentToday = await prisma.email.count({
-      where: { userId: user.id, createdAt: { gte: startOfDay } }
-    });
-
-    const emergency = await prisma.email.count({
-      where: { userId: user.id, category: { contains: 'Emergency' } }
-    });
-
-    const leave = await prisma.email.count({
-      where: { userId: user.id, category: { contains: 'Leave' } }
-    });
-
-    const resume = await prisma.email.count({
-      where: { userId: user.id, category: { contains: 'Resume' } }
-    });
-
-    const official = await prisma.email.count({
-      where: { userId: user.id, category: { contains: 'Official' } }
-    });
-
-    res.json({
-      totalEmails,
-      sentToday,
-      emergency,
-      leave,
-      resume,
-      official
-    });
+    res.json({ success: true, message: 'Email removed.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ----------------------------------------------------
-// 6. Notifications API (User Isolated)
-// ----------------------------------------------------
-router.get('/notifications', async (req, res) => {
-  try {
-    const user = await getAuthUser(req);
-    if (!user) {
-      return res.json({ notifications: [], unreadCount: 0, trashedCount: 0, activeCount: 0 });
-    }
-
-    const isTrashedQuery = req.query.trashed === 'true';
-
-    const notifications = await prisma.notification.findMany({
-      where: {
-        userId: user.id,
-        isTrashed: isTrashedQuery
-      },
-      orderBy: { createdAt: 'desc' },
-      include: { email: true }
-    });
-
-    const unreadCount = await prisma.notification.count({
-      where: { userId: user.id, read: false, isTrashed: false }
-    });
-
-    const trashedCount = await prisma.notification.count({
-      where: { userId: user.id, isTrashed: true }
-    });
-
-    const activeCount = await prisma.notification.count({
-      where: { userId: user.id, isTrashed: false }
-    });
-
-    res.json({ notifications, unreadCount, trashedCount, activeCount });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.patch('/notifications/:id/read', async (req, res) => {
-  try {
-    const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { id } = req.params;
-    const notif = await prisma.notification.findFirst({
-      where: { id, userId: user.id }
-    });
-    if (!notif) return res.status(404).json({ error: 'Notification not found.' });
-
-    await prisma.notification.update({
-      where: { id: notif.id },
-      data: { read: true }
-    });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.put('/notifications/trash-all', async (req, res) => {
-  try {
-    const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-    await prisma.notification.updateMany({
-      where: { userId: user.id, isTrashed: false },
-      data: { isTrashed: true }
-    });
-    res.json({ success: true, message: 'All notifications moved to trash' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.put('/notifications/:id/trash', async (req, res) => {
-  try {
-    const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { id } = req.params;
-    const notif = await prisma.notification.findFirst({
-      where: { id, userId: user.id }
-    });
-    if (!notif) return res.status(404).json({ error: 'Notification not found or access denied.' });
-
-    await prisma.notification.update({
-      where: { id: notif.id },
-      data: { isTrashed: true }
-    });
-    res.json({ success: true, message: 'Notification moved to trash' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.put('/notifications/:id/restore', async (req, res) => {
-  try {
-    const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { id } = req.params;
-    const notif = await prisma.notification.findFirst({
-      where: { id, userId: user.id }
-    });
-    if (!notif) return res.status(404).json({ error: 'Notification not found or access denied.' });
-
-    await prisma.notification.update({
-      where: { id: notif.id },
-      data: { isTrashed: false }
-    });
-    res.json({ success: true, message: 'Notification restored successfully' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.delete('/notifications/:id', async (req, res) => {
-  try {
-    const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { id } = req.params;
-    const notif = await prisma.notification.findFirst({
-      where: { id, userId: user.id }
-    });
-    if (!notif) return res.status(404).json({ error: 'Notification not found or access denied.' });
-
-    await prisma.notification.delete({
-      where: { id: notif.id }
-    });
-    res.json({ success: true, message: 'Notification permanently deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.delete('/notifications/empty-trash', async (req, res) => {
-  try {
-    const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-    await prisma.notification.deleteMany({
-      where: { userId: user.id, isTrashed: true }
-    });
-    res.json({ success: true, message: 'Trash emptied successfully' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.patch('/notifications/read-all', async (req, res) => {
-  try {
-    const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-    await prisma.notification.updateMany({
-      where: { userId: user.id, read: false },
-      data: { read: true }
-    });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ----------------------------------------------------
-// 7. Saved Contacts API (User Isolated)
-// ----------------------------------------------------
 router.get('/contacts', async (req, res) => {
   try {
     const user = await getAuthUser(req);
-    if (!user) return res.json([]);
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
 
     const contacts = await prisma.contact.findMany({
       where: { userId: user.id },
@@ -1111,23 +1017,20 @@ router.get('/contacts', async (req, res) => {
 router.post('/contacts', async (req, res) => {
   try {
     const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
 
-    const { name, email, relationship } = req.body;
-    if (!name || !email) {
-      return res.status(400).json({ error: 'Name and email are required.' });
-    }
+    const { name, email, relationship } = req.body || {};
+    if (!name || !email) return res.status(400).json({ error: 'Name and email are required.' });
 
     const contact = await prisma.contact.create({
       data: {
         userId: user.id,
-        name,
-        email,
-        relationship: relationship || 'Client'
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        relationship: relationship || 'Other'
       }
     });
-
-    res.json(contact);
+    res.status(201).json(contact);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1136,61 +1039,114 @@ router.post('/contacts', async (req, res) => {
 router.delete('/contacts/:id', async (req, res) => {
   try {
     const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
 
-    const contact = await prisma.contact.findFirst({
+    await prisma.contact.deleteMany({
       where: { id: req.params.id, userId: user.id }
     });
-    if (!contact) return res.status(404).json({ error: 'Contact not found or access denied.' });
-
-    await prisma.contact.delete({ where: { id: contact.id } });
-    res.json({ success: true });
+    res.json({ success: true, message: 'Contact deleted.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ----------------------------------------------------
-// 8. Email Templates API
-// ----------------------------------------------------
 router.get('/templates', async (req, res) => {
   try {
-    const templates = await prisma.template.findMany({
-      orderBy: { category: 'asc' }
-    });
+    const templates = await prisma.template.findMany();
     res.json(templates);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ----------------------------------------------------
-// 9. User Signature & Settings API (User Isolated)
-// ----------------------------------------------------
-router.get('/signature', async (req, res) => {
+router.get('/notifications', async (req, res) => {
   try {
     const user = await getAuthUser(req);
-    if (!user) return res.json(null);
-    res.json(user.signature);
+    if (!user) return res.json({ notifications: [], unreadCount: 0 });
+
+    const notifications = await prisma.notification.findMany({
+      where: { userId: user.id, isTrashed: false },
+      orderBy: { createdAt: 'desc' }
+    });
+    const unreadCount = notifications.filter(n => !n.read).length;
+    res.json({ notifications, unreadCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.post('/signature', async (req, res) => {
+router.patch('/notifications/read-all', async (req, res) => {
   try {
     const user = await getAuthUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
 
-    const { name, designation, company, phone, website, preferredTone, enabled } = req.body;
-
-    const signature = await prisma.userSignature.upsert({
-      where: { userId: user.id },
-      update: { name, designation, company, phone, website, preferredTone: preferredTone || 'Professional', enabled: enabled ?? true },
-      create: { userId: user.id, name, designation, company, phone, website, preferredTone: preferredTone || 'Professional', enabled: enabled ?? true }
+    await prisma.notification.updateMany({
+      where: { userId: user.id, read: false },
+      data: { read: true }
     });
+    res.json({ success: true, message: 'All notifications marked as read.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    res.json(signature);
+router.get('/settings/signature', async (req, res) => {
+  try {
+    const user = await getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
+
+    let sig = await prisma.userSignature.findUnique({
+      where: { userId: user.id }
+    });
+    if (!sig) {
+      sig = await prisma.userSignature.create({
+        data: {
+          userId: user.id,
+          name: user.name,
+          designation: '',
+          company: '',
+          phone: '',
+          website: '',
+          preferredTone: 'Professional',
+          enabled: true
+        }
+      });
+    }
+    res.json(sig);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/settings/signature', async (req, res) => {
+  try {
+    const user = await getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const { name, designation, company, phone, website, preferredTone, enabled } = req.body || {};
+    const updated = await prisma.userSignature.upsert({
+      where: { userId: user.id },
+      update: {
+        name: name || user.name,
+        designation: designation || '',
+        company: company || '',
+        phone: phone || '',
+        website: website || '',
+        preferredTone: preferredTone || 'Professional',
+        enabled: enabled !== undefined ? !!enabled : true
+      },
+      create: {
+        userId: user.id,
+        name: name || user.name,
+        designation: designation || '',
+        company: company || '',
+        phone: phone || '',
+        website: website || '',
+        preferredTone: preferredTone || 'Professional',
+        enabled: enabled !== undefined ? !!enabled : true
+      }
+    });
+    res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

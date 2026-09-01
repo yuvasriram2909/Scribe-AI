@@ -1,3 +1,15 @@
+/**
+ * ============================================================================
+ * Scribe-AI — ComposeWorkflow Component
+ * ============================================================================
+ * An 11-step human-in-the-loop email composition interface that integrates:
+ * - Natural language instruction capture
+ * - Google Gemini AI situation classification & drafting
+ * - Manual situation/priority/tone overrides
+ * - Security verification & confirmation modal
+ * - Official Gmail REST API dispatch via OAuth 2.0
+ */
+
 import React, { useState } from 'react';
 import { 
   Sparkles, Send, Edit3, RefreshCw, X, CheckCircle, ShieldAlert, Paperclip, 
@@ -228,7 +240,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
             <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
             <span>{errorMessage}</span>
           </div>
-          {(errorMessage.includes('Gmail account not connected') || errorMessage.includes('insufficient authentication scopes') || errorMessage.includes('OAuth') || errorMessage.includes('scopes')) && (
+          {(errorMessage.includes('Gmail') || errorMessage.includes('connect') || errorMessage.includes('OAuth') || errorMessage.includes('scopes') || errorMessage.includes('revoked') || errorMessage.includes('expired')) && (
             <button
               onClick={async () => {
                 try {
@@ -246,7 +258,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
               className="px-4 py-2 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
               <ExternalLink className="w-4 h-4" />
-              ⚡ Re-authorize Google OAuth Permissions
+              ⚡ Connect Google Gmail
             </button>
           )}
         </div>

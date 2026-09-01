@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Mail, Send, AlertTriangle, Calendar, FileText, Briefcase, Sparkles, 
-  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings
+  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings, Bell, LogOut
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
 
 const CATEGORIES_LIST = [
   { id: 'All', label: 'All Situations' },
@@ -43,6 +44,7 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings 
     connectedEmail: null
   });
 
+  const [showPushBanner, setShowPushBanner] = useState(false);
   const [recentEmails, setRecentEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
@@ -63,7 +65,41 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings 
   useEffect(() => {
     fetchDashboardData();
     checkConnectionStatus();
+    checkPushNotificationSupport();
   }, [selectedCategory, selectedStatus, searchQuery]);
+
+  const checkPushNotificationSupport = async () => {
+    registerServiceWorker();
+    if ('Notification' in window && Notification.permission === 'default') {
+      const dismissed = sessionStorage.getItem('dismissPushBanner');
+      if (!dismissed) {
+        setShowPushBanner(true);
+      }
+    }
+  };
+
+  const handleEnablePush = async () => {
+    const result = await subscribeUserToPush();
+    if (result.success) {
+      setShowPushBanner(false);
+      alert('🔔 Notifications enabled! You will receive push alerts on login.');
+    } else if (result.reason === 'denied') {
+      setShowPushBanner(false);
+    }
+  };
+
+  const handleDisconnectGmail = async () => {
+    if (!window.confirm('Are you sure you want to disconnect your Gmail account?')) return;
+    try {
+      const res = await apiFetch('/api/auth/google/disconnect', { method: 'POST' });
+      if (res.ok) {
+        setConnectionStatus({ isConnected: false, status: 'DISCONNECTED', connectedEmail: null });
+        alert('Gmail account disconnected successfully.');
+      }
+    } catch (err) {
+      console.error('Failed to disconnect Gmail:', err);
+    }
+  };
 
   const checkConnectionStatus = async () => {
     try {
@@ -216,6 +252,40 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings 
   return (
     <div className="space-y-8 animate-fadeIn">
 
+      {/* Push Notification Opt-in Banner */}
+      {showPushBanner && (
+        <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-[#D8D1BC] bg-[#FAF8F1] flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs animate-fadeIn">
+          <div className="flex items-center gap-3 text-center sm:text-left">
+            <div className="w-10 h-10 rounded-2xl bg-[#667A45] text-[#FAF8F1] flex items-center justify-center font-bold shrink-0 shadow-xs">
+              <Bell className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-extrabold text-[#28321D]">Allow Scribe AI to send login and security notifications?</h4>
+              <p className="text-[11px] text-[#6F725F]">
+                Receive instant Web Push alerts on your phone or browser whenever a new sign-in occurs.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleEnablePush}
+              className="px-4 py-2 rounded-xl gradient-btn text-[#FAF8F1] text-xs font-bold shadow-xs hover:scale-[1.02] cursor-pointer"
+            >
+              🔔 Allow Notifications
+            </button>
+            <button
+              onClick={() => {
+                setShowPushBanner(false);
+                sessionStorage.setItem('dismissPushBanner', 'true');
+              }}
+              className="px-3 py-2 rounded-xl text-[#6F725F] hover:text-[#28321D] text-xs font-semibold cursor-pointer"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Gmail Connection Status Card */}
       {!connectionStatus.isConnected || connectionStatus.status === 'DISCONNECTED' ? (
         <div className="glass-panel p-6 rounded-3xl border border-[#D8D1BC] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#FAF8F1] shadow-xs">
@@ -282,13 +352,22 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings 
             </div>
           </div>
 
-          <button
-            onClick={onNavigateToSettings}
-            className="px-4 py-2.5 rounded-xl bg-white hover:bg-[#FAF8F1] text-[#3F4D2A] border border-[#A8DADC] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-          >
-            <Settings className="w-4 h-4 text-[#667A45]" />
-            Manage Connection
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleDisconnectGmail}
+              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-red-50 text-red-700 border border-red-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5 text-red-600" />
+              Disconnect Gmail
+            </button>
+            <button
+              onClick={onNavigateToSettings}
+              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#FAF8F1] text-[#3F4D2A] border border-[#A8DADC] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5 text-[#667A45]" />
+              Manage Settings
+            </button>
+          </div>
         </div>
       )}
       

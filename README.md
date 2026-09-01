@@ -1,125 +1,195 @@
-# 🚀 Scribe-AI — AI Smart Email Sender
+# 🚀 Scribe-AI — Intelligent Email Automation Platform
 
-An intelligent full-stack email automation platform that uses **Google Gemini AI** and the **Official Gmail API** to categorize natural language instructions into 8 distinct situations, detect urgency and tone, generate polished email drafts, and safely dispatch emails via Google OAuth 2.0.
+[![React](https://img.shields.io/badge/Frontend-React%2018%20%7C%20Vite-61DAFB?style=flat-square&logo=react&logoColor=black)](https://reactjs.org/)
+[![Node.js](https://img.shields.io/badge/Backend-Node.js%20%7C%20Express-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Prisma](https://img.shields.io/badge/Database-SQLite%20%7C%20Prisma%20ORM-2D3748?style=flat-square&logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![Google Gemini](https://img.shields.io/badge/AI-Google%20Gemini-8E75B2?style=flat-square&logo=google&logoColor=white)](https://ai.google.dev/)
+[![Gmail API](https://img.shields.io/badge/Email-Official%20Gmail%20API%20%7C%20OAuth%202.0-EA4335?style=flat-square&logo=gmail&logoColor=white)](https://developers.google.com/gmail/api)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+
+An enterprise-grade, full-stack email automation system that uses **Google Gemini AI** and the **Official Gmail REST API** to transform natural language instructions into precisely classified, context-aware email drafts with an 11-step human-in-the-loop security verification pipeline.
 
 ---
 
-## 🌟 Key Features
+## 📚 Table of Contents
 
-- **🧠 Intelligent 8-Situation AI Classification**:
-  Automatically analyzes natural instructions and maps them into 8 exact email situations:
-  - 🚨 **Emergency** (High Priority, Urgent Tone)
-  - ⚠️ **Important / Necessary** (High/Medium Priority, Professional/Direct Tone)
-  - 💼 **Official / Professional** (Normal Priority, Professional Tone)
-  - 📅 **Leave / Holiday** (Normal Priority, Professional Tone)
-  - 📄 **Resume / Job Application** (Normal Priority, Formal/Professional Tone)
-  - 🔄 **Follow-up** (Normal Priority, Professional Tone)
-  - 💬 **Casual** (Normal Priority, Friendly/Casual Tone)
-  - 🎉 **Celebration / Occasion** (Normal Priority, Warm Tone)
+- [🌟 Core Features](#-core-features)
+- [🛠️ Tech Stack & Tools Breakdown](#️-tech-stack--tools-breakdown)
+- [📁 Project Explorer Structure](#-project-explorer-structure)
+- [⚡ 11-Step Human-in-the-Loop Workflow](#-11-step-human-in-the-loop-workflow)
+- [📖 Documentation Links](#-documentation-links)
+- [🚀 Quick Start Guide](#-quick-start-guide)
+- [⚙️ Environment Configuration](#️-environment-configuration)
+- [🛡️ Security & Privacy Model](#️-security--privacy-model)
+- [📄 License](#-license)
 
-- **⚡ 11-Step Human-in-the-Loop Security Workflow**:
-  `Short Instruction → AI Intent Analysis → Situation & Priority Detection → Email Draft Generation → AI Email Analysis Review → Manual Situation Override (optional) → User Draft Review/Editing → Security Confirmation Modal → Gmail API Dispatch → Sent Confirmation → History Record`.
+---
 
-- **🔐 Official Gmail API & OAuth 2.0 Integration**:
-  Sends emails natively through user-authorized Google OAuth 2.0 access tokens (`https://www.googleapis.com/auth/gmail.send`) with safe base64url MIME RFC 2822 header encoding.
+## 🌟 Core Features
 
-- **🛡️ Multi-User Data Isolation**:
-  Strict server-side JWT authentication ensures that email history, templates, contacts, notifications, settings, and OAuth credentials remain completely private per user account.
+- **🧠 8-Situation AI Classification Engine**:
+  Maps raw natural instructions into 8 distinct communication contexts with automatic priority and tone adjustment:
+  1. 🚨 **Emergency** (High Priority, Urgent Tone)
+  2. ⚠️ **Important / Necessary** (High/Medium Priority, Professional/Direct Tone)
+  3. 💼 **Official / Professional** (Normal Priority, Professional Tone)
+  4. 📅 **Leave / Holiday** (Normal Priority, Professional Tone)
+  5. 📄 **Resume / Job Application** (Normal Priority, Formal/Professional Tone)
+  6. 🔄 **Follow-up** (Normal Priority, Professional Tone)
+  7. 💬 **Casual** (Normal Priority, Friendly/Casual Tone)
+  8. 🎉 **Celebration / Occasion** (Normal Priority, Warm Tone)
+
+- **🛡️ 11-Step Human-in-the-Loop Security Verification**:
+  Prevents accidental sends with a zero-hallucination review stage, manual situation override controls, draft editing, and safety confirmation modals prior to API dispatch.
+
+- **📮 Native Gmail API & OAuth 2.0 Integration**:
+  Direct integration with Google Cloud OAuth 2.0 and Gmail REST API (`gmail.googleapis.com`), utilizing RFC 2822 MIME base64url encoding and automated token refresh.
+
+- **👥 Intelligent Contacts & Tone Mapping**:
+  Address book that auto-tunes email tone based on recipient relationship (HR, Client, Manager, Friend, Colleague).
 
 - **🔔 Multi-Platform Login Security Alerts**:
-  Tracks login platform, browser, device OS, timestamp, and IP address, sending both in-app notification cards and transactional security alert emails.
+  Audits client browser, operating system, and IP address on login, providing both in-app notification cards and security email alerts.
 
-- **👥 Contacts Address Book & 🎛️ Canned Templates Library**:
-  Save frequent client contacts (with auto-tuned AI tones) and choose from canned email templates for instant dispatches.
-
----
-
-## 🏗️ Tech Stack
-
-- **Frontend**: React 18, Vite, Vanilla CSS + Tailwind CSS, Lucide Icons
-- **Backend**: Node.js, Express.js
-- **Database**: SQLite, Prisma ORM
-- **AI Service**: Google Gemini AI API (`@google/generative-ai`)
-- **Email Service**: Official Gmail REST API (`gmail.googleapis.com`), Nodemailer (for security alerts)
+- **🗄️ Multi-User Data Isolation**:
+  Isolated SQLite/Prisma records per user, ensuring complete confidentiality of drafts, contacts, notifications, and credentials.
 
 ---
 
-## 📁 Project Structure
+## 🛠️ Tech Stack & Tools Breakdown
+
+### Frontend (Client)
+- **Framework**: [React 18](https://reactjs.org/) (Hooks, dynamic SPA routing)
+- **Build System**: [Vite 5](https://vitejs.dev/) (Fast HMR & bundling)
+- **Styling**: [Tailwind CSS 3](https://tailwindcss.com/) + Custom Glassmorphism CSS Design System
+- **Icons**: [Lucide React](https://lucide.dev/) (Modern SVG UI icons)
+- **Utilities**: Modular API client with authentication and base URL resolution
+
+### Backend (Server)
+- **Runtime**: [Node.js](https://nodejs.org/) (ES Modules)
+- **Server Framework**: [Express.js](https://expressjs.com/) (RESTful API architecture)
+- **ORM & Database**: [Prisma ORM](https://www.prisma.io/) + [SQLite](https://www.sqlite.org/) (`dev.db`)
+- **AI Integration**: [Google Gemini AI SDK](https://www.npmjs.com/package/@google/generative-ai) (`@google/generative-ai`)
+- **Email Dispatch**: [Official Googleapis](https://www.npmjs.com/package/googleapis) Gmail REST API
+- **Transactional Alerts**: [Nodemailer](https://nodemailer.com/)
+- **File Uploads**: [Multer](https://www.npmjs.com/package/multer)
+
+---
+
+## 📁 Project Explorer Structure
 
 ```text
 AI-Email/
-├── client/                   # React + Vite Frontend
+├── docs/                              # 📚 Full Technical Documentation
+│   ├── ARCHITECTURE.md                # System diagrams & data pipelines
+│   ├── TECH_STACK.md                  # Comprehensive tool & dependency inventory
+│   ├── API_DOCUMENTATION.md           # REST API endpoint reference
+│   └── PROJECT_STRUCTURE.md           # Detailed file explorer walkthrough
+│
+├── client/                            # 🖥️ Frontend (React 18 + Vite)
 │   ├── src/
-│   │   ├── components/       # Dashboard, ComposeWorkflow, History, Contacts, Templates
-│   │   ├── utils/            # apiFetch helper with multi-user headers
-│   │   ├── App.jsx           # Main App layout & view switcher
-│   │   └── index.css         # Custom styling design system
-│   └── vite.config.js        # API Proxy setup (/api -> http://localhost:5000)
-├── server/                   # Node.js + Express Backend
-│   ├── prisma/
-│   │   ├── schema.prisma     # SQLite Prisma Schema (Users, Emails, Notifications)
-│   │   └── dev.db            # Local SQLite Database
+│   │   ├── components/                # Modular UI views (Compose, Dashboard, History, etc.)
+│   │   ├── utils/                     # Authenticated apiFetch client
+│   │   ├── App.jsx                    # Navigation and view routing
+│   │   └── index.css                  # Design tokens & glassmorphism theme
+│   ├── .env.example                   # Client environment variables template
+│   └── vite.config.js                 # Vite config with /api proxy
+│
+├── server/                            # ⚙️ Backend (Node.js + Express)
+│   ├── prisma/                        # Database schema & SQLite database
+│   │   ├── schema.prisma              # Data models (User, Email, Contact, etc.)
+│   │   └── dev.db                     # SQLite database file
 │   ├── src/
-│   │   ├── routes/api.js     # REST API Routes (/ai, /emails, /auth, /notifications)
-│   │   ├── aiService.js      # Gemini AI Generation & Situation Detection
-│   │   ├── emailPatterns.js  # 8-Situation Detection & Natural Prose Generators
-│   │   ├── gmailService.js   # Google OAuth 2.0 & Gmail API HTTPS client
-│   │   └── securityService.js# Login device detection & transactional alert emails
-│   └── index.js              # Express Server Entry Point
-└── package.json              # Root package with concurrent dev scripts
+│   │   ├── routes/api.js              # REST API route handlers
+│   │   ├── aiService.js               # Gemini AI engine & fallback
+│   │   ├── emailPatterns.js           # 8-Situation classification patterns
+│   │   ├── gmailService.js            # Gmail OAuth 2.0 & MIME dispatcher
+│   │   ├── securityService.js         # Device fingerprinting & login alerts
+│   │   └── index.js                   # Express server entry point
+│   ├── .env.example                   # Server environment variables template
+│   └── uploads/                       # Temporary attachment storage
+│
+└── package.json                       # Monorepo task runner (concurrent dev scripts)
 ```
 
 ---
 
-## ⚡ Quick Start Guide
+## 📖 Documentation Links
 
-### 1. Prerequisites
-- **Node.js**: v18.0 or higher
-- **npm**: v9.0 or higher
+Explore the detailed architecture and API manuals inside the [`docs/`](file:///c:/Users/testm/Desktop/AI-Email/docs) folder:
 
-### 2. Installation & Setup
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/yuvasriram2909/Scribe-AI.git
-   cd Scribe-AI
-   ```
-
-2. **Install Root Dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Configure Environment Variables**:
-   Create a `.env` file in the `server/` directory (see [`server/.env.example`](file:///c:/Users/testm/Desktop/AI-Email/server/.env.example)):
-   ```env
-   PORT=5000
-   DATABASE_URL="file:./dev.db"
-   JWT_SECRET="your-super-secret-jwt-key"
-   GOOGLE_CLIENT_ID="your-google-client-id.apps.googleusercontent.com"
-   GOOGLE_CLIENT_SECRET="your-google-client-secret"
-   GOOGLE_REDIRECT_URI="http://localhost:5000/api/auth/google/callback"
-   GEMINI_API_KEY="your-gemini-api-key"
-   ```
-
-4. **Initialize Database Schema**:
-   ```bash
-   cd server
-   npx prisma db push
-   npx prisma generate
-   cd ..
-   ```
-
-5. **Run Frontend & Backend Concurrently**:
-   ```bash
-   npm run dev
-   ```
-
-6. **Open in Web Browser**:
-   Navigate to **[http://localhost:5173](http://localhost:5173)** to start using Scribe-AI!
+- 🏛️ **[System Architecture & Workflow Deep Dive](file:///c:/Users/testm/Desktop/AI-Email/docs/ARCHITECTURE.md)**
+- 🛠️ **[Tools & Technical Stack Reference](file:///c:/Users/testm/Desktop/AI-Email/docs/TECH_STACK.md)**
+- 🌐 **[REST API Endpoint Specification](file:///c:/Users/testm/Desktop/AI-Email/docs/API_DOCUMENTATION.md)**
+- 📁 **[Project Structure & File Guide](file:///c:/Users/testm/Desktop/AI-Email/docs/PROJECT_STRUCTURE.md)**
 
 ---
 
-## 🛡️ License
+## ⚡ 11-Step Human-in-the-Loop Workflow
 
-Distributed under the MIT License. See `LICENSE` for more information.
+```text
+1. Short Instruction ➔ 2. AI Intent Analysis ➔ 3. Situation & Priority Detection ➔
+4. Draft Generation ➔ 5. Analysis Review ➔ 6. Manual Override (Optional) ➔
+7. User Draft Customization ➔ 8. Attachment Upload ➔ 9. Security Confirmation Modal ➔
+10. Gmail REST API Dispatch ➔ 11. Sent Confirmation & Audit History Log
+```
+
+---
+
+## 🚀 Quick Start Guide
+
+### 1. Prerequisites
+- **Node.js**: `v18.0.0` or higher
+- **npm**: `v9.0.0` or higher
+
+### 2. Installation
+Clone the repository and install all dependencies in one command:
+```bash
+git clone https://github.com/yuvasriram2909/Scribe-AI.git
+cd AI-Email
+npm run install:all
+```
+
+### 3. Configure Server Environment
+Create `server/.env` using the template provided in `server/.env.example`:
+```env
+PORT=5000
+DATABASE_URL="file:./dev.db"
+JWT_SECRET="your-super-secret-jwt-key"
+GOOGLE_CLIENT_ID="your-google-client-id.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+GOOGLE_REDIRECT_URI="http://localhost:5000/api/auth/google/callback"
+GEMINI_API_KEY="your-gemini-api-key"
+```
+
+### 4. Initialize Database
+```bash
+cd server
+npx prisma db push
+npx prisma generate
+node src/seed.js
+cd ..
+```
+
+### 5. Start Development Servers
+Run both client and backend servers concurrently:
+```bash
+npm run dev
+```
+
+- **Frontend App**: `http://localhost:5173`
+- **Backend API**: `http://localhost:5000/api`
+
+---
+
+## 🛡️ Security & Privacy Model
+
+- **Multi-Tenant Isolation**: Server-side user scoping on every database query prevents cross-tenant data access.
+- **Official Google OAuth**: Uses limited `gmail.send` scope without reading private inbox emails.
+- **Offline Fallback Engine**: If AI API keys or quota limits occur, the system smoothly falls back to built-in rule-based generators.
+- **Device Fingerprinting**: Real-time identification of browser, OS, and IP address on login.
+
+---
+
+## 📄 License
+
+Distributed under the **MIT License**. See `LICENSE` for details.

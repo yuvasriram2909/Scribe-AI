@@ -1,5 +1,18 @@
+/**
+ * ============================================================================
+ * Scribe-AI — Express Backend Server (index.js)
+ * ============================================================================
+ * Node.js + Express API server entry point:
+ * - Prisma ORM database schema auto-synchronization
+ * - CORS middleware with credential support
+ * - Static uploads serving
+ * - REST API routing mounted under /api
+ * - Global error handling & health checks
+ */
+
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import dotenv from 'dotenv';
 import apiRouter from './routes/api.js';
@@ -32,6 +45,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));

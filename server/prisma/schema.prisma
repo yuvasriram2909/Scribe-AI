@@ -3,26 +3,30 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id            String         @id @default(uuid())
-  name          String
-  email         String         @unique
-  passwordHash  String?
-  createdAt     DateTime       @default(now())
-  gmailAccounts GmailAccount[]
-  contacts      Contact[]
-  emails        Email[]
-  notifications Notification[]
-  signature     UserSignature?
+  id                String             @id @default(uuid())
+  name              String
+  email             String             @unique
+  passwordHash      String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt @default(now())
+  lastLoginAt       DateTime?
+  gmailAccounts     GmailAccount[]
+  contacts          Contact[]
+  emails            Email[]
+  notifications     Notification[]
+  signature         UserSignature?
+  pushSubscriptions PushSubscription[]
 }
 
 model GmailAccount {
   id                    String    @id @default(uuid())
   userId                String
+  googleUserId          String?
   gmailEmail            String
   encryptedAccessToken  String?
   encryptedRefreshToken String?
@@ -84,7 +88,7 @@ model Notification {
   id               String   @id @default(uuid())
   userId           String
   emailId          String?
-  notificationType String   // Emergency, Leave, Resume, Official, Casual, Occasion, Follow-up, System
+  notificationType String   // Emergency, Leave, Resume, Official, Casual, Occasion, Follow-up, System, Security Alert
   message          String
   read             Boolean  @default(false)
   isTrashed        Boolean  @default(false)
@@ -120,4 +124,15 @@ model SystemConfig {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt @default(now())
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
