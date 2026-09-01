@@ -64,8 +64,9 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
   const handleGenerateEmail = async (e) => {
     if (e) e.preventDefault();
 
-    if (!instruction.trim()) {
-      setErrorMessage('Please enter a short natural-language instruction.');
+    const query = instruction.trim() || subject.trim();
+    if (!query) {
+      setErrorMessage('Please enter what you want to send or provide a subject.');
       return;
     }
     if (!recipient.trim()) {
@@ -82,7 +83,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
       const catRes = await apiFetch('/api/ai/categorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instruction, recipient })
+        body: JSON.stringify({ instruction: query, subject: subject.trim(), recipient: recipient.trim() })
       });
       const catData = await safeParseResponse(catRes);
       
@@ -100,22 +101,23 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instruction,
+          instruction: query,
+          subject: subject.trim(),
           situation: sitObj.label,
           category: sitObj.category,
           priority: catData.priority || sitObj.priority,
           tone: catData.tone || sitObj.tone,
-          recipient
+          recipient: recipient.trim()
         })
       });
       const genData = await safeParseResponse(genRes);
 
-      setSubject(genData.subject || genData.suggested_subject || 'Email Subject');
-      setBody(genData.body || genData.email_body || instruction);
+      setSubject(genData.subject || genData.suggested_subject || subject.trim() || 'Email Subject');
+      setBody(genData.body || genData.email_body || query);
       setStep(3); // Step 3: Preview
     } catch (err) {
       console.error('AI Generation Error:', err);
-      setErrorMessage(err.message || 'Failed to generate email.');
+      setErrorMessage('Unable to generate the email right now. Please try again.');
       setStep(1);
     } finally {
       setAiLoading(false);
@@ -134,17 +136,19 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
     setDetectedCategory(sitObj.category);
 
     setAiLoading(true);
+    const query = instruction.trim() || subject.trim();
     try {
       const res = await apiFetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instruction,
+          instruction: query,
+          subject: subject.trim(),
           situation: sitObj.label,
           category: sitObj.category,
           priority: sitObj.priority,
           tone: sitObj.tone,
-          recipient
+          recipient: recipient.trim()
         })
       });
       const data = await safeParseResponse(res);
@@ -356,13 +360,27 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
             </div>
 
             <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-[#28321D] block">
+                  Subject / Topic <span className="text-[11px] font-normal text-[#6F725F]">(Optional — AI can generate automatically)</span>
+                </label>
+              </div>
+              <input
+                type="text"
+                placeholder="e.g. Request for 3 days leave due to illness, or Complaint about delayed delivery"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl glass-input text-xs text-[#28321D] focus:ring-2 focus:ring-[#667A45]"
+              />
+            </div>
+
+            <div>
               <label className="text-xs font-bold text-[#28321D] block mb-1">
-                What do you want to send? <span className="text-red-600">*</span>
+                What do you want to send? / Problem Details <span className="text-red-600">*</span>
               </label>
               <textarea
                 rows={4}
-                required
-                placeholder="Example: Inform my manager that I need emergency leave this afternoon because of a doctor's appointment."
+                placeholder="Example: Request 3 days leave from tomorrow because of illness, and ask manager for approval."
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl glass-input text-xs text-[#28321D] focus:ring-2 focus:ring-[#667A45] leading-relaxed"
@@ -394,10 +412,11 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
               <button
                 type="submit"
-                className="px-8 py-3 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer"
+                disabled={aiLoading}
+                className="px-8 py-3 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Sparkles className="w-4 h-4 text-[#E8DFC8]" />
-                Generate Email ✦
+                {aiLoading ? 'Generating...' : 'Generate Email ✦'}
               </button>
             </div>
           </form>

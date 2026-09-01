@@ -392,15 +392,16 @@ router.post('/push/unsubscribe', async (req, res) => {
 
 router.post('/ai/categorize', async (req, res) => {
   try {
-    const { instruction, recipient, relationship } = req.body || {};
-    if (!instruction || instruction.trim() === '') {
+    const { instruction, subject, recipient, relationship } = req.body || {};
+    const inputContent = instruction || subject;
+    if (!inputContent || inputContent.trim() === '') {
       return res.status(400).json({
         success: false,
-        error: 'Short instruction is required.'
+        error: 'Please enter a subject, problem, or instruction.'
       });
     }
 
-    const result = await categorizeInstruction({ instruction, recipient, relationship });
+    const result = await categorizeInstruction({ instruction: inputContent, subject, recipient, relationship });
     
     return res.json({
       success: true,
@@ -425,23 +426,26 @@ router.post('/ai/categorize', async (req, res) => {
 
 router.post('/ai/generate', async (req, res) => {
   try {
-    const { instruction, situation, category, tone, priority, recipient, recipientName } = req.body || {};
-    if (!instruction || instruction.trim() === '') {
+    const { instruction, subject, situation, category, tone, priority, recipient, recipientName, relationship } = req.body || {};
+    const inputContent = instruction || subject;
+    if (!inputContent || inputContent.trim() === '') {
       return res.status(400).json({
         success: false,
-        error: 'Short instruction is required.'
+        error: 'Please enter a subject, problem, or instruction.'
       });
     }
 
     const user = await getAuthUser(req);
     const result = await generateEmail({
-      instruction,
+      instruction: inputContent,
+      subject,
       situation: situation || '💼 Official / Professional',
       category: category || 'Official/Professional',
       tone: tone || 'Professional',
       priority: priority || 'Normal',
       recipient: recipient || '',
       recipientName: recipientName || '',
+      relationship: relationship || '',
       userSignature: user ? user.signature : null
     });
 
