@@ -263,7 +263,7 @@ router.post('/auth/login', async (req, res) => {
     // Set HttpOnly Secure session cookie
     res.cookie('scribe_session', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' || !!process.env.RENDER,
+      secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
