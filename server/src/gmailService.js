@@ -11,10 +11,16 @@ dotenv.config();
 export function getOAuth2Client() {
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
   const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-  const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 
-    (process.env.RENDER || process.env.NODE_ENV === 'production'
-      ? 'https://scribe-ai-1-5nqu.onrender.com/api/auth/google/callback'
-      : 'http://localhost:5000/api/auth/google/callback');
+  
+  let GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
+  if (!GOOGLE_REDIRECT_URI || !GOOGLE_REDIRECT_URI.trim()) {
+    if (process.env.BACKEND_URL) {
+      const cleanBack = process.env.BACKEND_URL.trim().replace(/\/+$/, '').replace(/\/api\/?$/, '');
+      GOOGLE_REDIRECT_URI = `${cleanBack}/api/auth/google/callback`;
+    } else {
+      GOOGLE_REDIRECT_URI = 'http://localhost:5000/api/auth/google/callback';
+    }
+  }
 
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     return null;

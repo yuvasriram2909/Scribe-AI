@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, CheckCircle, ExternalLink, Save, UserCheck, Check, Lock, X } from 'lucide-react';
-import { apiFetch } from '../utils/api';
+import { Settings, Shield, CheckCircle, ExternalLink, Save, UserCheck, Check, Lock, X, Server, RefreshCw, AlertCircle } from 'lucide-react';
+import { apiFetch, getApiBaseUrl, setCustomBackendUrl } from '../utils/api';
 
 export function SettingsView() {
   const [authStatus, setAuthStatus] = useState({
@@ -16,6 +16,11 @@ export function SettingsView() {
   const [clientSecretInput, setClientSecretInput] = useState('');
   const [savingCreds, setSavingCreds] = useState(false);
 
+  // Backend URL configuration
+  const [backendUrlInput, setBackendUrlInput] = useState(localStorage.getItem('customBackendUrl') || '');
+  const [testingBackend, setTestingBackend] = useState(false);
+  const [backendStatus, setBackendStatus] = useState({ tested: false, success: false, message: '' });
+
   // User Signature Form State
   const [signature, setSignature] = useState({
     name: '',
@@ -30,6 +35,13 @@ export function SettingsView() {
   const [savingSig, setSavingSig] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Dynamically compute active redirect URI
+  const activeApiBase = getApiBaseUrl();
+  const activeBackendOrigin = activeApiBase.startsWith('http') 
+    ? activeApiBase.replace(/\/api\/?$/, '') 
+    : (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000');
+  const dynamicRedirectUri = `${activeBackendOrigin}/api/auth/google/callback`;
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -38,7 +50,7 @@ export function SettingsView() {
     try {
       const [authRes, sigRes, urlRes] = await Promise.all([
         apiFetch('/api/auth/status'),
-        apiFetch('/api/signature'),
+        apiFetch('/api/settings/signature'),
         apiFetch('/api/auth/google/url')
       ]);
 
@@ -48,70 +60,119 @@ export function SettingsView() {
       }
       if (sigRes.ok) {
         const sigData = await sigRes.json();
-        if (sigData) setSignature(sigData);
+        setSignature({
+          name: sigData.name || '',
+          designation: sigData.designation || '',
+          company: sigData.company || '',
+          phone: sigData.phone || '',
+          website: sigData.website || '',
+          preferredTone: sigData.preferredTone || 'Professional',
+          enabled: sigData.enabled !== undefined ? sigData.enabled : true
+        });
       }
       if (urlRes.ok) {
         const urlData = await urlRes.json();
-        if (urlData.configured) setAuthUrl(urlData.url);
+        if (urlData.url) setAuthUrl(urlData.url);
       }
     } catch (err) {
-      console.error('Error fetching settings:', err);
+      console.error('Failed to load settings:', err);
     }
   };
 
-  const handleDisconnect = async () => {
+  const handleTestBackend = async () => {
+    setTestingBackend(true);
+    setBackendStatus({ tested: false, success: false, message: '' });
     try {
-      const res = await apiFetch('/api/auth/google/disconnect', { method: 'DELETE' });
+      const targetBase = (backendUrlInput.trim() || activeApiBase).replace(/\/+$/, '');
+      const healthUrl = targetBase.endsWith('/api') ? `${targetBase}/health` : `${targetBase}/api/health`;
+      const res = await fetch(healthUrl, { method: 'GET' });
       if (res.ok) {
-        fetchSettings();
+        setBackendStatus({ tested: true, success: true, message: 'Backend connected successfully! API is online.' });
+      } else {
+        setBackendStatus({ tested: true, success: false, message: `Server returned HTTP ${res.status}.` });
       }
     } catch (err) {
-      console.error('Failed to disconnect:', err);
+      setBackendStatus({ tested: true, success: false, message: `Could not reach server: ${err.message}` });
+    } finally {
+      setTestingBackend(false);
     }
+  };
+
+  const handleSaveBackendUrl = (e) => {
+    e.preventDefault();
+    setCustomBackendUrl(backendUrlInput);
+    alert('Backend URL configuration updated!');
+    fetchSettings();
   };
 
   const handleSaveSignature = async (e) => {
     e.preventDefault();
     setSavingSig(true);
+    setSaveSuccess(false);
+
     try {
-      const res = await apiFetch('/api/signature', {
-        method: 'POST',
+      const res = await apiFetch('/api/settings/signature', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(signature)
       });
+
       if (res.ok) {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        alert('Failed to save signature.');
       }
     } catch (err) {
-      console.error('Failed to save signature:', err);
+      alert('Error saving signature: ' + err.message);
     } finally {
       setSavingSig(false);
     }
   };
 
-  const handleConnectClick = async () => {
-    if (authUrl) {
-      window.location.href = authUrl;
+  const handleDisconnect = async () => {
+    if (!window.confirm('Are you sure you want to disconnect your Gmail OAuth connection?')) {
       return;
     }
+
+    try {
+      const res = await apiFetch('/api/auth/google/disconnect', { method: 'POST' });
+      if (res.ok) {
+        setAuthStatus({
+          isConnected: false,
+          connectedEmail: null,
+          isGoogleConfigured: true,
+          mode: 'Not Connected'
+        });
+        setAuthUrl(null);
+        fetchSettings();
+      }
+    } catch (err) {
+      alert('Error disconnecting: ' + err.message);
+    }
+  };
+
+  const handleConnectClick = async () => {
     try {
       const res = await apiFetch('/api/auth/google/url');
       const data = await res.json();
       if (data && data.url) {
-        setAuthUrl(data.url);
         window.location.href = data.url;
       } else {
         setShowConfigModal(true);
       }
-    } catch (e) {
+    } catch (err) {
       setShowConfigModal(true);
     }
   };
 
   const handleSaveOAuthCredentials = async (e) => {
     e.preventDefault();
-    if (!clientIdInput.trim() || !clientSecretInput.trim()) return;
+    if (!clientIdInput.trim() || !clientSecretInput.trim()) {
+      alert('Please enter both Google Client ID and Client Secret.');
+      return;
+    }
+
     setSavingCreds(true);
     try {
       const res = await apiFetch('/api/auth/google/credentials', {
@@ -140,7 +201,7 @@ export function SettingsView() {
           <Settings className="w-5 h-5 text-[#667A45]" />
           Settings & Account Authorization
         </h2>
-        <p className="text-xs text-[#6F725F] mt-1">Configure Gmail sender authorization, user signature, and security defaults</p>
+        <p className="text-xs text-[#6F725F] mt-1">Configure Gmail sender authorization, backend endpoint, and email signature defaults</p>
       </div>
 
       {/* 1. Official Google OAuth 2.0 Authorization Card */}
@@ -208,6 +269,159 @@ export function SettingsView() {
         )}
       </div>
 
+      {/* 2. Backend Server & Database Endpoint Configuration */}
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6">
+        <div className="flex items-start justify-between border-b border-[#D8D1BC] pb-4">
+          <div>
+            <h3 className="text-base font-extrabold text-[#28321D] flex items-center gap-2">
+              <Server className="w-5 h-5 text-[#667A45]" />
+              Backend API & Database Server Connection
+            </h3>
+            <p className="text-xs text-[#6F725F] mt-1">
+              Active backend endpoint: <code className="font-mono font-bold text-[#3F4D2A] bg-[#FAF8F1] px-2 py-0.5 rounded border border-[#D8D1BC]">{activeApiBase}</code>
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSaveBackendUrl} className="space-y-4">
+          <div>
+            <label className="text-xs font-bold text-[#28321D] block mb-1">
+              Custom Backend API URL <span className="text-[#6F725F] font-normal">(Optional — defaults to environment variable or local server)</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="url"
+                placeholder="e.g. https://your-backend-api.onrender.com or http://localhost:5000"
+                value={backendUrlInput}
+                onChange={(e) => setBackendUrlInput(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl glass-input text-xs text-[#28321D] font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleTestBackend}
+                disabled={testingBackend}
+                className="px-4 py-2.5 rounded-xl bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] border border-[#D8D1BC] text-xs font-bold shrink-0 cursor-pointer flex items-center gap-1"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${testingBackend ? 'animate-spin' : ''}`} />
+                Test
+              </button>
+            </div>
+          </div>
+
+          {backendStatus.tested && (
+            <div className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
+              backendStatus.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
+            }`}>
+              {backendStatus.success ? <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />}
+              <span>{backendStatus.message}</span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-[#D8D1BC]">
+            <div className="text-[11px] text-[#6F725F]">
+              Required OAuth Redirect URI for this backend: <code className="font-mono font-bold text-[#28321D] select-all">{dynamicRedirectUri}</code>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(dynamicRedirectUri);
+                  alert('Copied Redirect URI to clipboard!');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] border border-[#D8D1BC] text-xs font-bold cursor-pointer"
+              >
+                Copy Redirect URI
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl gradient-btn text-[#FAF8F1] text-xs font-bold shadow-xs cursor-pointer"
+              >
+                Save Backend URL
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      {/* 3. User Signature Settings Card */}
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6">
+        <div className="flex items-start justify-between border-b border-[#D8D1BC] pb-4">
+          <div>
+            <h3 className="text-base font-extrabold text-[#28321D] flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-[#667A45]" />
+              Personal Email Signature
+            </h3>
+            <p className="text-xs text-[#6F725F] mt-1">Automatically appended to all AI-drafted emails</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSaveSignature} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-[#28321D] block mb-1">Full Name</label>
+              <input
+                type="text"
+                placeholder="Alex Morgan"
+                value={signature.name}
+                onChange={(e) => setSignature({ ...signature, name: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-[#28321D] block mb-1">Designation / Title</label>
+              <input
+                type="text"
+                placeholder="Product Lead / Senior Engineer"
+                value={signature.designation}
+                onChange={(e) => setSignature({ ...signature, designation: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-[#28321D] block mb-1">Company / Organization</label>
+              <input
+                type="text"
+                placeholder="Acme Corp"
+                value={signature.company}
+                onChange={(e) => setSignature({ ...signature, company: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-[#28321D] block mb-1">Phone Number</label>
+              <input
+                type="text"
+                placeholder="+1 (555) 000-1234"
+                value={signature.phone}
+                onChange={(e) => setSignature({ ...signature, phone: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-[#D8D1BC]">
+            <label className="flex items-center gap-2 text-xs font-semibold text-[#28321D] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={signature.enabled}
+                onChange={(e) => setSignature({ ...signature, enabled: e.target.checked })}
+                className="rounded text-[#667A45] focus:ring-[#667A45]"
+              />
+              <span>Enable signature on all outgoing emails</span>
+            </label>
+
+            <button
+              type="submit"
+              disabled={savingSig}
+              className="px-6 py-2.5 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {savingSig ? 'Saving...' : saveSuccess ? 'Saved ✓' : 'Save Signature'}
+            </button>
+          </div>
+        </form>
+      </div>
+
       {/* Configuration Modal if credentials need initializing */}
       {showConfigModal && (
         <div className="fixed inset-0 z-50 bg-[#28321D]/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -245,7 +459,7 @@ export function SettingsView() {
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText('https://scribe-ai-1-5nqu.onrender.com/api/auth/google/callback');
+                    navigator.clipboard.writeText(dynamicRedirectUri);
                     alert('Copied Redirect URI to clipboard!');
                   }}
                   className="px-2.5 py-1 rounded bg-[#667A45] hover:bg-[#3F4D2A] text-[#FAF8F1] font-bold text-[10px] cursor-pointer"
@@ -254,7 +468,7 @@ export function SettingsView() {
                 </button>
               </div>
               <code className="block p-2 rounded bg-white border border-amber-200 font-mono text-[11px] text-[#28321D] break-all select-all font-bold">
-                https://scribe-ai-1-5nqu.onrender.com/api/auth/google/callback
+                {dynamicRedirectUri}
               </code>
               <p className="text-[10px] text-amber-800 leading-tight">
                 Make sure this exact URI is listed under <strong>Authorized redirect URIs</strong> in Google Cloud Console for your Client ID.
@@ -290,121 +504,23 @@ export function SettingsView() {
                 <button
                   type="button"
                   onClick={() => setShowConfigModal(false)}
-                  className="px-4 py-2 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs font-bold text-[#6F725F]"
+                  className="px-4 py-2 rounded-xl bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#28321D] text-xs font-bold border border-[#D8D1BC] cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingCreds}
-                  className="px-6 py-2 rounded-xl gradient-btn text-[#FAF8F1] text-xs font-bold"
+                  className="px-6 py-2 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
                 >
-                  {savingCreds ? 'Saving & Launching...' : '⚡ Save & Launch Google Sign-In'}
+                  <Lock className="w-3.5 h-3.5" />
+                  {savingCreds ? 'Saving...' : '⚡ Save & Launch Google Sign-In'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {/* 2. User Signature Settings */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6">
-        <div className="border-b border-[#D8D1BC] pb-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-bold text-[#28321D] flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-[#667A45]" />
-              User Signature Configuration
-            </h3>
-            <p className="text-xs text-[#6F725F] mt-1">
-              Your signature is automatically appended to generated professional emails.
-            </p>
-          </div>
-
-          <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[#28321D]">
-            <input
-              type="checkbox"
-              checked={signature.enabled}
-              onChange={(e) => setSignature({ ...signature, enabled: e.target.checked })}
-              className="rounded bg-[#FAF8F1] border-[#D8D1BC] text-[#667A45] focus:ring-[#667A45] w-4 h-4"
-            />
-            Enable Signature
-          </label>
-        </div>
-
-        <form onSubmit={handleSaveSignature} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-[#28321D] block mb-1">Full Name</label>
-              <input
-                type="text"
-                placeholder="Alex Morgan"
-                value={signature.name || ''}
-                onChange={(e) => setSignature({ ...signature, name: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-[#28321D] block mb-1">Designation / Role</label>
-              <input
-                type="text"
-                placeholder="Senior Software Engineer"
-                value={signature.designation || ''}
-                onChange={(e) => setSignature({ ...signature, designation: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-[#28321D] block mb-1">Company</label>
-              <input
-                type="text"
-                placeholder="TechCorp Innovations"
-                value={signature.company || ''}
-                onChange={(e) => setSignature({ ...signature, company: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-[#28321D] block mb-1">Phone Number</label>
-              <input
-                type="text"
-                placeholder="+1 (555) 234-5678"
-                value={signature.phone || ''}
-                onChange={(e) => setSignature({ ...signature, phone: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            {saveSuccess && (
-              <span className="text-xs text-[#137333] font-bold flex items-center gap-1">
-                <Check className="w-4 h-4" /> Signature saved successfully!
-              </span>
-            )}
-            <button
-              type="submit"
-              disabled={savingSig}
-              className="ml-auto px-6 py-2.5 rounded-xl gradient-btn text-[#FAF8F1] text-xs font-bold flex items-center gap-2 shadow-xs cursor-pointer"
-            >
-              <Save className="w-4 h-4" />
-              {savingSig ? 'Saving...' : 'Save Signature Settings'}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* 3. Security Policy Statement */}
-      <div className="glass-panel p-6 rounded-3xl border border-[#D8D1BC] text-xs text-[#6F725F] space-y-2">
-        <div className="flex items-center gap-2 text-[#3F4D2A] font-extrabold">
-          <Lock className="w-4 h-4 text-[#667A45]" /> Security & Privacy Assurance
-        </div>
-        <p>
-          Scribe AI strictly adheres to explicit user confirmation principles. No email is sent without your explicit approval click in Step 4. All API keys and OAuth tokens remain securely stored server-side.
-        </p>
-      </div>
     </div>
   );
 }
