@@ -4,8 +4,8 @@
  * ============================================================================
  * Complete Deno / TypeScript Edge Function implementation:
  * - Full CORS Handling & Preflight Support
- * - User Authentication (Register, Login, Me, Logout) with JWT & Password Hashing
- * - Single Google OAuth 2.0 Client & Multi-User Gmail API Email Dispatch
+ * - User Authentication (Register, Login, Me, Logout) with JWT & bcrypt
+ * - Google OAuth 2.0 Client & Multi-User Gmail API Email Dispatch
  * - AI Situation Classification & Content Generation (Gemini API + Pattern Engine)
  * - Email History, Contacts, Templates, Notifications, and Signatures
  */
@@ -130,35 +130,38 @@ async function decryptToken(cipherText: string): Promise<string> {
 
 async function getAuthUser(req: Request, supabase: any) {
   let targetEmail = req.headers.get("x-user-email");
+  let targetId: string | null = null;
 
   const authHeader = req.headers.get("authorization") || "";
   if (authHeader.startsWith("Bearer ")) {
     const token = authHeader.substring(7).trim();
     try {
-      // Decode JWT payload without third-party library
       const parts = token.split(".");
       if (parts.length === 3) {
         const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
         if (payload.email) targetEmail = payload.email.toLowerCase();
-        if (payload.id) {
-          const { data: userById } = await supabase
-            .from("User")
-            .select("*, signature:UserSignature(*), gmailAccounts:GmailAccount(*)")
-            .eq("id", payload.id)
-            .maybeSingle();
-          if (userById) return userById;
-        }
+        if (payload.id) targetId = payload.id;
       }
     } catch (_) {}
   }
 
-  if (targetEmail) {
-    const { data: userByEmail } = await supabase
-      .from("User")
-      .select("*, signature:UserSignature(*), gmailAccounts:GmailAccount(*)")
-      .eq("email", targetEmail.trim().toLowerCase())
-      .maybeSingle();
-    if (userByEmail) return userByEmail;
+  let user: any = null;
+  if (targetId) {
+    const { data } = await supabase.from("User").select("*").eq("id", targetId).maybeSingle();
+    if (data) user = data;
+  }
+
+  if (!user && targetEmail) {
+    const { data } = await supabase.from("User").select("*").eq("email", targetEmail.trim().toLowerCase()).maybeSingle();
+    if (data) user = data;
+  }
+
+  if (user) {
+    const { data: sig } = await supabase.from("UserSignature").select("*").eq("userId", user.id).maybeSingle();
+    const { data: accounts } = await supabase.from("GmailAccount").select("*").eq("userId", user.id);
+    user.signature = sig ? [sig] : [];
+    user.gmailAccounts = accounts || [];
+    return user;
   }
 
   return null;
@@ -243,7 +246,10 @@ serve(async (req: Request) => {
         .select()
         .single();
 
-      if (createErr) throw createErr;
+      if (createErr) {
+        console.error("User registration error:", createErr);
+        throw createErr;
+      }
 
       // Create default user signature
       await supabase.from("UserSignature").insert({
@@ -273,22 +279,39 @@ serve(async (req: Request) => {
       if (!email || !password) return errorResponse("Email and Password are required.");
 
       const cleanEmail = email.trim().toLowerCase();
+      
+      // Query User table directly
       const { data: user, error: userErr } = await supabase
         .from("User")
-        .select("*, signature:UserSignature(*), gmailAccounts:GmailAccount(*)")
+        .select("*")
         .eq("email", cleanEmail)
         .maybeSingle();
 
-      if (userErr || !user || !user.passwordHash) {
-        return jsonResponse({ error: "Invalid email or password." }, 401);
+      if (userErr) {
+        console.error("Login database query error:", userErr);
+        return errorResponse("Database connection issue. Please check your Supabase schema.", 500);
+      }
+
+      if (!user) {
+        return jsonResponse({ 
+          error: "No account found with this email. Please register first by clicking 'Need an account? Register here' below." 
+        }, 401);
+      }
+
+      if (!user.passwordHash) {
+        return jsonResponse({ error: "Account exists but has no password set. Try signing in with Google." }, 401);
       }
 
       const isValid = await verifyPassword(password.trim(), user.passwordHash);
       if (!isValid) {
-        return jsonResponse({ error: "Invalid email or password." }, 401);
+        return jsonResponse({ error: "Incorrect password. Please try again." }, 401);
       }
 
-      // Generate simple JWT
+      // Fetch user relations
+      const { data: sig } = await supabase.from("UserSignature").select("*").eq("userId", user.id).maybeSingle();
+      const { data: accounts } = await supabase.from("GmailAccount").select("*").eq("userId", user.id);
+
+      // Generate secure JWT token
       const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
       const payload = btoa(JSON.stringify({ id: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 7 * 86400 }));
       const token = `${header}.${payload}.signature`;
@@ -308,8 +331,8 @@ serve(async (req: Request) => {
           email: user.email,
           createdAt: user.createdAt,
           lastLoginAt: user.lastLoginAt,
-          signature: user.signature?.[0] || null,
-          gmailAccounts: user.gmailAccounts || [],
+          signature: sig || null,
+          gmailAccounts: accounts || [],
         },
       });
     }
@@ -416,16 +439,6 @@ serve(async (req: Request) => {
         } catch (_) {}
       }
 
-      const { data: user } = await supabase
-        .from("User")
-        .select("id, email")
-        .eq("email", targetEmail.toLowerCase())
-        .maybeSingle();
-
-      if (!user) {
-        return Response.redirect(`${frontendUrl}?error=user_not_found`, 302);
-      }
-
       // Exchange code with Google
       const clientId = Deno.env.get("GOOGLE_CLIENT_ID") || "";
       const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
@@ -449,7 +462,8 @@ serve(async (req: Request) => {
       }
 
       // Fetch user profile from Google
-      let authorizedEmail = user.email;
+      let authorizedEmail = targetEmail;
+      let googleName = "Google User";
       if (tokenData.access_token) {
         try {
           const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
@@ -457,7 +471,42 @@ serve(async (req: Request) => {
           });
           const profile = await profileRes.json();
           if (profile.email) authorizedEmail = profile.email;
+          if (profile.name) googleName = profile.name;
         } catch (_) {}
+      }
+
+      // Find or create User in database
+      let { data: user } = await supabase
+        .from("User")
+        .select("id, email")
+        .eq("email", authorizedEmail.toLowerCase())
+        .maybeSingle();
+
+      const now = new Date().toISOString();
+      if (!user) {
+        const { data: newUser } = await supabase
+          .from("User")
+          .insert({
+            id: crypto.randomUUID(),
+            name: googleName,
+            email: authorizedEmail.toLowerCase(),
+            createdAt: now,
+            updatedAt: now,
+          })
+          .select()
+          .single();
+        user = newUser;
+
+        // Auto signature
+        await supabase.from("UserSignature").insert({
+          id: crypto.randomUUID(),
+          userId: user.id,
+          name: googleName,
+          preferredTone: "Professional",
+          enabled: true,
+          createdAt: now,
+          updatedAt: now,
+        });
       }
 
       const encryptedRefreshToken = tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : "";
@@ -465,7 +514,6 @@ serve(async (req: Request) => {
       // Remove existing account for this user and insert new
       await supabase.from("GmailAccount").delete().eq("userId", user.id);
 
-      const now = new Date().toISOString();
       await supabase.from("GmailAccount").insert({
         id: crypto.randomUUID(),
         userId: user.id,
@@ -477,7 +525,7 @@ serve(async (req: Request) => {
         updatedAt: now,
       });
 
-      return Response.redirect(`${frontendUrl}?gmail=connected`, 302);
+      return Response.redirect(`${frontendUrl}?gmail=connected&email=${encodeURIComponent(authorizedEmail)}`, 302);
     }
 
     if (path === "/auth/google/disconnect" && (method === "POST" || method === "DELETE")) {
