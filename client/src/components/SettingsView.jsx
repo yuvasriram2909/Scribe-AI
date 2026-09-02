@@ -1,29 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, CheckCircle, ExternalLink, Save, UserCheck, Check, Lock, X, Server, RefreshCw, AlertCircle } from 'lucide-react';
-import { apiFetch, getApiBaseUrl, setCustomBackendUrl } from '../utils/api';
+import { 
+  Settings, 
+  Shield, 
+  CheckCircle, 
+  ExternalLink, 
+  Server, 
+  RefreshCw, 
+  AlertCircle, 
+  UserCheck, 
+  Save, 
+  Copy,
+  Mail,
+  Lock
+} from 'lucide-react';
+import { apiFetch, safeParseResponse, getApiBaseUrl, setCustomBackendUrl } from '../utils/api';
 
 export function SettingsView() {
+  // Gmail OAuth status
   const [authStatus, setAuthStatus] = useState({
     isConnected: false,
+    status: 'DISCONNECTED',
     connectedEmail: null,
-    isGoogleConfigured: false,
-    mode: 'Loading...'
+    isGoogleConfigured: true,
+    mode: 'Checking connection...'
   });
+  const [connectingGoogle, setConnectingGoogle] = useState(false);
+  const [authError, setAuthError] = useState('');
 
-  const [authUrl, setAuthUrl] = useState(null);
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const [clientIdInput, setClientIdInput] = useState('');
-  const [clientSecretInput, setClientSecretInput] = useState('');
-  const [savingCreds, setSavingCreds] = useState(false);
-
-  // Backend URL configuration
-  const [backendUrlInput, setBackendUrlInput] = useState(localStorage.getItem('customBackendUrl') || '');
+  // Backend API URL State
+  const [activeApiBase, setActiveApiBase] = useState(getApiBaseUrl());
+  const [backendUrlInput, setBackendUrlInput] = useState(getApiBaseUrl());
   const [testingBackend, setTestingBackend] = useState(false);
   const [backendStatus, setBackendStatus] = useState({ tested: false, success: false, message: '' });
 
-  // User Signature Form State
+  // Signature Settings State
   const [signature, setSignature] = useState({
-    name: '',
+    name: localStorage.getItem('userName') || '',
     designation: '',
     company: '',
     phone: '',
@@ -31,35 +43,38 @@ export function SettingsView() {
     preferredTone: 'Professional',
     enabled: true
   });
-
   const [savingSig, setSavingSig] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Dynamically compute active redirect URI
-  const activeApiBase = getApiBaseUrl();
-  const activeBackendOrigin = activeApiBase.startsWith('http') 
-    ? activeApiBase.replace(/\/api\/?$/, '') 
-    : (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000');
-  const dynamicRedirectUri = `${activeBackendOrigin}/api/auth/google/callback`;
+  const dynamicRedirectUri = `${activeApiBase.replace(/\/+$/, '')}/auth/google/callback`;
 
+  // Fetch status on mount
   useEffect(() => {
     fetchSettings();
   }, []);
 
   const fetchSettings = async () => {
     try {
-      const [authRes, sigRes, urlRes] = await Promise.all([
-        apiFetch('/api/auth/status'),
-        apiFetch('/api/settings/signature'),
-        apiFetch('/api/auth/google/url')
-      ]);
+      // 1. Fetch Gmail OAuth status
+      const res = await apiFetch('/api/auth/status');
+      const data = await safeParseResponse(res);
+      setAuthStatus(data);
+    } catch (err) {
+      console.warn('Error fetching auth status:', err);
+      setAuthStatus({
+        isConnected: false,
+        status: 'DISCONNECTED',
+        connectedEmail: null,
+        isGoogleConfigured: true,
+        mode: 'Backend connecting...'
+      });
+    }
 
-      if (authRes.ok) {
-        const data = await authRes.json();
-        setAuthStatus(data);
-      }
-      if (sigRes.ok) {
-        const sigData = await sigRes.json();
+    try {
+      // 2. Fetch user signature
+      const sigRes = await apiFetch('/api/settings/signature');
+      const sigData = await safeParseResponse(sigRes);
+      if (sigData && sigData.name) {
         setSignature({
           name: sigData.name || '',
           designation: sigData.designation || '',
@@ -70,82 +85,27 @@ export function SettingsView() {
           enabled: sigData.enabled !== undefined ? sigData.enabled : true
         });
       }
-      if (urlRes.ok) {
-        const urlData = await urlRes.json();
-        if (urlData.url) setAuthUrl(urlData.url);
-      }
     } catch (err) {
-      console.error('Failed to load settings:', err);
-    }
-  };
-
-  const handleTestBackend = async () => {
-    setTestingBackend(true);
-    setBackendStatus({ tested: false, success: false, message: '' });
-    try {
-      const targetBase = (backendUrlInput.trim() || activeApiBase).replace(/\/+$/, '');
-      const healthUrl = targetBase.endsWith('/api') ? `${targetBase}/health` : `${targetBase}/api/health`;
-      const res = await fetch(healthUrl, { method: 'GET' });
-      if (res.ok) {
-        setBackendStatus({ tested: true, success: true, message: 'Backend connected successfully! API is online.' });
-      } else {
-        setBackendStatus({ tested: true, success: false, message: `Server returned HTTP ${res.status}.` });
-      }
-    } catch (err) {
-      setBackendStatus({ tested: true, success: false, message: `Could not reach server: ${err.message}` });
-    } finally {
-      setTestingBackend(false);
-    }
-  };
-
-  const handleSaveBackendUrl = (e) => {
-    e.preventDefault();
-    setCustomBackendUrl(backendUrlInput);
-    alert('Backend URL configuration updated!');
-    fetchSettings();
-  };
-
-  const handleSaveSignature = async (e) => {
-    e.preventDefault();
-    setSavingSig(true);
-    setSaveSuccess(false);
-
-    try {
-      const res = await apiFetch('/api/settings/signature', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(signature)
-      });
-
-      if (res.ok) {
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
-      } else {
-        alert('Failed to save signature.');
-      }
-    } catch (err) {
-      alert('Error saving signature: ' + err.message);
-    } finally {
-      setSavingSig(false);
+      console.warn('Error fetching signature:', err);
     }
   };
 
   const handleDisconnect = async () => {
-    if (!window.confirm('Are you sure you want to disconnect your Gmail OAuth connection?')) {
-      return;
-    }
-
+    if (!confirm('Are you sure you want to disconnect your Google Gmail account from Scribe AI?')) return;
     try {
       const res = await apiFetch('/api/auth/google/disconnect', { method: 'POST' });
+      const data = await safeParseResponse(res);
       if (res.ok) {
         setAuthStatus({
           isConnected: false,
+          status: 'DISCONNECTED',
           connectedEmail: null,
           isGoogleConfigured: true,
           mode: 'Not Connected'
         });
-        setAuthUrl(null);
         fetchSettings();
+      } else {
+        alert(data.error || 'Failed to disconnect account.');
       }
     } catch (err) {
       alert('Error disconnecting: ' + err.message);
@@ -153,44 +113,82 @@ export function SettingsView() {
   };
 
   const handleConnectClick = async () => {
+    setConnectingGoogle(true);
+    setAuthError('');
     try {
-      const res = await apiFetch('/api/auth/google/url');
-      const data = await res.json();
+      const res = await apiFetch('/api/auth/google/start');
+      const data = await safeParseResponse(res);
       if (data && data.url) {
         window.location.href = data.url;
       } else {
-        setShowConfigModal(true);
+        throw new Error(data?.error || 'Google OAuth is not configured in backend environment.');
       }
     } catch (err) {
-      setShowConfigModal(true);
+      console.error('OAuth start error:', err);
+      setAuthError(err.message || 'Failed to initiate Google OAuth. Please ensure GOOGLE_CLIENT_ID is set in Supabase Secrets.');
+      setConnectingGoogle(false);
     }
   };
 
-  const handleSaveOAuthCredentials = async (e) => {
+  const handleSaveBackendUrl = (e) => {
     e.preventDefault();
-    if (!clientIdInput.trim() || !clientSecretInput.trim()) {
-      alert('Please enter both Google Client ID and Client Secret.');
-      return;
-    }
+    setCustomBackendUrl(backendUrlInput);
+    setActiveApiBase(getApiBaseUrl());
+    setBackendStatus({
+      tested: true,
+      success: true,
+      message: 'Backend URL updated in local configuration.'
+    });
+    fetchSettings();
+  };
 
-    setSavingCreds(true);
+  const handleTestBackend = async () => {
+    setTestingBackend(true);
+    setBackendStatus({ tested: false, success: false, message: '' });
     try {
-      const res = await apiFetch('/api/auth/google/credentials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: clientIdInput.trim(), clientSecret: clientSecretInput.trim() })
-      });
-      const data = await res.json();
-      if (res.ok && data.url) {
-        setAuthUrl(data.url);
-        window.location.href = data.url;
+      const res = await apiFetch('/api/health');
+      const data = await safeParseResponse(res);
+      if (res.ok && data.status === 'online') {
+        setBackendStatus({
+          tested: true,
+          success: true,
+          message: `Connection successful! Supabase Edge Function is active (${data.service || 'Online'}).`
+        });
       } else {
-        alert(data.error || 'Failed to initialize Google OAuth.');
+        setBackendStatus({
+          tested: true,
+          success: false,
+          message: `Endpoint responded with status ${res.status}.`
+        });
       }
     } catch (err) {
-      alert('Error connecting to OAuth endpoint: ' + err.message);
+      setBackendStatus({
+        tested: true,
+        success: false,
+        message: err.message || 'Unable to reach backend endpoint.'
+      });
     } finally {
-      setSavingCreds(false);
+      setTestingBackend(false);
+    }
+  };
+
+  const handleSaveSignature = async (e) => {
+    e.preventDefault();
+    setSavingSig(true);
+    try {
+      const res = await apiFetch('/api/settings/signature', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(signature)
+      });
+      if (res.ok) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      }
+    } catch (err) {
+      alert('Failed to save signature: ' + err.message);
+    } finally {
+      setSavingSig(false);
     }
   };
 
@@ -221,9 +219,15 @@ export function SettingsView() {
               ? 'bg-[#E6F4EA] text-[#137333] border border-[#A8DADC]'
               : 'bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]'
           }`}>
-            {authStatus.isConnected ? 'Gmail Connected ✓' : 'Not Connected'}
+            {authStatus.isConnected ? 'Gmail OAuth Active ✓' : 'Not Connected'}
           </span>
         </div>
+
+        {authError && (
+          <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold animate-fadeIn">
+            {authError}
+          </div>
+        )}
 
         {authStatus.isConnected ? (
           <div className="p-5 rounded-2xl bg-[#E6F4EA] border border-[#A8DADC] space-y-3">
@@ -231,18 +235,18 @@ export function SettingsView() {
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-[#137333] shrink-0" />
                 <span className="text-xs font-bold text-[#28321D]">
-                  Gmail Account Connected: <span className="text-[#667A45] font-mono">{authStatus.connectedEmail}</span>
+                  Connected account: <span className="text-[#667A45] font-mono">{authStatus.connectedEmail}</span>
                 </span>
               </div>
               <button
                 onClick={handleDisconnect}
                 className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold border border-red-200 transition-all cursor-pointer"
               >
-                Disconnect Account
+                Disconnect Google
               </button>
             </div>
             <p className="text-xs text-[#6F725F]">
-              All AI-generated emails are dispatched directly from your authentic Gmail address ({authStatus.connectedEmail}) via official Google OAuth 2.0 Gmail API.
+              All AI-generated emails are dispatched directly from your authenticated Gmail address (<span className="font-semibold text-[#28321D]">{authStatus.connectedEmail}</span>) via the official Google OAuth 2.0 Gmail API.
             </p>
           </div>
         ) : (
@@ -250,23 +254,45 @@ export function SettingsView() {
             <div>
               <h4 className="text-base font-extrabold text-[#28321D] flex items-center justify-center sm:justify-start gap-2">
                 <Shield className="w-5 h-5 text-[#667A45]" />
-                Connect Gmail Account via Google OAuth
+                Connect with Google
               </h4>
               <p className="text-xs text-[#6F725F] mt-1 max-w-xl">
-                Click the button below to sign in securely with your Google account and grant 1-click Gmail sending permissions for real email dispatches.
+                Click the button to choose your Google account and grant 1-click Gmail sending permissions for genuine email dispatches.
               </p>
             </div>
 
             <button
               type="button"
               onClick={handleConnectClick}
-              className="px-8 py-4 rounded-2xl gradient-btn text-[#FAF8F1] font-extrabold text-xs inline-flex items-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shrink-0"
+              disabled={connectingGoogle}
+              className="px-8 py-4 rounded-2xl gradient-btn text-[#FAF8F1] font-extrabold text-xs inline-flex items-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shrink-0 disabled:opacity-60"
             >
               <ExternalLink className="w-4 h-4 text-[#FAF8F1]" />
-              ⚡ Connect Google Account
+              {connectingGoogle ? 'Connecting to Google...' : '⚡ Connect with Google'}
             </button>
           </div>
         )}
+
+        {/* Developer configuration info */}
+        <div className="p-4 rounded-2xl bg-[#FAF8F1] border border-[#D8D1BC] text-[11px] text-[#6F725F] space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="font-bold text-[#28321D]">Developer Note — Google Cloud Console Authorized Redirect URI:</span>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(dynamicRedirectUri);
+                alert('Copied Redirect URI to clipboard!');
+              }}
+              className="px-2.5 py-1 rounded bg-[#667A45] hover:bg-[#3F4D2A] text-[#FAF8F1] font-bold text-[10px] cursor-pointer flex items-center gap-1"
+            >
+              <Copy className="w-3 h-3" />
+              Copy Redirect URI
+            </button>
+          </div>
+          <code className="block p-2 rounded bg-white border border-[#D8D1BC] font-mono text-[11px] text-[#28321D] break-all select-all font-bold">
+            {dynamicRedirectUri}
+          </code>
+        </div>
       </div>
 
       {/* 2. Backend Server & Database Endpoint Configuration */}
@@ -317,28 +343,13 @@ export function SettingsView() {
             </div>
           )}
 
-          <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-[#D8D1BC]">
-            <div className="text-[11px] text-[#6F725F]">
-              Required OAuth Redirect URI for this backend: <code className="font-mono font-bold text-[#28321D] select-all">{dynamicRedirectUri}</code>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(dynamicRedirectUri);
-                  alert('Copied Redirect URI to clipboard!');
-                }}
-                className="px-3 py-1.5 rounded-lg bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] border border-[#D8D1BC] text-xs font-bold cursor-pointer"
-              >
-                Copy Redirect URI
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 rounded-xl gradient-btn text-[#FAF8F1] text-xs font-bold shadow-xs cursor-pointer"
-              >
-                Save Backend URL
-              </button>
-            </div>
+          <div className="flex items-center justify-end pt-2 border-t border-[#D8D1BC]">
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl gradient-btn text-[#FAF8F1] text-xs font-bold shadow-xs cursor-pointer"
+            >
+              Save Backend URL
+            </button>
           </div>
         </form>
       </div>
@@ -421,106 +432,6 @@ export function SettingsView() {
           </div>
         </form>
       </div>
-
-      {/* Configuration Modal if credentials need initializing */}
-      {showConfigModal && (
-        <div className="fixed inset-0 z-50 bg-[#28321D]/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-panel max-w-lg w-full p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-5 animate-fadeIn shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#D8D1BC] pb-3">
-              <h3 className="text-sm font-extrabold text-[#28321D] flex items-center gap-2">
-                <Shield className="w-4 h-4 text-[#667A45]" />
-                Initialize Google OAuth Credentials
-              </h3>
-              <button onClick={() => setShowConfigModal(false)} className="text-[#6F725F] hover:text-[#28321D]">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-[#6F725F]">
-              Enter your Google OAuth Client ID & Secret to activate direct Google Cloud OAuth sign-in.
-            </p>
-
-            <div className="p-3.5 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs text-[#28321D] flex items-center justify-between gap-2">
-              <span className="text-[#6F725F] text-[11px] font-medium">Find your OAuth Credentials:</span>
-              <a
-                href="https://console.cloud.google.com/apis/credentials"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[#667A45] hover:text-[#3F4D2A] font-extrabold text-[11px] underline inline-flex items-center gap-1 shrink-0"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Google Cloud Credentials Console ↗
-              </a>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-[#28321D] space-y-2">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <span className="font-bold text-amber-900 text-[11px]">⚠️ Required Redirect URI for this Client ID:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(dynamicRedirectUri);
-                    alert('Copied Redirect URI to clipboard!');
-                  }}
-                  className="px-2.5 py-1 rounded bg-[#667A45] hover:bg-[#3F4D2A] text-[#FAF8F1] font-bold text-[10px] cursor-pointer"
-                >
-                  Copy Redirect URI
-                </button>
-              </div>
-              <code className="block p-2 rounded bg-white border border-amber-200 font-mono text-[11px] text-[#28321D] break-all select-all font-bold">
-                {dynamicRedirectUri}
-              </code>
-              <p className="text-[10px] text-amber-800 leading-tight">
-                Make sure this exact URI is listed under <strong>Authorized redirect URIs</strong> in Google Cloud Console for your Client ID.
-              </p>
-            </div>
-
-            <form onSubmit={handleSaveOAuthCredentials} className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-[#28321D] block mb-1">Google Client ID</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 123456789-abc.apps.googleusercontent.com"
-                  value={clientIdInput}
-                  onChange={(e) => setClientIdInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-[#28321D] block mb-1">Google Client Secret</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="e.g. GOCSPX-xxxxxxxxxxxx"
-                  value={clientSecretInput}
-                  onChange={(e) => setClientSecretInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-[#28321D]"
-                />
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowConfigModal(false)}
-                  className="px-4 py-2 rounded-xl bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#28321D] text-xs font-bold border border-[#D8D1BC] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingCreds}
-                  className="px-6 py-2 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  {savingCreds ? 'Saving...' : '⚡ Save & Launch Google Sign-In'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

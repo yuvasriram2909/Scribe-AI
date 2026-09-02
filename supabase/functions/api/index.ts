@@ -691,12 +691,12 @@ serve(async (req: Request) => {
       });
     }
 
-    if ((path === "/auth/google" || path === "/auth/google/url") && method === "GET") {
+    if ((path === "/auth/google" || path === "/auth/google/url" || path === "/auth/google/start") && method === "GET") {
       const { clientId } = await getGoogleCredentials(supabase);
       const redirectUri = Deno.env.get("GOOGLE_REDIRECT_URI") || `${url.origin}/functions/v1/api/auth/google/callback`;
 
       if (!clientId) {
-        return errorResponse("Google Client ID is not configured. Please initialize credentials in Settings.", 400);
+        return errorResponse("Google Client ID is not configured in Supabase Edge Function Secrets.", 400);
       }
 
       const scopes = [
@@ -712,9 +712,9 @@ serve(async (req: Request) => {
         clientId
       )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(
         scopes
-      )}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
+      )}&access_type=offline&prompt=select_account%20consent&state=${encodeURIComponent(state)}`;
 
-      return jsonResponse({ configured: true, url: googleAuthUrl });
+      return jsonResponse({ success: true, configured: true, url: googleAuthUrl });
     }
 
     if (path === "/auth/google/callback" && method === "GET") {
@@ -993,7 +993,7 @@ serve(async (req: Request) => {
       });
     }
 
-    if ((path === "/ai/generate" || path === "/generate" || path === "/ai/generate-email" || path === "/generate-email") && method === "POST") {
+    if ((path === "/ai/generate" || path === "/generate" || path === "/ai/generate-email" || path === "/generate-email" || path === "/email/generate") && method === "POST") {
       const body = await req.json().catch(() => ({}));
       const { instruction, subject, situation, category, tone, priority, recipient, recipientName } = body;
       const input = instruction || subject || "";
@@ -1132,7 +1132,7 @@ RULES:
       return jsonResponse({ success: true, message: "Contact deleted." });
     }
 
-    if (path === "/emails" && method === "GET") {
+    if ((path === "/emails" || path === "/email/history" || path === "/history") && method === "GET") {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
 
