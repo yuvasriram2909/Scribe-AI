@@ -699,7 +699,9 @@ serve(async (req: Request) => {
         return errorResponse("Google Client ID is not configured in Supabase Edge Function Secrets.", 400);
       }
 
+      // Explicitly request Gmail Send scope along with profile and email
       const scopes = [
+        "openid",
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/gmail.send",
@@ -708,11 +710,12 @@ serve(async (req: Request) => {
       const userEmail = req.headers.get("x-user-email") || "";
       const state = btoa(`${userEmail}:${Date.now()}`);
 
+      // prompt=consent forces Google to display the permissions checkbox screen even if user previously authorized
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
         clientId
       )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(
         scopes
-      )}&access_type=offline&prompt=select_account%20consent&include_granted_scopes=true&state=${encodeURIComponent(state)}`;
+      )}&access_type=offline&prompt=consent%20select_account&include_granted_scopes=true&state=${encodeURIComponent(state)}`;
 
       return jsonResponse({ success: true, configured: true, url: googleAuthUrl });
     }
@@ -810,9 +813,25 @@ serve(async (req: Request) => {
         });
       }
 
-      const encryptedRefreshToken = tokenData.refresh_token ? await encryptToken(tokenData.refresh_token) : "";
+      // Preserve existing refresh token if Google didn't return one during incremental re-auth
+      let encryptedRefreshToken = "";
+      if (tokenData.refresh_token) {
+        encryptedRefreshToken = await encryptToken(tokenData.refresh_token);
+      } else {
+        const { data: existingAccount } = await supabase
+          .from("GmailAccount")
+          .select("encryptedRefreshToken")
+          .eq("userId", user.id)
+          .maybeSingle();
+        if (existingAccount?.encryptedRefreshToken) {
+          encryptedRefreshToken = existingAccount.encryptedRefreshToken;
+        }
+      }
 
-      // Remove existing account for this user and insert new
+      const grantedScope = tokenData.scope || "";
+      const hasGmailSend = grantedScope.includes("gmail.send") || grantedScope.includes("mail.google.com");
+
+      // Remove existing account record for this user and insert updated
       await supabase.from("GmailAccount").delete().eq("userId", user.id);
 
       await supabase.from("GmailAccount").insert({
@@ -821,10 +840,15 @@ serve(async (req: Request) => {
         gmailEmail: authorizedEmail,
         encryptedAccessToken: tokenData.access_token || "",
         encryptedRefreshToken,
-        status: "CONNECTED",
+        scope: grantedScope,
+        status: hasGmailSend ? "CONNECTED" : "NEEDS_ATTENTION",
         createdAt: now,
         updatedAt: now,
       });
+
+      if (!hasGmailSend) {
+        return Response.redirect(`${frontendUrl}?gmail=missing_scopes`, 302);
+      }
 
       return Response.redirect(`${frontendUrl}?gmail=connected&email=${encodeURIComponent(authorizedEmail)}`, 302);
     }

@@ -50,6 +50,11 @@ export default function App() {
       setToastMessage('✓ Gmail Connected Successfully!');
       window.history.replaceState({}, '', window.location.pathname);
       setTimeout(() => setToastMessage(''), 5000);
+    } else if (params.get('gmail') === 'missing_scopes') {
+      setActiveTab('settings');
+      setToastMessage('⚠️ Gmail sending permission was not granted. Please click "Connect with Google" and check the "Send email on your behalf" box.');
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => setToastMessage(''), 8000);
     } else if (params.get('gmail') === 'cancelled') {
       setToastMessage('⚠️ Gmail connection cancelled.');
       window.history.replaceState({}, '', window.location.pathname);
