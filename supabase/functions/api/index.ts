@@ -845,9 +845,25 @@ serve(async (req: Request) => {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Authentication required to send emails.", 401);
 
-      const body = await req.json().catch(() => ({}));
-      const recipient = body.recipient || body.to;
-      const { cc, bcc, subject, body: emailBody, category, situation, priority, tone } = body;
+      let body: any = {};
+      const contentType = req.headers.get("content-type") || "";
+      if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
+        try {
+          const form = await req.formData();
+          const formObj: Record<string, any> = {};
+          for (const [key, value] of form.entries()) {
+            formObj[key] = typeof value === "string" ? value : (value as File).name;
+          }
+          body = formObj;
+        } catch (_) {}
+      } else {
+        body = await req.json().catch(() => ({}));
+      }
+
+      const recipient = body.recipient || body.to || "";
+      const subject = body.subject || "";
+      const emailBody = body.body || body.emailBody || body.email_body || "";
+      const { cc, bcc, category, situation, priority, tone } = body;
 
       if (!recipient || !subject || !emailBody) {
         return errorResponse("Recipient (to), Subject, and Body are required.");
