@@ -275,10 +275,10 @@ export function SettingsView() {
           <div>
             <h3 className="text-base font-extrabold text-[#28321D] flex items-center gap-2">
               <Server className="w-5 h-5 text-[#667A45]" />
-              Backend API & Database Server Connection
+              Supabase Edge Function & Backend API Connection
             </h3>
             <p className="text-xs text-[#6F725F] mt-1">
-              Active backend endpoint: <code className="font-mono font-bold text-[#3F4D2A] bg-[#FAF8F1] px-2 py-0.5 rounded border border-[#D8D1BC]">{activeApiBase}</code>
+              Active Edge Function endpoint: <code className="font-mono font-bold text-[#3F4D2A] bg-[#FAF8F1] px-2 py-0.5 rounded border border-[#D8D1BC]">{activeApiBase}</code>
             </p>
           </div>
         </div>
@@ -286,12 +286,12 @@ export function SettingsView() {
         <form onSubmit={handleSaveBackendUrl} className="space-y-4">
           <div>
             <label className="text-xs font-bold text-[#28321D] block mb-1">
-              Custom Backend API URL <span className="text-[#6F725F] font-normal">(Optional — defaults to environment variable or local server)</span>
+              Backend API / Edge Function URL <span className="text-[#6F725F] font-normal">(Defaults to Supabase Edge Function)</span>
             </label>
             <div className="flex items-center gap-2">
               <input
                 type="url"
-                placeholder="e.g. https://your-backend-api.com or http://localhost:5000"
+                placeholder="https://bjxjorlxjjssrqjosed.supabase.co/functions/v1/api"
                 value={backendUrlInput}
                 onChange={(e) => setBackendUrlInput(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl glass-input text-xs text-[#28321D] font-mono"

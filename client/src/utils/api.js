@@ -1,8 +1,11 @@
 /**
  * Scribe AI — API Utility Helper
  * Performs authenticated API calls with multi-user isolation headers,
- * dynamic backend endpoint resolution, and detailed error handling.
+ * dynamic Supabase Edge Function endpoint resolution, and detailed error handling.
  */
+
+// Default Supabase Edge Function backend endpoint
+const DEFAULT_SUPABASE_EDGE_FUNCTION = 'https://bjxjorlxjjssrqjosed.supabase.co/functions/v1/api';
 
 /**
  * Returns the currently active backend API base URL
@@ -11,24 +14,17 @@ export function getApiBaseUrl() {
   // 1. User-configured custom backend URL in localStorage
   const customUrl = localStorage.getItem('customBackendUrl');
   if (customUrl && customUrl.trim()) {
-    const clean = customUrl.trim().replace(/\/+$/, '');
-    return clean.endsWith('/api') ? clean : `${clean}/api`;
+    return customUrl.trim().replace(/\/+$/, '');
   }
 
-  // 2. Vite environment variable
-  const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+  // 2. Vite environment variable (supports VITE_API_URL and VITE_API_BASE_URL)
+  const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
   if (envUrl && envUrl.trim()) {
-    const clean = envUrl.trim().replace(/\/+$/, '');
-    return clean.endsWith('/api') ? clean : `${clean}/api`;
+    return envUrl.trim().replace(/\/+$/, '');
   }
 
-  // 3. If running in local development
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:5000/api';
-  }
-
-  // 4. Default production fallback (relative /api on same origin)
-  return '/api';
+  // 3. Default production and development endpoint: Supabase Edge Function
+  return DEFAULT_SUPABASE_EDGE_FUNCTION;
 }
 
 /**
@@ -43,7 +39,7 @@ export function setCustomBackendUrl(url) {
 }
 
 /**
- * Performs authenticated API request to active backend
+ * Performs authenticated API request to the active Supabase Edge Function backend
  */
 export async function apiFetch(url, options = {}) {
   const userEmail = localStorage.getItem('userEmail') || '';
@@ -52,7 +48,7 @@ export async function apiFetch(url, options = {}) {
   const rawBase = getApiBaseUrl().replace(/\/+$/, '');
   
   let targetUrl = url;
-  if (rawBase && rawBase !== '/api') {
+  if (rawBase) {
     if (rawBase.endsWith('/api') && url.startsWith('/api/')) {
       targetUrl = `${rawBase}${url.slice(4)}`;
     } else if (url.startsWith('/')) {
@@ -79,7 +75,7 @@ export async function apiFetch(url, options = {}) {
   } catch (fetchErr) {
     console.error(`[API Network Error] Failed to fetch from: ${targetUrl}`, fetchErr);
     if (fetchErr.message?.includes('Failed to fetch') || fetchErr.name === 'TypeError') {
-      throw new Error(`Unable to connect to backend server at ${rawBase || targetUrl}. Please verify your backend service is running and DATABASE_URL is set.`);
+      throw new Error(`Unable to connect to Supabase Edge Function backend at ${rawBase}. Please verify the function is deployed and active.`);
     }
     throw fetchErr;
   }
@@ -92,11 +88,11 @@ export async function safeParseResponse(res) {
   const status = res.status;
 
   if (status === 503 || status === 502) {
-    throw new Error('Backend server is currently starting or unreachable. Please verify your backend service is running.');
+    throw new Error('Supabase Edge Function backend is currently starting or unreachable.');
   }
 
   if (status === 404) {
-    throw new Error(`API endpoint not found (HTTP 404). Please ensure the backend API is deployed and accessible.`);
+    throw new Error(`API endpoint not found (HTTP 404) on Supabase Edge Function.`);
   }
 
   const contentType = res.headers.get('content-type') || '';
@@ -109,9 +105,9 @@ export async function safeParseResponse(res) {
     return { success: true };
   }
 
-  // Check if response is an HTML page (e.g. Vite SPA index.html fallback)
+  // Check if response is an HTML error page
   if (contentType.includes('text/html') || text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-    throw new Error('Backend API returned HTML instead of JSON. The backend server might be offline or VITE_API_BASE_URL is not set.');
+    throw new Error('Backend API returned HTML instead of JSON. Please verify your Supabase Edge Function endpoint.');
   }
 
   if (contentType.includes('application/json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
