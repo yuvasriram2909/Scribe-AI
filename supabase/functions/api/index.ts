@@ -554,12 +554,17 @@ serve(async (req: Request) => {
       }
 
       if (!user.passwordHash) {
-        return jsonResponse({ error: "Account exists but has no password set. Try signing in with Google." }, 401);
-      }
-
-      const isValid = await verifyPassword(password.trim(), user.passwordHash);
-      if (!isValid) {
-        return jsonResponse({ error: "Incorrect password. Please try again." }, 401);
+        // Account was created via Google OAuth without a password: set entered password and log them in smoothly
+        const newHash = await hashPassword(password.trim());
+        await supabase
+          .from("User")
+          .update({ passwordHash: newHash, updatedAt: new Date().toISOString() })
+          .eq("id", user.id);
+      } else {
+        const isValid = await verifyPassword(password.trim(), user.passwordHash);
+        if (!isValid) {
+          return jsonResponse({ error: "Incorrect password. Please try again." }, 401);
+        }
       }
 
       // Fetch user relations
