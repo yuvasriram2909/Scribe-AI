@@ -244,12 +244,12 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
             <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
             <span>{errorMessage}</span>
           </div>
-          {(errorMessage.includes('Gmail') || errorMessage.includes('connect') || errorMessage.includes('OAuth') || errorMessage.includes('scopes') || errorMessage.includes('revoked') || errorMessage.includes('expired')) && (
+          {(errorMessage.includes('Gmail') || errorMessage.includes('connect') || errorMessage.includes('OAuth') || errorMessage.includes('scopes') || errorMessage.includes('permission') || errorMessage.includes('revoked') || errorMessage.includes('expired')) && (
             <button
               onClick={async () => {
                 try {
-                  const res = await apiFetch('/api/auth/google/url');
-                  const data = await res.json();
+                  const res = await apiFetch('/api/auth/google/start');
+                  const data = await safeParseResponse(res);
                   if (data && data.url) {
                     window.location.href = data.url;
                   } else if (onNavigateToSettings) {

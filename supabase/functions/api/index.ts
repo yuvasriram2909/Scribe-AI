@@ -937,7 +937,15 @@ serve(async (req: Request) => {
 
       const sendData = await sendRes.json();
       if (!sendRes.ok || sendData.error) {
-        throw new Error(sendData.error?.message || "Failed to send email through Gmail API");
+        const errorMsg = sendData.error?.message || "Failed to send email through Gmail API";
+        if (sendRes.status === 403 && (errorMsg.includes("insufficient") || errorMsg.includes("scope") || errorMsg.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT"))) {
+          return jsonResponse({
+            success: false,
+            error: "Gmail sending permission (gmail.send) is missing. Please click 'Connect Google Gmail' to authorize Gmail sending.",
+            needsReauth: true,
+          }, 403);
+        }
+        throw new Error(errorMsg);
       }
 
       // Record email in database
