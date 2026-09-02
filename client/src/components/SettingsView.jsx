@@ -13,7 +13,7 @@ import {
   Mail,
   Lock
 } from 'lucide-react';
-import { apiFetch, safeParseResponse, getApiBaseUrl, setCustomBackendUrl } from '../utils/api';
+import { apiFetch, safeParseResponse, getApiBaseUrl, setCustomBackendUrl, DEFAULT_SUPABASE_EDGE_FUNCTION } from '../utils/api';
 
 export function SettingsView() {
   // Gmail OAuth status
@@ -343,7 +343,24 @@ export function SettingsView() {
             </div>
           )}
 
-          <div className="flex items-center justify-end pt-2 border-t border-[#D8D1BC]">
+          <div className="flex items-center justify-between pt-2 border-t border-[#D8D1BC]">
+            <button
+              type="button"
+              onClick={() => {
+                setCustomBackendUrl('');
+                setBackendUrlInput(DEFAULT_SUPABASE_EDGE_FUNCTION);
+                setActiveApiBase(DEFAULT_SUPABASE_EDGE_FUNCTION);
+                setBackendStatus({
+                  tested: true,
+                  success: true,
+                  message: 'Reset backend URL to default Supabase Edge Function.'
+                });
+                fetchSettings();
+              }}
+              className="px-4 py-2 rounded-xl bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] border border-[#D8D1BC] text-xs font-bold cursor-pointer"
+            >
+              Reset to Default
+            </button>
             <button
               type="submit"
               className="px-5 py-2 rounded-xl gradient-btn text-[#FAF8F1] text-xs font-bold shadow-xs cursor-pointer"

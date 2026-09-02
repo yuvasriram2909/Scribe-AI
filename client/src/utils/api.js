@@ -5,7 +5,28 @@
  */
 
 // Default Supabase Edge Function backend endpoint
-const DEFAULT_SUPABASE_EDGE_FUNCTION = 'https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api';
+export const DEFAULT_SUPABASE_EDGE_FUNCTION = 'https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api';
+
+/**
+ * Normalizes and sanitizes the API base URL to ensure no duplicate or nested sub-paths
+ */
+export function sanitizeApiUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string' || !rawUrl.trim()) {
+    return DEFAULT_SUPABASE_EDGE_FUNCTION;
+  }
+  let url = rawUrl.trim().replace(/\/+$/, '');
+  
+  // If user pasted a sub-route like .../functions/v1/api/auth/google/callback, extract the base function endpoint
+  const edgeFunctionMatch = url.match(/^(https?:\/\/[^\/]+\/functions\/v1\/[^\/]+)/i);
+  if (edgeFunctionMatch) {
+    return edgeFunctionMatch[1];
+  }
+  
+  // If URL contains sub-paths after /api or /auth, clean them up
+  url = url.replace(/\/auth(\/.*)?$/i, '');
+  url = url.replace(/\/api\/.*$/i, '/api');
+  return url || DEFAULT_SUPABASE_EDGE_FUNCTION;
+}
 
 /**
  * Returns the currently active backend API base URL
@@ -14,13 +35,18 @@ export function getApiBaseUrl() {
   // 1. User-configured custom backend URL in localStorage
   const customUrl = localStorage.getItem('customBackendUrl');
   if (customUrl && customUrl.trim()) {
-    return customUrl.trim().replace(/\/+$/, '');
+    const sanitized = sanitizeApiUrl(customUrl);
+    // If localStorage had a corrupted sub-route, fix it in storage
+    if (sanitized !== customUrl.trim()) {
+      localStorage.setItem('customBackendUrl', sanitized);
+    }
+    return sanitized;
   }
 
   // 2. Vite environment variable (supports VITE_API_URL and VITE_API_BASE_URL)
   const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
   if (envUrl && envUrl.trim()) {
-    return envUrl.trim().replace(/\/+$/, '');
+    return sanitizeApiUrl(envUrl);
   }
 
   // 3. Default production and development endpoint: Supabase Edge Function
@@ -31,10 +57,10 @@ export function getApiBaseUrl() {
  * Sets or clears custom backend API URL in localStorage
  */
 export function setCustomBackendUrl(url) {
-  if (!url || !url.trim()) {
+  if (!url || !url.trim() || url.trim() === DEFAULT_SUPABASE_EDGE_FUNCTION) {
     localStorage.removeItem('customBackendUrl');
   } else {
-    localStorage.setItem('customBackendUrl', url.trim());
+    localStorage.setItem('customBackendUrl', sanitizeApiUrl(url));
   }
 }
 
