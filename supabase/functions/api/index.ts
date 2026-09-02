@@ -712,7 +712,7 @@ serve(async (req: Request) => {
         clientId
       )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(
         scopes
-      )}&access_type=offline&prompt=select_account%20consent&state=${encodeURIComponent(state)}`;
+      )}&access_type=offline&prompt=select_account%20consent&include_granted_scopes=true&state=${encodeURIComponent(state)}`;
 
       return jsonResponse({ success: true, configured: true, url: googleAuthUrl });
     }
