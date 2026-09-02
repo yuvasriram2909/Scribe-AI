@@ -5,7 +5,9 @@
  * Complete Deno / TypeScript Edge Function implementation:
  * - Full CORS Handling & Preflight Support
  * - User Authentication (Register, Login, Me, Logout) with JWT & bcrypt
- * - Google OAuth 2.0 Client & Multi-User Gmail API Email Dispatch
+ * - Multi-User Google OAuth 2.0 Client & Gmail REST API Email Dispatch
+ * - Dynamic Google Credentials Setup (POST /auth/google/credentials) & SystemConfig persistence
+ * - Automatic OAuth Access Token Refreshing with AES-256-GCM encrypted refresh tokens
  * - AI Situation Classification & Content Generation (Gemini API + Pattern Engine)
  * - Email History, Contacts, Templates, Notifications, and Signatures
  */
@@ -125,6 +127,33 @@ async function decryptToken(cipherText: string): Promise<string> {
 }
 
 // ----------------------------------------------------
+// Google Credentials Dynamic Resolver
+// ----------------------------------------------------
+
+async function getGoogleCredentials(supabase: any) {
+  let clientId = Deno.env.get("GOOGLE_CLIENT_ID") || "";
+  let clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
+
+  if (!clientId || !clientSecret) {
+    try {
+      const { data: configs } = await supabase
+        .from("SystemConfig")
+        .select("key, value")
+        .in("key", ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]);
+
+      if (configs && Array.isArray(configs)) {
+        for (const conf of configs) {
+          if (conf.key === "GOOGLE_CLIENT_ID" && !clientId) clientId = conf.value;
+          if (conf.key === "GOOGLE_CLIENT_SECRET" && !clientSecret) clientSecret = conf.value;
+        }
+      }
+    } catch (_) {}
+  }
+
+  return { clientId: clientId.trim(), clientSecret: clientSecret.trim() };
+}
+
+// ----------------------------------------------------
 // Authentication Resolution Helper
 // ----------------------------------------------------
 
@@ -141,6 +170,12 @@ async function getAuthUser(req: Request, supabase: any) {
         const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
         if (payload.email) targetEmail = payload.email.toLowerCase();
         if (payload.id) targetId = payload.id;
+      } else {
+        // Base64 encoded email token fallback
+        try {
+          const raw = atob(token);
+          if (raw.includes("@")) targetEmail = raw.toLowerCase();
+        } catch (_) {}
       }
     } catch (_) {}
   }
@@ -196,7 +231,7 @@ serve(async (req: Request) => {
       return jsonResponse({
         status: "online",
         service: "Scribe AI Supabase Edge Function",
-        endpoint: "https://bjxjorlxjjssrqjosed.supabase.co/functions/v1/api",
+        endpoint: "https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api",
         timestamp: new Date().toISOString(),
       });
     }
@@ -289,7 +324,7 @@ serve(async (req: Request) => {
 
       if (userErr) {
         console.error("Login database query error:", userErr);
-        return errorResponse("Database connection issue. Please check your Supabase schema.", 500);
+        return errorResponse("Database connection issue. Please run the schema initializer in Supabase SQL Editor.", 500);
       }
 
       if (!user) {
@@ -360,10 +395,54 @@ serve(async (req: Request) => {
     }
 
     // ----------------------------------------------------
-    // Google OAuth 2.0 & Gmail Status / URL / Callback
+    // Google OAuth 2.0 Credentials Setup (POST /auth/google/credentials)
     // ----------------------------------------------------
 
-    if (path === "/auth/status" && method === "GET") {
+    if (path === "/auth/google/credentials" && method === "POST") {
+      const body = await req.json().catch(() => ({}));
+      const { clientId, clientSecret } = body;
+
+      if (!clientId || !clientSecret) {
+        return errorResponse("Both Google Client ID and Client Secret are required.");
+      }
+
+      const cleanClientId = clientId.trim();
+      const cleanClientSecret = clientSecret.trim();
+
+      // Persist in SystemConfig table
+      const now = new Date().toISOString();
+      await supabase.from("SystemConfig").upsert({ key: "GOOGLE_CLIENT_ID", value: cleanClientId, updatedAt: now });
+      await supabase.from("SystemConfig").upsert({ key: "GOOGLE_CLIENT_SECRET", value: cleanClientSecret, updatedAt: now });
+
+      const redirectUri = Deno.env.get("GOOGLE_REDIRECT_URI") || `${url.origin}/functions/v1/api/auth/google/callback`;
+      const scopes = [
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/gmail.send",
+      ].join(" ");
+
+      const userEmail = req.headers.get("x-user-email") || "";
+      const state = btoa(`${userEmail}:${Date.now()}`);
+
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
+        cleanClientId
+      )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(
+        scopes
+      )}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
+
+      return jsonResponse({
+        success: true,
+        message: "Google OAuth credentials configured successfully!",
+        configured: true,
+        url: googleAuthUrl,
+      });
+    }
+
+    // ----------------------------------------------------
+    // Google OAuth 2.0 Status, URL, and Callback
+    // ----------------------------------------------------
+
+    if ((path === "/auth/status" || path === "/auth/google/status") && method === "GET") {
       const user = await getAuthUser(req, supabase);
       if (!user) {
         return jsonResponse({
@@ -388,17 +467,16 @@ serve(async (req: Request) => {
         status: account ? (account.status || "CONNECTED") : "DISCONNECTED",
         connectedEmail: account?.gmailEmail || null,
         isGoogleConfigured: true,
-        mode: isConnected ? "Google OAuth Connected ✓" : "Not Connected",
+        mode: isConnected ? "Google OAuth Active" : "Not Connected",
       });
     }
 
     if ((path === "/auth/google" || path === "/auth/google/url") && method === "GET") {
-      const clientId = Deno.env.get("GOOGLE_CLIENT_ID") || "";
-      const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://scribe-ai-self.vercel.app";
+      const { clientId } = await getGoogleCredentials(supabase);
       const redirectUri = Deno.env.get("GOOGLE_REDIRECT_URI") || `${url.origin}/functions/v1/api/auth/google/callback`;
 
       if (!clientId) {
-        return errorResponse("Google Client ID is not configured in Supabase Edge Function Secrets.");
+        return errorResponse("Google Client ID is not configured. Please initialize credentials in Settings.", 400);
       }
 
       const scopes = [
@@ -439,10 +517,13 @@ serve(async (req: Request) => {
         } catch (_) {}
       }
 
-      // Exchange code with Google
-      const clientId = Deno.env.get("GOOGLE_CLIENT_ID") || "";
-      const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
+      // Resolve Google Client ID and Secret
+      const { clientId, clientSecret } = await getGoogleCredentials(supabase);
       const redirectUri = Deno.env.get("GOOGLE_REDIRECT_URI") || `${url.origin}/functions/v1/api/auth/google/callback`;
+
+      if (!clientId || !clientSecret) {
+        return Response.redirect(`${frontendUrl}?error=oauth_credentials_missing`, 302);
+      }
 
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
@@ -534,6 +615,137 @@ serve(async (req: Request) => {
 
       await supabase.from("GmailAccount").delete().eq("userId", user.id);
       return jsonResponse({ success: true, message: "Gmail account disconnected successfully." });
+    }
+
+    // ----------------------------------------------------
+    // Send Email via Gmail REST API (POST /auth/send-email, /emails/send, /email/send)
+    // ----------------------------------------------------
+
+    if ((path === "/auth/send-email" || path === "/emails/send" || path === "/email/send") && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Authentication required to send emails.", 401);
+
+      const body = await req.json().catch(() => ({}));
+      const recipient = body.recipient || body.to;
+      const { cc, bcc, subject, body: emailBody, category, situation, priority, tone } = body;
+
+      if (!recipient || !subject || !emailBody) {
+        return errorResponse("Recipient (to), Subject, and Body are required.");
+      }
+
+      const { data: accounts } = await supabase
+        .from("GmailAccount")
+        .select("*")
+        .eq("userId", user.id);
+
+      const account = accounts?.[0];
+      if (!account || (!account.encryptedAccessToken && !account.encryptedRefreshToken)) {
+        return errorResponse("Gmail account is not connected. Please connect Google first.", 400);
+      }
+
+      let accessToken = account.encryptedAccessToken;
+      const refreshToken = await decryptToken(account.encryptedRefreshToken);
+
+      // Refresh Google Access Token if refresh token is available
+      if (refreshToken) {
+        const { clientId, clientSecret } = await getGoogleCredentials(supabase);
+        if (clientId && clientSecret) {
+          const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: clientId,
+              client_secret: clientSecret,
+              refresh_token: refreshToken,
+              grant_type: "refresh_token",
+            }),
+          });
+          const refreshData = await refreshRes.json();
+          if (refreshData.access_token) {
+            accessToken = refreshData.access_token;
+            await supabase
+              .from("GmailAccount")
+              .update({ encryptedAccessToken: accessToken, updatedAt: new Date().toISOString() })
+              .eq("id", account.id);
+          }
+        }
+      }
+
+      // Encode RFC 2822 MIME Email
+      const emailLines = [
+        `From: ${account.gmailEmail}`,
+        `To: ${recipient}`,
+        cc ? `Cc: ${cc}` : "",
+        bcc ? `Bcc: ${bcc}` : "",
+        `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+        "MIME-Version: 1.0",
+        "Content-Type: text/plain; charset=UTF-8",
+        "Content-Transfer-Encoding: 7bit",
+        "",
+        emailBody,
+      ].filter(Boolean).join("\r\n");
+
+      const rawBase64 = btoa(unescape(encodeURIComponent(emailLines)))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+
+      const sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ raw: rawBase64 }),
+      });
+
+      const sendData = await sendRes.json();
+      if (!sendRes.ok || sendData.error) {
+        throw new Error(sendData.error?.message || "Failed to send email through Gmail API");
+      }
+
+      // Record email in database
+      const now = new Date().toISOString();
+      const { data: emailRecord } = await supabase
+        .from("Email")
+        .insert({
+          id: crypto.randomUUID(),
+          userId: user.id,
+          recipient,
+          cc: cc || null,
+          bcc: bcc || null,
+          subject,
+          body: emailBody,
+          category: category || "Official/Professional",
+          situation: situation || "💼 Official / Professional",
+          priority: priority || "Normal",
+          tone: tone || "Professional",
+          status: "Sent",
+          sentAt: now,
+          gmailMessageId: sendData.id || null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .select()
+        .single();
+
+      // Create notification
+      await supabase.from("Notification").insert({
+        id: crypto.randomUUID(),
+        userId: user.id,
+        emailId: emailRecord?.id || null,
+        notificationType: category || "General",
+        message: `Email "${subject}" successfully sent to ${recipient} via Gmail.`,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      return jsonResponse({
+        success: true,
+        message: "Email sent successfully",
+        gmailMessageId: sendData.id,
+        email: emailRecord,
+      });
     }
 
     // ----------------------------------------------------
@@ -660,135 +872,6 @@ RULES:
         email_body: generatedBody,
         greeting,
         closing: `Best regards,\n${signatureName}`,
-      });
-    }
-
-    // ----------------------------------------------------
-    // Send Email via Gmail REST API
-    // ----------------------------------------------------
-
-    if ((path === "/emails/send" || path === "/email/send") && method === "POST") {
-      const user = await getAuthUser(req, supabase);
-      if (!user) return errorResponse("Authentication required to send emails.", 401);
-
-      const body = await req.json().catch(() => ({}));
-      const { recipient, cc, bcc, subject, body: emailBody, category, situation, priority, tone } = body;
-
-      if (!recipient || !subject || !emailBody) {
-        return errorResponse("Recipient, Subject, and Body are required.");
-      }
-
-      const { data: accounts } = await supabase
-        .from("GmailAccount")
-        .select("*")
-        .eq("userId", user.id);
-
-      const account = accounts?.[0];
-      if (!account || (!account.encryptedAccessToken && !account.encryptedRefreshToken)) {
-        return errorResponse("Please connect your Gmail account in Settings first.");
-      }
-
-      let accessToken = account.encryptedAccessToken;
-      const refreshToken = await decryptToken(account.encryptedRefreshToken);
-
-      // Refresh Google Access Token if refresh token is available
-      if (refreshToken) {
-        const clientId = Deno.env.get("GOOGLE_CLIENT_ID") || "";
-        const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
-        const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
-            refresh_token: refreshToken,
-            grant_type: "refresh_token",
-          }),
-        });
-        const refreshData = await refreshRes.json();
-        if (refreshData.access_token) {
-          accessToken = refreshData.access_token;
-          await supabase
-            .from("GmailAccount")
-            .update({ encryptedAccessToken: accessToken, updatedAt: new Date().toISOString() })
-            .eq("id", account.id);
-        }
-      }
-
-      // Encode RFC 2822 MIME Email
-      const emailLines = [
-        `From: ${account.gmailEmail}`,
-        `To: ${recipient}`,
-        cc ? `Cc: ${cc}` : "",
-        bcc ? `Bcc: ${bcc}` : "",
-        `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
-        "MIME-Version: 1.0",
-        "Content-Type: text/plain; charset=UTF-8",
-        "Content-Transfer-Encoding: 7bit",
-        "",
-        emailBody,
-      ].filter(Boolean).join("\r\n");
-
-      const rawBase64 = btoa(unescape(encodeURIComponent(emailLines)))
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-
-      const sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ raw: rawBase64 }),
-      });
-
-      const sendData = await sendRes.json();
-      if (!sendRes.ok || sendData.error) {
-        throw new Error(sendData.error?.message || "Failed to send email through Gmail API");
-      }
-
-      // Record email in database
-      const now = new Date().toISOString();
-      const { data: emailRecord } = await supabase
-        .from("Email")
-        .insert({
-          id: crypto.randomUUID(),
-          userId: user.id,
-          recipient,
-          cc: cc || null,
-          bcc: bcc || null,
-          subject,
-          body: emailBody,
-          category: category || "Official/Professional",
-          situation: situation || "💼 Official / Professional",
-          priority: priority || "Normal",
-          tone: tone || "Professional",
-          status: "Sent",
-          sentAt: now,
-          gmailMessageId: sendData.id || null,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .select()
-        .single();
-
-      // Create notification
-      await supabase.from("Notification").insert({
-        id: crypto.randomUUID(),
-        userId: user.id,
-        emailId: emailRecord?.id || null,
-        notificationType: category || "General",
-        message: `Email "${subject}" successfully sent to ${recipient} via Gmail.`,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      return jsonResponse({
-        success: true,
-        message: `Email sent successfully from ${account.gmailEmail}!`,
-        gmailMessageId: sendData.id,
-        email: emailRecord,
       });
     }
 

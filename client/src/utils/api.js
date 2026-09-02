@@ -5,7 +5,7 @@
  */
 
 // Default Supabase Edge Function backend endpoint
-const DEFAULT_SUPABASE_EDGE_FUNCTION = 'https://bjxjorlxjjssrqjosed.supabase.co/functions/v1/api';
+const DEFAULT_SUPABASE_EDGE_FUNCTION = 'https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api';
 
 /**
  * Returns the currently active backend API base URL

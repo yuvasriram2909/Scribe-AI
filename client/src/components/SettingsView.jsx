@@ -291,7 +291,7 @@ export function SettingsView() {
             <div className="flex items-center gap-2">
               <input
                 type="url"
-                placeholder="https://bjxjorlxjjssrqjosed.supabase.co/functions/v1/api"
+                placeholder="https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api"
                 value={backendUrlInput}
                 onChange={(e) => setBackendUrlInput(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl glass-input text-xs text-[#28321D] font-mono"
