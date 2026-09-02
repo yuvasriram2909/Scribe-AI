@@ -146,11 +146,23 @@ export default function App() {
 
   // Public Routes (Accessible without login)
   if (currentRoute === '/privacy') {
-    return <PrivacyPolicy onBackToHome={() => navigateTo('/')} onNavigateToTerms={() => navigateTo('/terms')} />;
+    return (
+      <PrivacyPolicy 
+        onBackToHome={() => navigateTo('/')} 
+        onNavigateToTerms={() => navigateTo('/terms')} 
+        onNavigateToLogin={() => navigateTo('/login')}
+      />
+    );
   }
 
   if (currentRoute === '/terms') {
-    return <TermsOfService onBackToHome={() => navigateTo('/')} onNavigateToPrivacy={() => navigateTo('/privacy')} />;
+    return (
+      <TermsOfService 
+        onBackToHome={() => navigateTo('/')} 
+        onNavigateToPrivacy={() => navigateTo('/privacy')} 
+        onNavigateToLogin={() => navigateTo('/login')}
+      />
+    );
   }
 
   if (currentRoute === '/login') {
