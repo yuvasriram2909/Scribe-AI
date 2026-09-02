@@ -8,7 +8,7 @@
  * - Multi-User Google OAuth 2.0 Client & Gmail REST API Email Dispatch
  * - Dynamic Google Credentials Setup (POST /auth/google/credentials) & SystemConfig persistence
  * - Automatic OAuth Access Token Refreshing with AES-256-GCM encrypted refresh tokens
- * - AI Situation Classification & Content Generation (Gemini API + Pattern Engine)
+ * - AI Situation Classification & Content Generation (Gemini 1.5 Flash + Intelligent Pattern Engine)
  * - Email History, Contacts, Templates, Notifications, and Signatures
  */
 
@@ -200,6 +200,226 @@ async function getAuthUser(req: Request, supabase: any) {
   }
 
   return null;
+}
+
+// ----------------------------------------------------
+// AI Situation & Natural Email Generation Engine
+// ----------------------------------------------------
+
+interface SituationConfig {
+  id: string;
+  name: string;
+  category: string;
+  priority: string;
+  tone: string;
+  keywords: string[];
+}
+
+const SUPPORTED_SITUATIONS: SituationConfig[] = [
+  {
+    id: "🚨 Emergency",
+    name: "🚨 Emergency",
+    category: "Emergency",
+    priority: "High",
+    tone: "Urgent",
+    keywords: ["emergency", "hospital", "doctor", "accident", "urgent personal", "unexpected absence", "medical"]
+  },
+  {
+    id: "⚠️ Important / Necessary",
+    name: "⚠️ Important / Necessary",
+    category: "Important",
+    priority: "High",
+    tone: "Professional",
+    keywords: ["important", "deadline", "time-sensitive", "critical", "required approval", "salary", "payment", "dues"]
+  },
+  {
+    id: "💼 Official / Professional",
+    name: "💼 Official / Professional",
+    category: "Official/Professional",
+    priority: "Normal",
+    tone: "Professional",
+    keywords: ["project update", "meeting", "client", "work from home", "wfh", "delay", "formal request", "extension"]
+  },
+  {
+    id: "📅 Leave / Holiday",
+    name: "📅 Leave / Holiday",
+    category: "Leave/Holiday",
+    priority: "Normal",
+    tone: "Polite",
+    keywords: ["leave", "vacation", "holiday", "sick", "illness", "day off", "permission", "out of office", "unwell"]
+  },
+  {
+    id: "📄 Resume / Job Application",
+    name: "📄 Resume / Job Application",
+    category: "Resume/Job Application",
+    priority: "Normal",
+    tone: "Formal",
+    keywords: ["resume", "cv", "job application", "applying", "role", "position", "internship", "vacancy"]
+  },
+  {
+    id: "🔄 Follow-up",
+    name: "🔄 Follow-up",
+    category: "Follow-up",
+    priority: "Normal",
+    tone: "Professional",
+    keywords: ["follow-up", "follow up", "checking in", "reminder", "status update", "pending"]
+  },
+  {
+    id: "💬 Casual",
+    name: "💬 Casual",
+    category: "Casual",
+    priority: "Normal",
+    tone: "Friendly",
+    keywords: ["casual", "hey", "catch up", "informal", "coffee", "lunch"]
+  },
+  {
+    id: "🎉 Celebration / Occasion",
+    name: "🎉 Celebration / Occasion",
+    category: "Occasion",
+    priority: "Normal",
+    tone: "Warm",
+    keywords: ["birthday", "congratulat", "anniversary", "festival", "greeting", "farewell", "welcome", "thank you"]
+  }
+];
+
+function detectSituationEngine(text: string): SituationConfig {
+  if (!text) return SUPPORTED_SITUATIONS[2];
+  const lower = text.toLowerCase().trim();
+
+  for (const sit of SUPPORTED_SITUATIONS) {
+    if (sit.keywords.some(k => lower.includes(k))) {
+      return sit;
+    }
+  }
+
+  return SUPPORTED_SITUATIONS[2];
+}
+
+function generateNaturalEmailContent(params: {
+  instruction: string;
+  subject?: string;
+  recipient?: string;
+  recipientName?: string;
+  senderName?: string;
+  situationObj?: SituationConfig;
+}) {
+  const { instruction, subject, recipient, recipientName, senderName, situationObj } = params;
+  const sit = situationObj || detectSituationEngine(instruction || subject || "");
+  const lower = (instruction || subject || "").toLowerCase();
+
+  const greeting = recipientName ? `Dear ${recipientName},` : "Dear Sir/Madam,";
+  const myName = senderName || "[Your Name]";
+  const closing = `Best regards,\n${myName}`;
+
+  let outSubject = subject || "";
+  let outBody = "";
+
+  // 1. Leave / Holiday Detection
+  if (sit.category === "Leave/Holiday" || lower.includes("leave") || lower.includes("sick") || lower.includes("illness")) {
+    let days = "a few days";
+    const dayMatch = lower.match(/(\d+|one|two|three|four|five)\s*days?/);
+    if (dayMatch) {
+      days = `${dayMatch[1]} days`;
+    }
+
+    let reason = "personal reasons";
+    if (lower.includes("illness") || lower.includes("sick") || lower.includes("fever") || lower.includes("unwell")) {
+      reason = "illness";
+    } else if (lower.includes("vacation") || lower.includes("trip")) {
+      reason = "vacation";
+    } else if (lower.includes("family")) {
+      reason = "family commitments";
+    }
+
+    if (!outSubject) {
+      outSubject = `Leave Application: ${days.charAt(0).toUpperCase() + days.slice(1)} Leave Due to ${reason.charAt(0).toUpperCase() + reason.slice(1)}`;
+    }
+
+    outBody = `${greeting}
+
+I am writing to formally request ${days} of leave from work due to ${reason}.
+
+During my absence, I will ensure that any urgent tasks are handed over appropriately and will be reachable via email if required for any critical matters.
+
+I kindly request you to approve my leave application, and I will keep you updated on my return.
+
+Thank you for your understanding.
+
+${closing}`;
+  }
+  // 2. Emergency
+  else if (sit.category === "Emergency" || lower.includes("emergency") || lower.includes("hospital")) {
+    if (!outSubject) {
+      outSubject = `Urgent: Emergency Notification & Absence Notice`;
+    }
+    outBody = `${greeting}
+
+I am writing to urgently notify you of an unexpected emergency situation regarding ${instruction}.
+
+Due to these unforeseen circumstances, I will be temporarily unavailable. I am taking necessary steps to manage any urgent pending tasks and will provide an update as soon as possible.
+
+Thank you for your prompt understanding and support.
+
+${closing}`;
+  }
+  // 3. Resume / Job Application
+  else if (sit.category === "Resume/Job Application" || lower.includes("resume") || lower.includes("job")) {
+    if (!outSubject) {
+      outSubject = `Application for Job Position - ${myName}`;
+    }
+    outBody = `${greeting}
+
+I am writing to formally express my strong interest in the open position.
+
+With my background and experience, I am confident in my ability to make a meaningful contribution to your organization. I have attached my resume for your review and consideration.
+
+I would welcome the opportunity to discuss my qualifications with you in an interview.
+
+Thank you for your time and consideration.
+
+${closing}`;
+  }
+  // 4. Follow-up / Payment
+  else if (sit.category === "Follow-up" || lower.includes("follow") || lower.includes("payment")) {
+    if (!outSubject) {
+      outSubject = `Follow-up Regarding: ${instruction.slice(0, 45)}`;
+    }
+    outBody = `${greeting}
+
+I hope this email finds you well.
+
+I am writing to follow up regarding ${instruction}. Could you please share a brief status update or let me know if any additional details are needed from my end?
+
+I appreciate your prompt attention to this matter.
+
+${closing}`;
+  }
+  // 5. Official / Default
+  else {
+    if (!outSubject) {
+      outSubject = `Regarding: ${instruction.slice(0, 50)}`;
+    }
+    outBody = `${greeting}
+
+I am writing to formally communicate regarding ${instruction}.
+
+Please let me know if you require any further information or clarification on this matter, and I will be happy to assist.
+
+Thank you for your time and assistance.
+
+${closing}`;
+  }
+
+  return {
+    subject: outSubject,
+    body: outBody,
+    greeting,
+    closing,
+    situation: sit.name,
+    category: sit.category,
+    priority: sit.priority,
+    tone: sit.tone,
+  };
 }
 
 // ----------------------------------------------------
@@ -621,7 +841,7 @@ serve(async (req: Request) => {
     // Send Email via Gmail REST API (POST /auth/send-email, /emails/send, /email/send)
     // ----------------------------------------------------
 
-    if ((path === "/auth/send-email" || path === "/emails/send" || path === "/email/send") && method === "POST") {
+    if ((path === "/auth/send-email" || path === "/emails/send" || path === "/email/send" || path === "/send-email") && method === "POST") {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Authentication required to send emails.", 401);
 
@@ -752,85 +972,71 @@ serve(async (req: Request) => {
     // AI Situation Categorization & Generation
     // ----------------------------------------------------
 
-    if (path === "/ai/categorize" && method === "POST") {
+    if ((path === "/ai/categorize" || path === "/categorize") && method === "POST") {
       const body = await req.json().catch(() => ({}));
       const input = body.instruction || body.subject || "";
       if (!input.trim()) return errorResponse("Please enter a subject or instruction.");
 
-      const lower = input.toLowerCase();
-      let situation = "💼 Official / Professional";
-      let category = "Official/Professional";
-      let priority = "Normal";
-      let tone = "Professional";
-
-      if (lower.includes("leave") || lower.includes("vacation") || lower.includes("sick") || lower.includes("holiday") || lower.includes("wfh") || lower.includes("work from home")) {
-        situation = "📅 Leave / Holiday";
-        category = "Leave/Holiday";
-        tone = "Polite";
-      } else if (lower.includes("urgent") || lower.includes("emergency") || lower.includes("asap") || lower.includes("outage")) {
-        situation = "🚨 Emergency";
-        category = "Emergency";
-        priority = "High";
-        tone = "Urgent";
-      } else if (lower.includes("resume") || lower.includes("job") || lower.includes("apply") || lower.includes("interview") || lower.includes("application")) {
-        situation = "📄 Resume / Job Application";
-        category = "Resume/Job Application";
-        tone = "Formal";
-      } else if (lower.includes("payment") || lower.includes("invoice") || lower.includes("salary") || lower.includes("dues")) {
-        situation = "⚠️ Important / Necessary";
-        category = "Important";
-        priority = "High";
-        tone = "Direct";
-      } else if (lower.includes("follow") || lower.includes("status update") || lower.includes("checking in")) {
-        situation = "🔄 Follow-up";
-        category = "Follow-up";
-        tone = "Professional";
-      }
+      const sitObj = detectSituationEngine(input);
 
       return jsonResponse({
         success: true,
-        situation,
-        category,
-        pattern: situation,
-        detectedFormat: situation,
-        tone,
-        priority,
-        urgency: priority,
-        attachment_recommended: situation.includes("Resume"),
-        attachment_filename: situation.includes("Resume") ? "resume.pdf" : null,
+        situation: sitObj.name,
+        category: sitObj.category,
+        pattern: sitObj.name,
+        detectedFormat: sitObj.name,
+        tone: sitObj.tone,
+        priority: sitObj.priority,
+        urgency: sitObj.priority,
+        attachment_recommended: sitObj.name.includes("Resume"),
+        attachment_filename: sitObj.name.includes("Resume") ? "resume.pdf" : null,
       });
     }
 
-    if (path === "/ai/generate" && method === "POST") {
+    if ((path === "/ai/generate" || path === "/generate" || path === "/ai/generate-email" || path === "/generate-email") && method === "POST") {
       const body = await req.json().catch(() => ({}));
       const { instruction, subject, situation, category, tone, priority, recipient, recipientName } = body;
       const input = instruction || subject || "";
       if (!input.trim()) return errorResponse("Please enter a subject or instruction.");
 
       const user = await getAuthUser(req, supabase);
-      const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+      const senderName = user?.signature?.[0]?.name || user?.name || "";
 
-      let generatedSubject = subject || `Regarding: ${input.slice(0, 40)}`;
-      let generatedBody = "";
-      const greeting = recipientName ? `Dear ${recipientName},` : "Dear Sir/Madam,";
-      const signatureName = user?.signature?.[0]?.name || user?.name || "[Your Name]";
-      const closing = `Best regards,\n${signatureName}`;
+      // 1. Generate via Situation Pattern Engine
+      const sitObj = situation 
+        ? (SUPPORTED_SITUATIONS.find(s => s.name === situation || s.id === situation) || detectSituationEngine(input))
+        : detectSituationEngine(input);
 
+      const generated = generateNaturalEmailContent({
+        instruction: input,
+        subject,
+        recipient,
+        recipientName,
+        senderName,
+        situationObj: sitObj,
+      });
+
+      let finalSubject = generated.subject;
+      let finalBody = generated.body;
+
+      // 2. Enhance with Google Gemini API if API key is provided
+      const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("AI_API_KEY");
       if (geminiApiKey) {
         try {
-          const geminiPrompt = `You are a professional email assistant. Write a high quality email body based strictly on this request:
-User Problem/Instruction: "${input}"
-Subject: "${subject || ''}"
-Tone: "${tone || 'Professional'}"
-Recipient: "${recipientName || 'Manager/Client'}"
+          const geminiPrompt = `You are a professional email writing assistant. Write a high quality email body based strictly on this situation:
+User Problem / Situation: "${input}"
+User Subject: "${subject || ''}"
+Tone: "${tone || generated.tone}"
+Recipient: "${recipientName || recipient || 'Manager/Colleague'}"
 
 RULES:
-1. Do not hallucinate fake dates, order numbers, or company names; use placeholders like [Date], [Company Name] if not given.
-2. Structure with proper paragraphs.
-3. Return ONLY valid JSON:
+1. Generate an email body tailored specifically to the user's problem.
+2. Incorporate all specific details (e.g. number of days, reasons, symptoms, requests).
+3. Do not invent fake dates or names; use placeholders like [Date], [Company Name] if needed.
+4. Return ONLY valid JSON:
 {
-  "subject": "Clear email subject",
-  "body": "Full body text"
+  "subject": "Clear concise subject line",
+  "body": "Full body text formatted with paragraphs and line breaks"
 }`;
 
           const aiRes = await fetch(
@@ -848,30 +1054,28 @@ RULES:
           const rawText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (rawText) {
             const parsed = JSON.parse(rawText);
-            if (parsed.subject) generatedSubject = parsed.subject;
-            if (parsed.body) generatedBody = parsed.body;
+            if (parsed.subject) finalSubject = parsed.subject;
+            if (parsed.body) finalBody = parsed.body;
           }
         } catch (e) {
-          console.warn("Gemini generation fallback:", e);
+          console.warn("Gemini generation notice (using natural pattern generator):", e);
         }
-      }
-
-      if (!generatedBody) {
-        generatedBody = `${greeting}\n\nI am writing to formally communicate regarding ${input}.\n\nPlease let me know if any additional details are needed, and thank you for your understanding.\n\n${closing}`;
       }
 
       return jsonResponse({
         success: true,
-        situation: situation || "💼 Official / Professional",
-        category: category || "Official/Professional",
-        tone: tone || "Professional",
-        priority: priority || "Normal",
-        subject: generatedSubject,
-        suggested_subject: generatedSubject,
-        body: generatedBody,
-        email_body: generatedBody,
-        greeting,
-        closing: `Best regards,\n${signatureName}`,
+        situation: generated.situation,
+        category: generated.category,
+        tone: tone || generated.tone,
+        priority: priority || generated.priority,
+        subject: finalSubject,
+        suggested_subject: finalSubject,
+        body: finalBody,
+        email_body: finalBody,
+        greeting: generated.greeting,
+        closing: generated.closing,
+        attachment_recommended: generated.situation.includes("Resume"),
+        attachment_filename: generated.situation.includes("Resume") ? "resume.pdf" : null,
       });
     }
 

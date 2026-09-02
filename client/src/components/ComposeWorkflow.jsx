@@ -117,7 +117,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
       setStep(3); // Step 3: Preview
     } catch (err) {
       console.error('AI Generation Error:', err);
-      setErrorMessage('Unable to generate the email right now. Please try again.');
+      setErrorMessage(err.message || 'Unable to generate the email right now. Please try again.');
       setStep(1);
     } finally {
       setAiLoading(false);
