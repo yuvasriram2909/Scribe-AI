@@ -8,24 +8,30 @@ export function PrivacyPolicy({ onBackToHome, onNavigateToTerms, onNavigateToLog
   const currentDate = 'September 2, 2026';
 
   return (
-    <div className="min-h-screen bg-[#F7F4EA] text-[#28321D] font-sans selection:bg-[#667A45] selection:text-white flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#080C14] text-slate-100 font-sans selection:bg-purple-600 selection:text-white flex flex-col relative overflow-hidden">
       
+      {/* Ambient Cosmic Lights */}
+      <div className="fixed -top-40 -right-40 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl pointer-events-none -z-10 animate-pulseGlow" />
+      <div className="fixed -bottom-40 -left-40 w-96 h-96 bg-cyan-600/15 rounded-full blur-3xl pointer-events-none -z-10" />
+
       {/* Public Header */}
-      <header className="border-b border-[#D8D1BC] bg-[#FAF8F1] sticky top-0 z-50 shadow-xs">
+      <header className="border-b border-slate-800/80 bg-[#0B0F19]/80 backdrop-blur-xl sticky top-0 z-50 shadow-xl">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={onBackToHome}>
-            <div className="w-10 h-10 rounded-xl bg-[#667A45] flex items-center justify-center shadow-md">
-              <Sparkles className="w-5 h-5 text-[#FAF8F1]" />
+          <div className="flex items-center gap-3 cursor-pointer group" onClick={onBackToHome}>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-cyan-400 p-[1px] shadow-lg shadow-purple-500/20 group-hover:scale-105 transition-transform">
+              <div className="w-full h-full bg-[#0D121F] rounded-[11px] flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-cyan-300" />
+              </div>
             </div>
-            <span className="text-xl font-extrabold text-[#28321D] tracking-tight">
-              Scribe <span className="text-[#879B62]">AI</span>
+            <span className="text-xl font-extrabold text-white tracking-tight">
+              Scribe <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">AI</span>
             </span>
           </div>
 
           <nav className="flex items-center gap-3 sm:gap-4">
             <button
               onClick={onBackToHome}
-              className="px-3.5 py-2 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] hover:bg-[#E8DFC8] text-[#28321D] text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 hover:bg-slate-700 text-slate-200 text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden sm:inline">Back to Home</span>
@@ -33,7 +39,7 @@ export function PrivacyPolicy({ onBackToHome, onNavigateToTerms, onNavigateToLog
             {onNavigateToTerms && (
               <button
                 onClick={onNavigateToTerms}
-                className="text-xs font-bold text-[#6F725F] hover:text-[#28321D] transition-colors cursor-pointer hidden md:inline-block"
+                className="text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer hidden md:inline-block"
               >
                 Terms of Service
               </button>
@@ -41,7 +47,7 @@ export function PrivacyPolicy({ onBackToHome, onNavigateToTerms, onNavigateToLog
             {onNavigateToLogin && (
               <button
                 onClick={onNavigateToLogin}
-                className="px-4 py-2 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs inline-flex items-center gap-1.5 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl gradient-btn text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
               >
                 <span>Launch App</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -52,321 +58,132 @@ export function PrivacyPolicy({ onBackToHome, onNavigateToTerms, onNavigateToLog
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8 relative z-10 w-full">
+      <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8 relative z-10 w-full animate-fadeIn">
         
         {/* Main Document Card */}
-        <div className="glass-panel p-6 sm:p-10 rounded-3xl border border-[#D8D1BC] space-y-8 shadow-sm">
+        <div className="glass-panel p-6 sm:p-10 rounded-3xl border border-slate-800 space-y-8 shadow-2xl">
           
           {/* Header Banner */}
-          <div className="border-b border-[#D8D1BC] pb-6 space-y-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#E8DFC8] border border-[#D8D1BC] text-[#3F4D2A] text-xs font-extrabold uppercase tracking-wide">
-              <Shield className="w-4 h-4 text-[#667A45]" />
+          <div className="border-b border-slate-800 pb-6 space-y-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-extrabold uppercase tracking-wide">
+              <Shield className="w-4 h-4 text-emerald-400" />
               Google API Services Compliance & User Privacy
             </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-[#28321D] tracking-tight">
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
               Privacy Policy
             </h1>
-            <p className="text-xs text-[#6F725F]">
-              Effective Date: <strong>{currentDate}</strong> | Application URL: <a href="https://scribe-ai-self.vercel.app" className="text-[#667A45] font-bold underline">https://scribe-ai-self.vercel.app</a>
+            <p className="text-xs text-slate-400">
+              Effective Date: <strong className="text-slate-200">{currentDate}</strong> | Application URL: <a href="https://scribe-ai-self.vercel.app" className="text-cyan-400 font-bold underline">https://scribe-ai-self.vercel.app</a>
             </p>
           </div>
 
           {/* Quick Summary Box */}
-          <div className="p-5 rounded-2xl bg-[#FAF8F1] border border-[#D8D1BC] space-y-3">
-            <h2 className="text-sm font-extrabold text-[#28321D] flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#667A45]" />
+          <div className="p-5 rounded-2xl bg-slate-900/80 border border-purple-500/20 space-y-3">
+            <h2 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-400" />
               Executive Summary
             </h2>
-            <p className="text-xs text-[#6F725F] leading-relaxed">
+            <p className="text-xs text-slate-300 leading-relaxed">
               <strong>Scribe AI</strong> allows users to sign in with Google and compose AI-assisted emails to send through their own personal Gmail account. We prioritize user privacy, least-privilege access, and strong data security. We do not read your inbox, we do not sell your personal data, and we do not use your private email content to train generalized public AI models.
             </p>
           </div>
 
-          <div className="space-y-8 text-[#28321D] text-xs sm:text-sm leading-relaxed">
+          <div className="space-y-8 text-slate-300 text-xs sm:text-sm leading-relaxed">
             
             {/* 1. Introduction */}
             <section className="space-y-3">
-              <h2 className="text-base sm:text-lg font-bold text-[#28321D] flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center text-xs font-bold">1</span>
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-purple-950 text-purple-300 flex items-center justify-center text-xs font-bold border border-purple-500/30">1</span>
                 Introduction
               </h2>
-              <p className="text-xs sm:text-sm text-[#6F725F] leading-relaxed">
-                Scribe AI ("we", "our", or "us") operates the web application located at <a href="https://scribe-ai-self.vercel.app" className="text-[#667A45] font-bold underline">https://scribe-ai-self.vercel.app</a>. This Privacy Policy outlines our policies regarding the collection, access, use, storage, protection, and disclosure of personal data when you use our service, specifically covering our integration with <strong>Google OAuth 2.0 and Gmail API</strong> services.
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                Scribe AI ("we", "our", or "us") operates the web application located at <a href="https://scribe-ai-self.vercel.app" className="text-cyan-400 font-bold underline">https://scribe-ai-self.vercel.app</a>. This Privacy Policy outlines our policies regarding the collection, access, use, storage, protection, and disclosure of personal data when you use our service, specifically covering our integration with <strong>Google OAuth 2.0 and Gmail API</strong> services.
               </p>
             </section>
 
             {/* 2. Google OAuth Data Accessed */}
             <section className="space-y-4">
-              <h2 className="text-base sm:text-lg font-bold text-[#28321D] flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center text-xs font-bold">2</span>
-                Google OAuth Scopes & Data We Access
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-purple-950 text-purple-300 flex items-center justify-center text-xs font-bold border border-purple-500/30">2</span>
+                Google User Data We Access & Permissions Requested
               </h2>
-              <p className="text-xs sm:text-sm text-[#6F725F]">
-                When you connect your Google Account to Scribe AI, our application requests only the minimum necessary permissions (least-privilege scopes) required to provide email drafting and sending services:
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                When you choose to connect your Google account, Scribe AI requests the following OAuth 2.0 permissions:
               </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-                <div className="p-4 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] space-y-2">
-                  <div className="flex items-center gap-2 text-[#3F4D2A] font-bold text-xs">
-                    <UserCheck className="w-4 h-4 text-[#667A45]" />
-                    <span>userinfo.profile</span>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                <div className="p-4 rounded-2xl bg-[#131B30] border border-slate-800 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-purple-400" />
+                    <span className="font-bold text-white">Gmail Send Scope</span>
                   </div>
-                  <code className="text-[10px] font-mono text-[#667A45] block break-all">.../auth/userinfo.profile</code>
-                  <p className="text-[11px] text-[#6F725F]">
-                    Accesses your basic name and profile photo to personalize your Scribe AI account interface.
+                  <code className="text-[11px] font-mono text-cyan-300 block bg-black/40 p-2 rounded-lg border border-slate-800">
+                    https://www.googleapis.com/auth/gmail.send
+                  </code>
+                  <p className="text-xs text-slate-400">
+                    Used strictly to transmit user-approved emails directly from your Gmail account upon clicking the send button.
                   </p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] space-y-2">
-                  <div className="flex items-center gap-2 text-[#3F4D2A] font-bold text-xs">
-                    <Mail className="w-4 h-4 text-[#667A45]" />
-                    <span>userinfo.email</span>
+                <div className="p-4 rounded-2xl bg-[#131B30] border border-slate-800 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-emerald-400" />
+                    <span className="font-bold text-white">Basic Profile & Email</span>
                   </div>
-                  <code className="text-[10px] font-mono text-[#667A45] block break-all">.../auth/userinfo.email</code>
-                  <p className="text-[11px] text-[#6F725F]">
-                    Accesses your primary email address to authenticate your session and verify your connected sender address.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] space-y-2">
-                  <div className="flex items-center gap-2 text-[#3F4D2A] font-bold text-xs">
-                    <Key className="w-4 h-4 text-[#667A45]" />
-                    <span>gmail.send</span>
-                  </div>
-                  <code className="text-[10px] font-mono text-[#667A45] block break-all">.../auth/gmail.send</code>
-                  <p className="text-[11px] text-[#6F725F]">
-                    Authorizes Scribe AI strictly to transmit emails you have explicitly composed, reviewed, and approved for dispatch.
-                  </p>
-                </div>
-              </div>
-
-              {/* Explicit Scope Limitations Banner */}
-              <div className="p-4 rounded-xl bg-[#E6F4EA] border border-[#A8DADC] text-xs text-[#137333] space-y-2">
-                <div className="font-bold flex items-center gap-2 text-sm">
-                  <CheckCircle className="w-4 h-4 text-[#137333]" />
-                  What We DO NOT Access or Read:
-                </div>
-                <ul className="list-disc list-inside space-y-1 text-xs text-[#28321D]">
-                  <li>We do <strong>NOT</strong> request read permissions (<code className="font-mono font-semibold">gmail.readonly</code>) or inbox access.</li>
-                  <li>We do <strong>NOT</strong> scan, index, read, or download incoming emails from your inbox.</li>
-                  <li>We do <strong>NOT</strong> delete, modify, or search your existing email folders or message history.</li>
-                  <li>We do <strong>NOT</strong> access your Google Drive, Google Contacts, or other unrelated Google services.</li>
-                </ul>
-              </div>
-            </section>
-
-            {/* 3. How We Use Google User Data */}
-            <section className="space-y-3">
-              <h2 className="text-base sm:text-lg font-bold text-[#28321D] flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center text-xs font-bold">3</span>
-                How We Use Your Google Information
-              </h2>
-              <p className="text-xs sm:text-sm text-[#6F725F]">
-                We use the information accessed through Google OAuth strictly for the following functional purposes:
-              </p>
-              <ul className="list-disc list-inside space-y-1.5 text-xs sm:text-sm text-[#6F725F]">
-                <li><strong>User Sign-In & Identification:</strong> To authenticate your identity and restore your user workspace.</li>
-                <li><strong>Sender Verification:</strong> To display your connected Gmail address on the dashboard and in email preview cards.</li>
-                <li><strong>Direct Email Dispatch:</strong> To transmit user-approved emails via official Gmail REST API endpoints when you click <em>"Confirm & Send Email"</em>.</li>
-                <li><strong>Token Refresh:</strong> To maintain secure authorization connectivity using standard OAuth 2.0 refresh mechanisms.</li>
-              </ul>
-            </section>
-
-            {/* 4. Storage & Security */}
-            <section className="space-y-3">
-              <h2 className="text-base sm:text-lg font-bold text-[#28321D] flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center text-xs font-bold">4</span>
-                How We Store & Protect Google Data
-              </h2>
-              <p className="text-xs sm:text-sm text-[#6F725F]">
-                We enforce rigorous data protection and encryption standards across our infrastructure:
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div className="p-3.5 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] space-y-1">
-                  <span className="font-bold text-xs text-[#28321D] flex items-center gap-1.5">
-                    <Lock className="w-4 h-4 text-[#667A45]" /> AES-256-GCM Encryption
-                  </span>
-                  <p className="text-[11px] text-[#6F725F]">
-                    All OAuth refresh tokens are encrypted at rest with AES-256-GCM before storage in our persistent PostgreSQL database.
-                  </p>
-                </div>
-                <div className="p-3.5 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] space-y-1">
-                  <span className="font-bold text-xs text-[#28321D] flex items-center gap-1.5">
-                    <Shield className="w-4 h-4 text-[#667A45]" /> Multi-Tenant Isolation
-                  </span>
-                  <p className="text-[11px] text-[#6F725F]">
-                    Every account is strictly isolated by authenticated user ID; no user can access another user's tokens or emails.
+                  <code className="text-[11px] font-mono text-cyan-300 block bg-black/40 p-2 rounded-lg border border-slate-800">
+                    openid, email, profile
+                  </code>
+                  <p className="text-xs text-slate-400">
+                    Used strictly to authenticate your account identity and verify your connected email address.
                   </p>
                 </div>
               </div>
             </section>
 
-            {/* 5. Data Sharing & Third Parties */}
+            {/* 3. Limited Use Requirements */}
             <section className="space-y-3">
-              <h2 className="text-base sm:text-lg font-bold text-[#28321D] flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center text-xs font-bold">5</span>
-                Data Sharing & Third-Party Disclosure
-              </h2>
-              <p className="text-xs sm:text-sm text-[#6F725F]">
-                We maintain a strict zero-sale and zero-disclosure policy:
-              </p>
-              <ul className="list-disc list-inside space-y-1.5 text-xs sm:text-sm text-[#6F725F]">
-                <li>We do <strong>NOT</strong> sell, rent, trade, or monetize your Google user data.</li>
-                <li>We do <strong>NOT</strong> share your Google data with data brokers, advertisers, or analytics trackers.</li>
-                <li>We do <strong>NOT</strong> transfer user data to third parties except as strictly required to execute API requests to Google's official endpoints.</li>
-                <li>We do <strong>NOT</strong> use private email text to train generalized artificial intelligence or machine learning models.</li>
-              </ul>
-            </section>
-
-            {/* 6. Google API Limited Use Compliance */}
-            <section className="space-y-3">
-              <h2 className="text-base sm:text-lg font-bold text-[#28321D] flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center text-xs font-bold">6</span>
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-purple-950 text-purple-300 flex items-center justify-center text-xs font-bold border border-purple-500/30">3</span>
                 Google API Services User Data Policy Compliance
               </h2>
-              <div className="p-4 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] space-y-2">
-                <p className="text-xs sm:text-sm text-[#28321D] leading-relaxed">
-                  Scribe AI's use and transfer to any other app of information received from Google APIs will adhere to the{' '}
-                  <a
-                    href="https://developers.google.com/terms/api-services-user-data-policy"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[#667A45] font-extrabold underline inline-flex items-center gap-1"
-                  >
-                    Google API Services User Data Policy
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                  , including the <strong>Limited Use</strong> requirements.
-                </p>
-              </div>
-            </section>
-
-            {/* 7. Revocation & Data Deletion */}
-            <section className="space-y-3">
-              <h2 className="text-base sm:text-lg font-bold text-[#28321D] flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center text-xs font-bold">7</span>
-                How to Revoke Access & Delete Your Data
-              </h2>
-              <p className="text-xs sm:text-sm text-[#6F725F]">
-                You have full control over your Google connection and may revoke access at any time:
-              </p>
-              <div className="space-y-2.5">
-                <div className="p-3.5 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                    A
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-xs text-[#28321D]">In-App 1-Click Disconnect</h3>
-                    <p className="text-[11px] text-[#6F725F]">
-                      Navigate to the <strong>Settings</strong> tab in Scribe AI and click <strong>"Disconnect Account"</strong>. This immediately purges all stored tokens from our database.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                    B
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-xs text-[#28321D]">Google Account Security Settings</h3>
-                    <p className="text-[11px] text-[#6F725F]">
-                      You can revoke permissions directly from your Google Account at{' '}
-                      <a
-                        href="https://myaccount.google.com/permissions"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[#667A45] font-bold underline inline-flex items-center gap-1"
-                      >
-                        myaccount.google.com/permissions
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                      .
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                    C
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-xs text-[#28321D]">Account Deletion Request</h3>
-                    <p className="text-[11px] text-[#6F725F]">
-                      To request complete deletion of your account and all associated email history, email us at{' '}
-                      <span className="font-bold text-[#28321D]">yuvasriram2909@gmail.com</span>. All user records will be deleted within 48 hours.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* 8. Changes to this Policy */}
-            <section className="space-y-3">
-              <h2 className="text-base sm:text-lg font-bold text-[#28321D] flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center text-xs font-bold">8</span>
-                Changes to This Privacy Policy
-              </h2>
-              <p className="text-xs sm:text-sm text-[#6F725F]">
-                We may update this Privacy Policy periodically to reflect changes in legal requirements or service enhancements. Material changes will be posted on this page with an updated Effective Date.
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                Scribe AI's use and transfer of information received from Google APIs to any other app will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="text-cyan-400 font-bold underline inline-flex items-center gap-1">Google API Services User Data Policy <ExternalLink className="w-3.5 h-3.5" /></a>, including the Limited Use requirements.
               </p>
             </section>
-
-            {/* 9. Contact Us */}
-            <section className="space-y-3 pt-2">
-              <h2 className="text-base sm:text-lg font-bold text-[#28321D] flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-[#E8DFC8] text-[#3F4D2A] flex items-center justify-center text-xs font-bold">9</span>
-                Contact Information
-              </h2>
-              <div className="p-4 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] space-y-1.5">
-                <p className="text-xs text-[#6F725F]">
-                  If you have questions, feedback, or privacy concerns regarding this Privacy Policy or our Google OAuth integration, please contact us at:
-                </p>
-                <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3 text-xs">
-                  <div className="flex items-center gap-1.5 font-bold text-[#28321D]">
-                    <Mail className="w-4 h-4 text-[#667A45]" />
-                    <span>yuvasriram2909@gmail.com</span>
-                  </div>
-                  <span className="hidden sm:inline text-[#D8D1BC]">|</span>
-                  <div className="flex items-center gap-1.5 font-bold text-[#28321D]">
-                    <Sparkles className="w-4 h-4 text-[#667A45]" />
-                    <span>Scribe AI Privacy & Security Team</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
           </div>
 
+          <div className="pt-6 border-t border-slate-800 flex items-center justify-between">
+            <button
+              onClick={onBackToHome}
+              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-2 cursor-pointer transition-all"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Home</span>
+            </button>
+          </div>
         </div>
-
       </main>
 
       {/* Public Footer */}
-      <footer className="border-t border-[#D8D1BC] bg-[#FAF8F1] py-6 relative z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#6F725F]">
-          <span>© {new Date().getFullYear()} Scribe AI. All rights reserved.</span>
+      <footer className="border-t border-slate-800/80 bg-[#0B0F19]/80 py-8 relative z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-white">Scribe AI</span>
+            <span>© {new Date().getFullYear()} Scribe AI. All rights reserved.</span>
+          </div>
+
           <div className="flex items-center gap-6">
-            <button onClick={onBackToHome} className="hover:text-[#28321D] font-bold cursor-pointer">
+            <button onClick={onBackToHome} className="hover:text-white transition-colors cursor-pointer font-semibold">
               Home
             </button>
             {onNavigateToTerms && (
-              <button onClick={onNavigateToTerms} className="hover:text-[#28321D] font-bold cursor-pointer">
+              <button onClick={onNavigateToTerms} className="hover:text-white transition-colors cursor-pointer font-semibold">
                 Terms of Service
               </button>
             )}
-            <a
-              href="https://developers.google.com/terms/api-services-user-data-policy"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-[#28321D] font-bold inline-flex items-center gap-1"
-            >
-              Google User Data Policy
-              <ExternalLink className="w-3 h-3" />
-            </a>
           </div>
         </div>
       </footer>
-
     </div>
   );
 }
