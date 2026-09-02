@@ -12,6 +12,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
+import bcrypt from "npm:bcryptjs@2.4.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,38 +37,25 @@ function errorResponse(error: string, status = 400) {
 }
 
 // ----------------------------------------------------
-// Web Crypto Helpers (AES-256-GCM, SHA-256, HMAC, JWT)
+// Password & Token Crypto Helpers (bcrypt, AES-256-GCM)
 // ----------------------------------------------------
 
 async function hashPassword(password: string): Promise<string> {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(password),
-    { name: "PBKDF2" },
-    false,
-    ["deriveBits", "deriveKey"]
-  );
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const derivedKey = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt,
-      iterations: 100000,
-      hash: "SHA-256",
-    },
-    keyMaterial,
-    256
-  );
-  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
-  const hashHex = Array.from(new Uint8Array(derivedKey)).map(b => b.toString(16).padStart(2, '0')).join('');
-  return `pbkdf2:${saltHex}:${hashHex}`;
+  return await bcrypt.hash(password, 10);
 }
 
 async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
   if (!storedHash) return false;
   
-  // PBKDF2 format
+  if (storedHash.startsWith("$2a$") || storedHash.startsWith("$2b$") || storedHash.startsWith("$2y$")) {
+    try {
+      return await bcrypt.compare(password, storedHash);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // PBKDF2 format fallback
   if (storedHash.startsWith("pbkdf2:")) {
     const [, saltHex, hashHex] = storedHash.split(":");
     const salt = new Uint8Array(saltHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
@@ -93,13 +81,7 @@ async function verifyPassword(password: string, storedHash: string): Promise<boo
     return hashHex === checkHashHex;
   }
 
-  // SHA-256 legacy check
-  const enc = new TextEncoder();
-  const hashBuf = await crypto.subtle.digest("SHA-256", enc.encode(password));
-  const sha256Hex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
-  if (storedHash === sha256Hex) return true;
-
-  // Fallback for direct match
+  // Direct comparison fallback
   return storedHash === password;
 }
 
