@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Search, Filter, CheckCircle, Paperclip, RefreshCw, Eye, X, Trash2, AlertCircle, Clock } from 'lucide-react';
+import { Mail, Search, Filter, CheckCircle, Paperclip, RefreshCw, Eye, X, Trash2, AlertCircle, Clock, Send } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
 const CATEGORIES_FILTER = [
@@ -93,23 +93,23 @@ export function EmailHistory({ onReuseEmail }) {
   const renderStatusBadge = (status, errorMessage) => {
     if (status === 'Sent') {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#137333] bg-[#E6F4EA] border border-[#A8DADC] px-2.5 py-0.5 rounded-full">
-          <CheckCircle className="w-3 h-3 text-[#667A45]" />
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-0.5 rounded-full">
+          <CheckCircle className="w-3 h-3 text-emerald-400" />
           ✓ Sent
         </span>
       );
     }
     if (status === 'Failed') {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full" title={errorMessage || 'Sending failed'}>
-          <AlertCircle className="w-3 h-3 text-red-600 shrink-0" />
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-300 bg-rose-950/80 border border-rose-500/40 px-2.5 py-0.5 rounded-full" title={errorMessage || 'Sending failed'}>
+          <AlertCircle className="w-3 h-3 text-rose-400 shrink-0" />
           Failed
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#6F725F] bg-[#F2EBDD] border border-[#D8D1BC] px-2.5 py-0.5 rounded-full">
-        <Clock className="w-3 h-3 text-[#6F725F]" />
+      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 bg-slate-800 border border-slate-700 px-2.5 py-0.5 rounded-full">
+        <Clock className="w-3 h-3 text-slate-400" />
         {status || 'Draft'}
       </span>
     );
@@ -118,13 +118,13 @@ export function EmailHistory({ onReuseEmail }) {
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Header Bar */}
-      <div className="glass-panel p-6 rounded-3xl border border-[#D8D1BC] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
         <div>
-          <h2 className="text-xl font-extrabold text-[#28321D] flex items-center gap-2">
-            <Mail className="w-5 h-5 text-[#667A45]" />
+          <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+            <Mail className="w-5 h-5 text-purple-400" />
             Sent Email History
           </h2>
-          <p className="text-xs text-[#6F725F] mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Complete archive of generated and dispatched Gmail messages
           </p>
         </div>
@@ -137,8 +137,8 @@ export function EmailHistory({ onReuseEmail }) {
               onClick={() => setSelectedCategory(cat)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat
-                  ? 'bg-[#667A45] text-[#FAF8F1] shadow-xs'
-                  : 'bg-[#FAF8F1] text-[#3F4D2A] border border-[#D8D1BC] hover:bg-[#E8DFC8]'
+                  ? 'gradient-btn text-white shadow-md'
+                  : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
               }`}
             >
               {cat}
@@ -148,28 +148,28 @@ export function EmailHistory({ onReuseEmail }) {
       </div>
 
       {/* Search Input */}
-      <div className="glass-panel p-4 rounded-2xl flex items-center gap-3 border border-[#D8D1BC]">
-        <Search className="w-4 h-4 text-[#667A45] shrink-0" />
+      <div className="glass-panel p-4 rounded-2xl flex items-center gap-3 border border-slate-800 shadow-lg">
+        <Search className="w-4 h-4 text-purple-400 shrink-0" />
         <input
           type="text"
           placeholder="Search emails by recipient, subject, or content..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-transparent text-xs text-[#28321D] focus:outline-none placeholder-[#6F725F]"
+          className="w-full bg-transparent text-xs text-white focus:outline-none placeholder-slate-500"
         />
       </div>
 
       {/* Cards List */}
       {loading ? (
-        <div className="glass-panel p-12 text-center text-xs text-[#6F725F] rounded-3xl space-y-3 border border-[#D8D1BC]">
-          <RefreshCw className="w-6 h-6 animate-spin text-[#667A45] mx-auto" />
+        <div className="glass-panel p-12 text-center text-xs text-slate-400 rounded-3xl space-y-3 border border-slate-800">
+          <RefreshCw className="w-6 h-6 animate-spin text-purple-400 mx-auto" />
           <p className="font-semibold">Loading email history...</p>
         </div>
       ) : emails.length === 0 ? (
-        <div className="glass-panel p-12 text-center text-xs text-[#6F725F] rounded-3xl space-y-3 border border-[#D8D1BC]">
-          <Mail className="w-8 h-8 text-[#879B62] mx-auto opacity-50" />
-          <p className="font-bold text-[#28321D]">No email history found</p>
-          <p className="text-[#6F725F]">No dispatched emails matching your criteria.</p>
+        <div className="glass-panel p-12 text-center text-xs text-slate-400 rounded-3xl space-y-3 border border-slate-800 shadow-xl">
+          <Mail className="w-8 h-8 text-purple-400 mx-auto opacity-50" />
+          <p className="font-bold text-white">No email history found</p>
+          <p className="text-slate-400">No dispatched emails matching your criteria.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -177,26 +177,26 @@ export function EmailHistory({ onReuseEmail }) {
             <div
               key={email.id}
               onClick={() => setSelectedEmail(email)}
-              className="glass-card p-5 rounded-2xl space-y-3 border border-[#D8D1BC] cursor-pointer hover:scale-[1.01] transition-all flex flex-col justify-between"
+              className="glass-card p-5 rounded-2xl space-y-3 border border-slate-800 cursor-pointer hover:scale-[1.01] transition-all flex flex-col justify-between"
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-[#3F4D2A] bg-[#E8DFC8] px-2.5 py-0.5 rounded-full border border-[#D8D1BC]">
+                  <span className="text-[11px] font-bold text-purple-300 bg-purple-950/60 px-2.5 py-0.5 rounded-full border border-purple-500/30">
                     {email.category || 'Email'}
                   </span>
                   {renderStatusBadge(email.status, email.errorMessage)}
                 </div>
 
-                <h3 className="text-sm font-bold text-[#28321D] line-clamp-1">
+                <h3 className="text-sm font-bold text-white line-clamp-1">
                   {email.subject}
                 </h3>
-                <p className="text-xs text-[#6F725F]">
-                  To: <span className="font-semibold text-[#3F4D2A]">{email.recipient}</span>
+                <p className="text-xs text-slate-400">
+                  To: <span className="font-semibold text-cyan-300 font-mono">{email.recipient}</span>
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-[#D8D1BC] flex items-center justify-between gap-2">
-                <span className="text-[10px] text-[#6F725F]">
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                <span className="text-[10px] text-slate-500">
                   {new Date(email.createdAt).toLocaleDateString()}
                 </span>
 
@@ -206,7 +206,7 @@ export function EmailHistory({ onReuseEmail }) {
                       e.stopPropagation();
                       setSelectedEmail(email);
                     }}
-                    className="p-1.5 rounded-lg bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] border border-[#D8D1BC] transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors cursor-pointer"
                     title="View Email"
                   >
                     <Eye className="w-3.5 h-3.5" />
@@ -214,7 +214,7 @@ export function EmailHistory({ onReuseEmail }) {
 
                   <button
                     onClick={(e) => handleDeleteEmail(e, email.id)}
-                    className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-500/30 transition-colors cursor-pointer"
                     title="Move to Trash"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -228,42 +228,42 @@ export function EmailHistory({ onReuseEmail }) {
 
       {/* Detail Modal */}
       {selectedEmail && (
-        <div className="fixed inset-0 z-50 bg-[#28321D]/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-panel max-w-2xl w-full p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6 max-h-[90vh] overflow-y-auto animate-fadeIn shadow-2xl">
-            <div className="flex items-start justify-between border-b border-[#D8D1BC] pb-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel max-w-2xl w-full p-6 sm:p-8 rounded-3xl border border-slate-700 space-y-6 max-h-[90vh] overflow-y-auto animate-fadeIn shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-800 pb-4">
               <div>
-                <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#E8DFC8] text-[#3F4D2A]">
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-purple-950/60 text-purple-300 border border-purple-500/30">
                   {selectedEmail.category}
                 </span>
-                <h3 className="text-lg font-bold text-[#28321D] mt-2">
+                <h3 className="text-lg font-bold text-white mt-2">
                   {selectedEmail.subject}
                 </h3>
               </div>
               <button
                 onClick={() => setSelectedEmail(null)}
-                className="p-1 rounded-lg text-[#6F725F] hover:text-[#28321D] hover:bg-[#E8DFC8] transition-colors cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-[#3F4D2A]">
-              <p><strong>To:</strong> {selectedEmail.recipient}</p>
-              {selectedEmail.cc && <p><strong>CC:</strong> {selectedEmail.cc}</p>}
-              {selectedEmail.bcc && <p><strong>BCC:</strong> {selectedEmail.bcc}</p>}
-              <p><strong>Priority:</strong> {selectedEmail.priority || 'Normal'}</p>
-              <p><strong>Tone:</strong> {selectedEmail.tone || 'Professional'}</p>
+            <div className="space-y-2.5 text-xs text-slate-300 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+              <p><strong>To:</strong> <span className="font-mono text-cyan-300">{selectedEmail.recipient}</span></p>
+              {selectedEmail.cc && <p><strong>CC:</strong> <span className="font-mono">{selectedEmail.cc}</span></p>}
+              {selectedEmail.bcc && <p><strong>BCC:</strong> <span className="font-mono">{selectedEmail.bcc}</span></p>}
+              <p><strong>Priority:</strong> <span className="text-white">{selectedEmail.priority || 'Normal'}</span></p>
+              <p><strong>Tone:</strong> <span className="text-white">{selectedEmail.tone || 'Professional'}</span></p>
               <p><strong>Sent Date:</strong> {new Date(selectedEmail.createdAt).toLocaleString()}</p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs text-[#28321D] whitespace-pre-wrap font-sans leading-relaxed">
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">
               {selectedEmail.body}
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
               <button
                 onClick={(e) => handleDeleteEmail(e, selectedEmail.id)}
-                className="px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-rose-950/60 text-rose-300 border border-rose-500/30 hover:bg-rose-900/80 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
               >
                 <Trash2 className="w-4 h-4" />
                 Move to Trash

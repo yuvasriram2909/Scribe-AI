@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Layout, Sparkles, ArrowRight, Calendar, FileText, Briefcase, Heart, AlertTriangle, RefreshCw } from 'lucide-react';
-import { apiFetch } from '../utils/api';
+import React, { useState } from 'react';
+import { Layout, Sparkles, ArrowRight, Calendar, FileText, Briefcase, Heart, AlertTriangle } from 'lucide-react';
 
 const CANNED_TEMPLATES_LIST = [
   { id: '1', title: 'Emergency Leave', category: 'Emergency', situation: '🚨 Emergency', tone: 'Urgent', defaultInstruction: 'I need emergency leave this afternoon due to an urgent personal appointment.' },
@@ -45,13 +44,13 @@ export function TemplatesLibrary({ onSelectTemplate }) {
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Top Header */}
-      <div className="glass-panel p-6 rounded-3xl border border-[#D8D1BC] space-y-4">
+      <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl">
         <div>
-          <h2 className="text-xl font-extrabold text-[#28321D] flex items-center gap-2">
-            <Layout className="w-5 h-5 text-[#667A45]" />
+          <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+            <Layout className="w-5 h-5 text-purple-400" />
             Canned Email Templates Library
           </h2>
-          <p className="text-xs text-[#6F725F] mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             19 predefined professional scenarios. Select any template to auto-populate email instructions.
           </p>
         </div>
@@ -64,8 +63,8 @@ export function TemplatesLibrary({ onSelectTemplate }) {
               onClick={() => setSelectedCategory(cat)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat
-                  ? 'bg-[#667A45] text-[#FAF8F1] shadow-xs'
-                  : 'bg-[#FAF8F1] text-[#3F4D2A] border border-[#D8D1BC] hover:bg-[#E8DFC8]'
+                  ? 'gradient-btn text-white shadow-md'
+                  : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
               }`}
             >
               {cat}
@@ -77,30 +76,31 @@ export function TemplatesLibrary({ onSelectTemplate }) {
       {/* Templates Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map(t => (
-          <div key={t.id} className="glass-card p-5 rounded-2xl border border-[#D8D1BC] space-y-3 flex flex-col justify-between hover:scale-[1.01] transition-all">
+          <div key={t.id} className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3 flex flex-col justify-between hover:scale-[1.01] transition-all shadow-lg">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#E8DFC8] text-[#3F4D2A] border border-[#D8D1BC]">
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-950/60 text-purple-300 border border-purple-500/30">
                   {t.situation}
                 </span>
-                <span className="text-[10px] font-semibold text-[#6F725F]">Tone: {t.tone}</span>
+                <span className="text-[10px] font-semibold text-slate-500">Tone: {t.tone}</span>
               </div>
 
-              <h3 className="text-sm font-extrabold text-[#28321D]">
+              <h3 className="text-sm font-extrabold text-white">
                 {t.title}
               </h3>
 
-              <div className="p-3 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs text-[#28321D] font-mono leading-relaxed line-clamp-3">
+              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 font-mono leading-relaxed line-clamp-3">
                 "{t.defaultInstruction}"
               </div>
             </div>
 
-            <div className="pt-3 border-t border-[#D8D1BC] flex items-center justify-end">
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-end">
               <button
                 onClick={() => onSelectTemplate && onSelectTemplate(t.defaultInstruction)}
-                className="px-4 py-2 rounded-xl bg-[#667A45] hover:bg-[#3F4D2A] text-[#FAF8F1] text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                className="px-4 py-2 rounded-xl gradient-btn text-white text-xs font-bold flex items-center gap-1.5 shadow-md hover:scale-105 transition-transform cursor-pointer"
               >
-                Use Template <ArrowRight className="w-3.5 h-3.5" />
+                <span>Use Template</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

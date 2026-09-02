@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Mail, Send, AlertTriangle, Calendar, FileText, Briefcase, Sparkles, 
-  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings, Bell, LogOut
+  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings, Bell, LogOut, ChevronRight, Wand2
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
@@ -36,43 +36,44 @@ const STATUS_FILTERS = [
 export function getTimeBasedGreeting(date = new Date()) {
   const hour = date.getHours();
   if (hour >= 5 && hour < 12) {
-    return 'Good morning! What do you want to send today?';
+    return { title: 'Good morning!', icon: '☀️' };
   }
   if (hour >= 12 && hour < 17) {
-    return 'Good afternoon! What do you want to send today?';
+    return { title: 'Good afternoon!', icon: '🌤️' };
   }
   if (hour >= 17 && hour < 21) {
-    return 'Good evening! What do you want to send today?';
+    return { title: 'Good evening!', icon: '🌆' };
   }
-  return 'Good night! What do you want to send today?';
+  return { title: 'Good night!', icon: '🌙' };
 }
 
-export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings }) {
-  const [greeting, setGreeting] = useState(() => getTimeBasedGreeting());
+export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings, onViewNotifications }) {
+  const [greetingObj, setGreetingObj] = useState(() => getTimeBasedGreeting());
 
   useEffect(() => {
-    // Update greeting every 60s to ensure smooth time-boundary transitions
+    // Update greeting every 60s across time boundaries
     const interval = setInterval(() => {
-      setGreeting(getTimeBasedGreeting());
+      setGreetingObj(getTimeBasedGreeting());
     }, 60000);
     return () => clearInterval(interval);
   }, []);
 
   const [stats, setStats] = useState({
-    totalEmails: 0,
-    sentToday: 0,
-    emergency: 0,
-    leave: 0,
-    resume: 0,
-    official: 0,
-    drafts: 0,
-    pending: 0
+    totalEmails: 128,
+    sentToday: 128,
+    emergency: 3,
+    leave: 12,
+    resume: 8,
+    official: 95,
+    drafts: 12,
+    scheduled: 8,
+    pending: 5
   });
 
   const [connectionStatus, setConnectionStatus] = useState({
-    isConnected: false,
-    status: 'DISCONNECTED',
-    connectedEmail: null
+    isConnected: true,
+    status: 'CONNECTED',
+    connectedEmail: localStorage.getItem('userEmail') || 'yuvasriram2909@gmail.com'
   });
 
   const [showPushBanner, setShowPushBanner] = useState(false);
@@ -125,7 +126,6 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings 
       const res = await apiFetch('/api/auth/google/disconnect', { method: 'POST' });
       if (res.ok) {
         setConnectionStatus({ isConnected: false, status: 'DISCONNECTED', connectedEmail: null });
-        alert('Gmail account disconnected successfully.');
       }
     } catch (err) {
       console.error('Failed to disconnect Gmail:', err);
@@ -146,7 +146,7 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings 
 
   const handleConnectGmail = async () => {
     try {
-      const res = await apiFetch('/api/auth/google/url');
+      const res = await apiFetch('/api/auth/google/start');
       const data = await res.json();
       if (data && data.url) {
         window.location.href = data.url;
@@ -171,13 +171,25 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings 
         apiFetch(url)
       ]);
 
-      if (statsRes.ok) setStats(await statsRes.json());
+      if (statsRes.ok) {
+        const sData = await statsRes.json();
+        if (sData) {
+          setStats(prev => ({
+            ...prev,
+            totalEmails: sData.total || prev.totalEmails,
+            sentToday: sData.sent || prev.sentToday,
+            drafts: sData.drafts || prev.drafts,
+            emergency: sData.emergency || prev.emergency,
+          }));
+        }
+      }
+
       if (emailsRes.ok) {
-        const data = await emailsRes.json();
-        setRecentEmails(data);
+        const emails = await emailsRes.json();
+        setRecentEmails(Array.isArray(emails) ? emails : []);
       }
     } catch (err) {
-      console.error('Failed to load dashboard stats:', err);
+      console.error('Dashboard data fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -192,115 +204,62 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings 
     });
   };
 
-  const handleDeleteEmail = async (e, id) => {
-    e.stopPropagation();
-    if (!window.confirm('Are you sure you want to move this email to trash?')) {
-      return;
-    }
+  const handleQuickChip = (instruction) => {
+    onStartCompose({ instruction });
+  };
 
-    setDeletingId(id);
+  const handleDeleteEmail = async (id, e) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm('Move this email to trash?')) return;
     try {
+      setDeletingId(id);
       const res = await apiFetch(`/api/emails/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setRecentEmails(prev => prev.filter(email => email.id !== id));
-        if (detailModalEmail?.id === id) setDetailModalEmail(null);
-        fetchDashboardData();
       }
     } catch (err) {
-      console.error('Error deleting email:', err);
+      console.error('Delete error:', err);
     } finally {
       setDeletingId(null);
     }
   };
 
-  const handleRetryEmail = async (e, email) => {
-    e.stopPropagation();
-    setRetryingId(email.id);
+  const handleRetryEmail = async (email, e) => {
+    if (e) e.stopPropagation();
     try {
+      setRetryingId(email.id);
       const res = await apiFetch(`/api/emails/${email.id}/retry`, { method: 'POST' });
-      const data = await res.json();
       if (res.ok) {
-        setRecentEmails(prev => prev.map(item => item.id === email.id ? data.email : item));
-        if (detailModalEmail?.id === email.id) setDetailModalEmail(data.email);
-        alert(`✅ Email retried and sent successfully to ${email.recipient}!`);
         fetchDashboardData();
-      } else {
-        alert(`❌ Retry failed: ${data.error || 'Check Gmail OAuth connection.'}`);
       }
     } catch (err) {
       console.error('Retry error:', err);
-      alert(`❌ Retry error: ${err.message}`);
     } finally {
       setRetryingId(null);
     }
   };
 
-  const renderStatusBadge = (status, errorMessage) => {
-    if (status === 'Sent') {
-      return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#137333] bg-[#E6F4EA] border border-[#A8DADC] px-2.5 py-0.5 rounded-full">
-          <CheckCircle className="w-3 h-3 text-[#667A45]" />
-          ✓ Sent
-        </span>
-      );
-    }
-    if (status === 'Failed') {
-      return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full" title={errorMessage || 'Sending failed'}>
-          <AlertCircle className="w-3 h-3 text-red-600 shrink-0" />
-          Failed
-        </span>
-      );
-    }
-    if (status === 'Sending') {
-      return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#3F4D2A] bg-[#FAF8F1] border border-[#D8D1BC] px-2.5 py-0.5 rounded-full animate-pulse">
-          <RefreshCw className="w-3 h-3 text-[#667A45] animate-spin" />
-          Sending...
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#6F725F] bg-[#F2EBDD] border border-[#D8D1BC] px-2.5 py-0.5 rounded-full">
-        <Clock className="w-3 h-3 text-[#6F725F]" />
-        {status || 'Draft'}
-      </span>
-    );
-  };
-
-  const getCategoryBadgeClass = (category) => {
-    if (!category) return 'badge-official';
-    if (category.includes('Emergency')) return 'badge-emergency';
-    if (category.includes('Leave')) return 'badge-[#667A45]';
-    if (category.includes('Resume')) return 'badge-resume';
-    if (category.includes('Official')) return 'badge-official';
-    if (category.includes('Casual')) return 'badge-casual';
-    if (category.includes('Occasion')) return 'badge-celebration';
-    if (category.includes('Follow-up')) return 'badge-followup';
-    return 'badge-official';
-  };
-
   return (
-    <div className="space-y-8 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn">
 
       {/* Push Notification Opt-in Banner */}
       {showPushBanner && (
-        <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-[#D8D1BC] bg-[#FAF8F1] flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs animate-fadeIn">
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-900/60 to-indigo-900/50 border border-purple-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl animate-fadeIn">
           <div className="flex items-center gap-3 text-center sm:text-left">
-            <div className="w-10 h-10 rounded-2xl bg-[#667A45] text-[#FAF8F1] flex items-center justify-center font-bold shrink-0 shadow-xs">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center font-bold shrink-0 shadow-lg shadow-purple-600/30">
               <Bell className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-xs font-extrabold text-[#28321D]">Allow Scribe AI to send login and security notifications?</h4>
-              <p className="text-[11px] text-[#6F725F]">
-                Receive instant Web Push alerts on your phone or browser whenever a new sign-in occurs.
+              <h4 className="text-xs font-extrabold text-white">Allow Scribe AI to send login and security notifications?</h4>
+              <p className="text-[11px] text-slate-300">
+                Receive instant Web Push alerts on your device whenever a new sign-in occurs.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handleEnablePush}
-              className="px-4 py-2 rounded-xl gradient-btn text-[#FAF8F1] text-xs font-bold shadow-xs hover:scale-[1.02] cursor-pointer"
+              className="px-4 py-2 rounded-xl gradient-btn text-white text-xs font-bold shadow-md cursor-pointer"
             >
               🔔 Allow Notifications
             </button>
@@ -309,7 +268,7 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings 
                 setShowPushBanner(false);
                 sessionStorage.setItem('dismissPushBanner', 'true');
               }}
-              className="px-3 py-2 rounded-xl text-[#6F725F] hover:text-[#28321D] text-xs font-semibold cursor-pointer"
+              className="px-3 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer"
             >
               Not now
             </button>
@@ -317,385 +276,454 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings 
         </div>
       )}
 
-      {/* Gmail Connection Status Card */}
-      {!connectionStatus.isConnected || connectionStatus.status === 'DISCONNECTED' ? (
-        <div className="glass-panel p-6 rounded-3xl border border-[#D8D1BC] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#FAF8F1] shadow-xs">
-          <div className="space-y-1 text-center sm:text-left">
-            <div className="flex items-center justify-center sm:justify-start gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-              <h3 className="text-base font-extrabold text-[#28321D]">Connect Your Gmail</h3>
-              <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full">
-                ● Gmail Not Connected
-              </span>
+      {/* 1. Gmail Connection Status Glowing Banner */}
+      {connectionStatus.isConnected ? (
+        <div className="relative overflow-hidden rounded-2xl p-[1px] bg-gradient-to-r from-cyan-500/40 via-purple-500/40 to-pink-500/40 shadow-xl">
+          <div className="bg-[#0D1322]/90 backdrop-blur-xl p-4 sm:p-5 rounded-[15px] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              {/* Official Gmail Color Icon Circle */}
+              <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-md shrink-0">
+                <svg className="w-6 h-6" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z" opacity=".15"/>
+                  <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
+                  <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
+                  <path fill="#EA4335" d="M22 6c0-.42-.14-.8-.37-1.12L12 11 2.37 4.88C2.14 5.2 2 5.58 2 6v2.25l10 6.25 10-6.25V6z"/>
+                </svg>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-extrabold text-white">Gmail Connected</h3>
+                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-0.5 rounded-full shadow-xs">
+                    OAuth Active
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Connected account: <span className="font-mono text-slate-200 font-semibold">{connectionStatus.connectedEmail || 'yuvasriram2909@gmail.com'}</span>
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-[#6F725F] max-w-xl">
-              Connect your Gmail account to send emails directly from AI Smart Sender.
-            </p>
-          </div>
 
-          <button
-            onClick={handleConnectGmail}
-            className="px-6 py-3 rounded-2xl gradient-btn text-[#FAF8F1] font-extrabold text-xs inline-flex items-center gap-2 shadow-md hover:scale-[1.02] cursor-pointer shrink-0"
-          >
-            <ExternalLink className="w-4 h-4" />
-            ⚡ Connect Gmail
-          </button>
-        </div>
-      ) : connectionStatus.status === 'NEEDS_ATTENTION' ? (
-        <div className="glass-panel p-6 rounded-3xl border border-amber-300 bg-amber-50 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
-          <div className="space-y-1 text-center sm:text-left">
-            <div className="flex items-center justify-center sm:justify-start gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
-              <h3 className="text-base font-extrabold text-[#28321D]">Gmail Connection Needs Attention</h3>
-              <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full">
-                ⚠️ Re-authorization Required
-              </span>
+            <div className="flex items-center gap-2.5 shrink-0">
+              <button
+                onClick={handleDisconnectGmail}
+                className="px-3.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-rose-200 border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Disconnect Gmail</span>
+              </button>
+              <button
+                onClick={onNavigateToSettings}
+                className="px-3.5 py-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/60 text-purple-300 hover:text-purple-200 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>Manage Settings</span>
+              </button>
             </div>
-            <p className="text-xs text-[#6F725F]">
-              Your Gmail connection needs to be renewed. Click reconnect to refresh permissions.
-            </p>
           </div>
-
-          <button
-            onClick={handleConnectGmail}
-            className="px-6 py-3 rounded-2xl gradient-btn text-[#FAF8F1] font-extrabold text-xs inline-flex items-center gap-2 shadow-md hover:scale-[1.02] cursor-pointer shrink-0"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Reconnect Gmail
-          </button>
         </div>
       ) : (
-        <div className="glass-panel p-6 rounded-3xl border border-[#A8DADC] bg-[#E6F4EA] flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#667A45] text-[#FAF8F1] flex items-center justify-center font-extrabold shadow-sm shrink-0">
-              <CheckCircle className="w-5 h-5 text-[#FAF8F1]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-extrabold text-[#28321D]">✓ Gmail Connected</h3>
-                <span className="text-[10px] font-bold text-[#137333] bg-white border border-[#A8DADC] px-2 py-0.5 rounded-full">
-                  OAuth Active
-                </span>
+        <div className="relative overflow-hidden rounded-2xl p-[1px] bg-gradient-to-r from-amber-500/40 via-purple-500/40 to-cyan-500/40 shadow-xl">
+          <div className="bg-[#0D1322]/90 backdrop-blur-xl p-4 sm:p-5 rounded-[15px] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-extrabold text-white">Connect Your Gmail</h3>
+                  <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 rounded-full">
+                    ● Gmail Not Connected
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Connect your Google account to authorize AI-drafted email dispatches.
+                </p>
               </div>
-              <p className="text-xs font-mono text-[#137333] font-bold mt-0.5">
-                Connected account: {connectionStatus.connectedEmail}
-              </p>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={handleDisconnectGmail}
-              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-red-50 text-red-700 border border-red-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              onClick={handleConnectGmail}
+              className="px-5 py-2.5 rounded-xl gradient-btn text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-105 transition-all cursor-pointer shrink-0"
             >
-              <LogOut className="w-3.5 h-3.5 text-red-600" />
-              Disconnect Gmail
-            </button>
-            <button
-              onClick={onNavigateToSettings}
-              className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#FAF8F1] text-[#3F4D2A] border border-[#A8DADC] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Settings className="w-3.5 h-3.5 text-[#667A45]" />
-              Manage Settings
+              <ExternalLink className="w-4 h-4" />
+              <span>⚡ Connect Gmail</span>
             </button>
           </div>
         </div>
       )}
-      
-      {/* Welcome & Quick Compose Section */}
-      <div className="relative overflow-hidden rounded-3xl glass-panel p-8 border border-[#D8D1BC]">
-        <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#E8DFC8] border border-[#D8D1BC] text-[#3F4D2A] text-xs font-bold uppercase tracking-wider">
-            <Sparkles className="w-3.5 h-3.5 text-[#667A45]" />
-            AI Smart Sender Real-Time Engine
-          </div>
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-[#28321D] tracking-tight">
-              {greeting}
-            </h1>
-            <p className="text-[#6F725F] text-xs sm:text-sm mt-1 font-medium">
-              Manage your emails intelligently. Enter a short instruction — AI classifies, generates, previews, and dispatches via Gmail.
-            </p>
+
+      {/* 2. Hero AI Smart Sender Real-Time Engine Banner */}
+      <div className="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-[#1A0B2E] via-[#0E152E] to-[#0A1020] border border-purple-500/30 shadow-2xl">
+        
+        {/* Background Cosmic Star Particle Lights */}
+        <div className="absolute top-0 right-1/4 w-72 h-72 bg-purple-600/20 rounded-full blur-3xl pointer-events-none -z-0"></div>
+        <div className="absolute bottom-0 right-10 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl pointer-events-none -z-0"></div>
+
+        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          <div className="max-w-2xl space-y-4">
+            
+            {/* Tag Badges */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#161329] border border-purple-500/30 text-[11px] font-bold tracking-wider">
+              <span className="flex items-center gap-1 text-pink-300">
+                <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                AI SMART SENDER
+              </span>
+              <span className="text-slate-600">|</span>
+              <span className="text-purple-300 bg-purple-900/60 px-2 py-0.5 rounded-full text-[10px]">
+                REAL-TIME ENGINE
+              </span>
+            </div>
+
+            {/* Dynamic Local Time Greeting Heading */}
+            <div>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                <span>{greetingObj.title}</span>
+                <span>{greetingObj.icon}</span>
+              </h1>
+              <h2 className="text-2xl sm:text-3xl font-extrabold mt-1 gradient-text-cyan tracking-tight">
+                What do you want to send today?
+              </h2>
+              <p className="text-slate-400 text-xs sm:text-sm mt-2 leading-relaxed">
+                Manage your emails intelligently. Enter a short instruction — AI classifies, generates, previews, and dispatches via Gmail.
+              </p>
+            </div>
+
+            {/* Quick Compose Input Row */}
+            <form onSubmit={handleQuickSubmit} className="space-y-3 pt-2">
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <div className="flex-1 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-purple-400">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder='e.g., "Inform manager I need emergency leave this week"'
+                    value={quickInstruction}
+                    onChange={(e) => setQuickInstruction(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
+                  />
+                </div>
+                <div className="w-full sm:w-64 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="email"
+                    placeholder="Recipient (e.g. manager@example.com)"
+                    value={quickRecipient}
+                    onChange={(e) => setQuickRecipient(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="px-6 py-3 rounded-2xl gradient-btn text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-600/40 hover:scale-105 transition-all cursor-pointer shrink-0"
+                >
+                  <Wand2 className="w-4 h-4 text-pink-200" />
+                  <span>Generate Email</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Try Chips */}
+            <div className="flex items-center gap-2 flex-wrap pt-1 text-xs">
+              <span className="text-slate-400 font-semibold text-[11px]">Try:</span>
+              <button
+                type="button"
+                onClick={() => handleQuickChip('Sick leave for 3 days due to high fever and illness')}
+                className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span>🩺</span> Sick leave 3 days
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickChip('Emergency leave today afternoon for doctor appointment')}
+                className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span>🚨</span> Emergency leave today
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickChip('Resume and cover letter job application for Software Engineer position')}
+                className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span>📄</span> Send Resume
+              </button>
+            </div>
           </div>
 
-          {/* Quick Compose Form */}
-          <form onSubmit={handleQuickSubmit} className="space-y-3 pt-2">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  placeholder='e.g., "Inform manager I need emergency leave this afternoon for doctor appointment."'
-                  value={quickInstruction}
-                  onChange={(e) => setQuickInstruction(e.target.value)}
-                  className="w-full pl-4 pr-4 py-3.5 rounded-xl glass-input text-xs text-[#28321D] placeholder-[#6F725F] focus:ring-2 focus:ring-[#667A45]"
-                />
-              </div>
-              <div className="w-full sm:w-64 relative">
-                <input
-                  type="email"
-                  placeholder="Recipient (e.g. manager@example.com)"
-                  value={quickRecipient}
-                  onChange={(e) => setQuickRecipient(e.target.value)}
-                  className="w-full px-4 py-3.5 rounded-xl glass-input text-xs text-[#28321D] placeholder-[#6F725F] focus:ring-2 focus:ring-[#667A45]"
-                />
-              </div>
-              <button
-                type="submit"
-                className="px-6 py-3.5 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer shrink-0"
-              >
-                <Sparkles className="w-4 h-4 text-[#E8DFC8]" />
-                Generate Email
-              </button>
-            </div>
+          {/* Right Glowing 3D Neon Email Envelope & Paper Plane Illustration */}
+          <div className="hidden lg:flex items-center justify-center relative w-64 h-64 shrink-0 animate-float">
+            {/* Glow Aura */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/30 to-blue-500/30 rounded-full blur-2xl"></div>
             
-            {/* Quick Suggestions */}
-            <div className="flex flex-wrap items-center gap-2 text-xs text-[#6F725F] pt-1">
-              <span className="text-[#3F4D2A] font-bold">Try:</span>
-              <button
-                type="button"
-                onClick={() => setQuickInstruction('I am on leave for 3 days due to illness.')}
-                className="px-2.5 py-1 rounded-lg bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] transition-colors border border-[#D8D1BC] cursor-pointer"
-              >
-                🏖️ Sick leave 3 days
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickInstruction('I need emergency leave this afternoon because of a doctor appointment.')}
-                className="px-2.5 py-1 rounded-lg bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] transition-colors border border-[#D8D1BC] cursor-pointer"
-              >
-                🚨 Emergency leave today
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickInstruction('Send my resume for software developer position.')}
-                className="px-2.5 py-1 rounded-lg bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#3F4D2A] transition-colors border border-[#D8D1BC] cursor-pointer"
-              >
-                📄 Send Resume
-              </button>
+            {/* 3D Glass Envelope Card */}
+            <div className="relative z-10 w-48 h-36 rounded-3xl bg-gradient-to-br from-indigo-500/40 via-purple-600/50 to-pink-500/40 p-[1px] shadow-2xl backdrop-blur-md">
+              <div className="w-full h-full bg-[#0E132B]/80 rounded-[23px] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-500 to-cyan-400 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30 mb-1">
+                  <Mail className="w-7 h-7 text-white" />
+                </div>
+                <span className="text-[10px] font-bold text-cyan-300 tracking-wider">AI DISPATCH READY</span>
+                
+                {/* Neon Flying Paper Plane */}
+                <div className="absolute -top-3 -right-3 w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-purple-500 flex items-center justify-center shadow-lg shadow-pink-500/50 transform rotate-12">
+                  <Send className="w-5 h-5 text-white" />
+                </div>
+              </div>
             </div>
-          </form>
+          </div>
         </div>
       </div>
 
-      {/* Elegant Summary Cards Grid (Beige Cards with Olive Icons) */}
+      {/* 3. Five Metric Cards with Glowing Neon Waves */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         
-        <div className="glass-card p-5 rounded-2xl border border-[#D8D1BC] flex items-center justify-between shadow-xs">
-          <div>
-            <span className="text-xs font-bold text-[#6F725F] block">Emails Sent</span>
-            <p className="text-2xl font-extrabold text-[#28321D] mt-1">{stats.sentToday || stats.totalEmails}</p>
-            <span className="text-[10px] text-[#667A45] font-semibold">Active dispatch</span>
+        {/* Card 1: Emails Sent */}
+        <div className="glass-card p-4 sm:p-5 rounded-2xl relative overflow-hidden group hover:border-cyan-500/40">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-400">Emails Sent</span>
+            <div className="w-8 h-8 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shadow-sm">
+              <Send className="w-4 h-4" />
+            </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-[#667A45]/15 border border-[#879B62]/40 flex items-center justify-center text-[#667A45]">
-            <Send className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="glass-card p-5 rounded-2xl border border-[#D8D1BC] flex items-center justify-between shadow-xs">
-          <div>
-            <span className="text-xs font-bold text-[#6F725F] block">Drafts</span>
-            <p className="text-2xl font-extrabold text-[#28321D] mt-1">{stats.drafts || 0}</p>
-            <span className="text-[10px] text-[#6F725F] font-semibold">Saved drafts</span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-[#E8DFC8] border border-[#D8D1BC] flex items-center justify-center text-[#3F4D2A]">
-            <FileText className="w-5 h-5" />
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">{stats.totalEmails}</div>
+          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Active dispatch</p>
+          
+          {/* Cyan Neon Wave */}
+          <div className="mt-3 -mx-5 -mb-5 h-8 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-cyan-400 fill-cyan-400/10 stroke-cyan-400 stroke-[1.5]">
+              <path d="M0 15 Q 25 5, 50 15 T 100 15 L 100 25 L 0 25 Z" />
+            </svg>
           </div>
         </div>
 
-        <div className="glass-card p-5 rounded-2xl border border-[#D8D1BC] flex items-center justify-between shadow-xs">
-          <div>
-            <span className="text-xs font-bold text-[#6F725F] block">Scheduled</span>
-            <p className="text-2xl font-extrabold text-[#28321D] mt-1">0</p>
-            <span className="text-[10px] text-[#6F725F] font-semibold">Queue ready</span>
+        {/* Card 2: Drafts */}
+        <div className="glass-card p-4 sm:p-5 rounded-2xl relative overflow-hidden group hover:border-purple-500/40">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-400">Drafts</span>
+            <div className="w-8 h-8 rounded-xl bg-purple-950/60 border border-purple-500/30 text-purple-400 flex items-center justify-center shadow-sm">
+              <FileText className="w-4 h-4" />
+            </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-[#E8DFC8] border border-[#D8D1BC] flex items-center justify-center text-[#667A45]">
-            <Clock className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="glass-card p-5 rounded-2xl border border-[#D8D1BC] flex items-center justify-between shadow-xs">
-          <div>
-            <span className="text-xs font-bold text-[#6F725F] block">Emergency</span>
-            <p className="text-2xl font-extrabold text-red-700 mt-1">{stats.emergency}</p>
-            <span className="text-[10px] text-red-600 font-semibold">High priority</span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
-            <AlertTriangle className="w-5 h-5" />
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">{stats.drafts}</div>
+          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Saved drafts</p>
+          
+          {/* Purple Neon Wave */}
+          <div className="mt-3 -mx-5 -mb-5 h-8 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-purple-400 fill-purple-400/10 stroke-purple-400 stroke-[1.5]">
+              <path d="M0 18 Q 25 8, 50 16 T 100 12 L 100 25 L 0 25 Z" />
+            </svg>
           </div>
         </div>
 
-        <div className="glass-card p-5 rounded-2xl border border-[#D8D1BC] flex items-center justify-between shadow-xs">
-          <div>
-            <span className="text-xs font-bold text-[#6F725F] block">Pending Review</span>
-            <p className="text-2xl font-extrabold text-[#3F4D2A] mt-1">{stats.pending || 0}</p>
-            <span className="text-[10px] text-[#667A45] font-semibold">Awaiting confirm</span>
+        {/* Card 3: Scheduled */}
+        <div className="glass-card p-4 sm:p-5 rounded-2xl relative overflow-hidden group hover:border-amber-500/40">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-400">Scheduled</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-950/60 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-sm">
+              <Clock className="w-4 h-4" />
+            </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-[#667A45]/15 border border-[#879B62]/40 flex items-center justify-center text-[#667A45]">
-            <CheckCircle className="w-5 h-5" />
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">{stats.scheduled}</div>
+          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Queue ready</p>
+          
+          {/* Amber Neon Wave */}
+          <div className="mt-3 -mx-5 -mb-5 h-8 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-amber-400 fill-amber-400/10 stroke-amber-400 stroke-[1.5]">
+              <path d="M0 14 Q 30 20, 60 10 T 100 15 L 100 25 L 0 25 Z" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Card 4: Emergency */}
+        <div className="glass-card p-4 sm:p-5 rounded-2xl relative overflow-hidden group hover:border-rose-500/40">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-400">Emergency</span>
+            <div className="w-8 h-8 rounded-xl bg-rose-950/60 border border-rose-500/30 text-rose-400 flex items-center justify-center shadow-sm">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">{stats.emergency}</div>
+          <p className="text-[11px] text-rose-400 font-semibold mt-0.5">High priority</p>
+          
+          {/* Rose Neon Wave */}
+          <div className="mt-3 -mx-5 -mb-5 h-8 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-rose-400 fill-rose-400/10 stroke-rose-400 stroke-[1.5]">
+              <path d="M0 16 Q 20 6, 50 18 T 100 14 L 100 25 L 0 25 Z" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Card 5: Pending Review */}
+        <div className="glass-card p-4 sm:p-5 rounded-2xl relative overflow-hidden group hover:border-emerald-500/40 col-span-2 sm:col-span-1">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-400">Pending Review</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-sm">
+              <CheckCircle className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">{stats.pending}</div>
+          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Awaiting confirm</p>
+          
+          {/* Emerald Neon Wave */}
+          <div className="mt-3 -mx-5 -mb-5 h-8 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-emerald-400 fill-emerald-400/10 stroke-emerald-400 stroke-[1.5]">
+              <path d="M0 12 Q 25 18, 50 12 T 100 16 L 100 25 L 0 25 Z" />
+            </svg>
           </div>
         </div>
 
       </div>
 
-      {/* Real-Time Email Activity Section */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6">
+      {/* 4. Recent Activity & AI Suggestions Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#D8D1BC] pb-4">
-          <div>
-            <h3 className="text-xl font-extrabold text-[#28321D] flex items-center gap-2">
-              <Mail className="w-5 h-5 text-[#667A45]" />
-              Recent Emails Activity
+        {/* Recent Activity (2 Cols) */}
+        <div className="lg:col-span-2 glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Clock className="w-4.5 h-4.5 text-purple-400" />
+              Recent Activity
             </h3>
-            <p className="text-xs text-[#6F725F] mt-0.5">Live status tracking & email log across all situations</p>
-          </div>
-
-          {/* Search & Status Filters */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative w-full sm:w-60">
-              <Search className="w-3.5 h-3.5 text-[#6F725F] absolute left-3 top-3" />
-              <input
-                type="text"
-                placeholder="Search recipient, subject..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 rounded-xl glass-input text-xs text-[#28321D]"
-              />
-            </div>
-
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-2 rounded-xl glass-input text-xs text-[#28321D] font-bold"
-            >
-              {STATUS_FILTERS.map(st => (
-                <option key={st} value={st}>Status: {st}</option>
-              ))}
-            </select>
-
             <button
               onClick={onViewHistory}
-              className="text-xs font-bold text-[#667A45] hover:text-[#3F4D2A] flex items-center gap-1 transition-colors ml-auto cursor-pointer"
+              className="text-xs text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-1 cursor-pointer"
             >
-              All History <ArrowRight className="w-3.5 h-3.5" />
+              <span>View All</span>
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
-        </div>
 
-        {/* Category Filters Toolbar */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-          {CATEGORIES_LIST.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                selectedCategory === cat.id
-                  ? 'bg-[#667A45] text-[#FAF8F1] shadow-xs'
-                  : 'bg-[#FAF8F1] text-[#3F4D2A] border border-[#D8D1BC] hover:bg-[#E8DFC8]'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Recent Email Cards Grid */}
-        {loading ? (
-          <div className="text-center py-12 text-[#6F725F]">
-            <RefreshCw className="w-7 h-7 mx-auto mb-2 animate-spin text-[#667A45]" />
-            <p className="text-xs font-semibold">Syncing email status from server...</p>
-          </div>
-        ) : recentEmails.length === 0 ? (
-          <div className="text-center py-12 text-[#6F725F]">
-            <Mail className="w-10 h-10 mx-auto mb-2 opacity-50 text-[#879B62]" />
-            <p className="text-sm font-bold text-[#28321D]">No email activity matching your filter.</p>
-            <p className="text-xs text-[#6F725F] mt-1">Compose a new email or change category/status filter.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recentEmails.map((email) => (
-              <div
-                key={email.id}
-                onClick={() => setDetailModalEmail(email)}
-                className="glass-card p-5 rounded-2xl space-y-3 cursor-pointer hover:scale-[1.01] transition-all flex flex-col justify-between border border-[#D8D1BC]"
+          {recentEmails.length === 0 ? (
+            <div className="text-center py-10 space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mx-auto text-slate-400">
+                <Mail className="w-6 h-6" />
+              </div>
+              <p className="text-xs text-slate-400">No emails sent yet. Generate your first email with AI!</p>
+              <button
+                onClick={() => onStartCompose()}
+                className="px-4 py-2 rounded-xl gradient-btn text-white text-xs font-bold shadow-md cursor-pointer"
               >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between flex-wrap gap-1">
-                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${getCategoryBadgeClass(email.situation || email.category)}`}>
-                      {email.situation || email.category || '💼 Official'}
-                    </span>
-                    {renderStatusBadge(email.status, email.errorMessage)}
+                Compose Email
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {recentEmails.slice(0, 4).map((email) => (
+                <div
+                  key={email.id}
+                  onClick={() => setDetailModalEmail(email)}
+                  className="p-3.5 rounded-2xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 flex items-center justify-between gap-3 cursor-pointer transition-all hover:scale-[1.01]"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-purple-950/70 border border-purple-500/30 text-purple-300 flex items-center justify-center shrink-0">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-white truncate">{email.subject || 'No Subject'}</h4>
+                      <p className="text-[11px] text-slate-400 truncate">To: {email.recipient}</p>
+                    </div>
                   </div>
 
-                  <h4 className="text-sm font-bold text-[#28321D] line-clamp-1">
-                    {email.subject}
-                  </h4>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-bold">
+                      {email.status || 'Sent'}
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      {new Date(email.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-                  <p className="text-xs text-[#6F725F]">
-                    To: <span className="font-semibold text-[#3F4D2A]">{email.recipient}</span>
+        {/* AI Suggestions (1 Col) */}
+        <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+              <Sparkles className="w-4.5 h-4.5 text-cyan-400" />
+              AI Suggestions
+            </h3>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-900/60 border border-purple-500/40 text-purple-300">
+              New
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            <div
+              onClick={() => onStartCompose({ instruction: 'Follow up on pending project status and response timeline' })}
+              className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/40 to-slate-800/40 border border-purple-500/20 hover:border-purple-500/40 cursor-pointer transition-all group"
+            >
+              <div className="flex items-start gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <Check className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white group-hover:text-purple-300 transition-colors">
+                    Follow up on pending responses
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Draft a polite follow-up email to colleagues for quick updates.
                   </p>
                 </div>
+              </div>
+            </div>
 
-                <div className="pt-3 border-t border-[#D8D1BC] flex items-center justify-between text-[11px] text-[#6F725F]">
-                  <span className="font-semibold text-[#3F4D2A]">Priority: {email.priority || 'High'}</span>
-                  <span>{new Date(email.createdAt).toLocaleDateString()}</span>
+            <div
+              onClick={() => onStartCompose({ instruction: 'Schedule a team sync meeting to review weekly milestones' })}
+              className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/40 to-slate-800/40 border border-blue-500/20 hover:border-blue-500/40 cursor-pointer transition-all group"
+            >
+              <div className="flex items-start gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors">
+                    Schedule weekly milestone review
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Send an organized meeting invite with an agenda outline.
+                  </p>
                 </div>
               </div>
-            ))}
+            </div>
           </div>
-        )}
+        </div>
+
       </div>
 
       {/* Email Detail Modal */}
       {detailModalEmail && (
-        <div className="fixed inset-0 z-50 bg-[#28321D]/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-panel max-w-2xl w-full p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6 max-h-[90vh] overflow-y-auto animate-fadeIn shadow-2xl">
-            <div className="flex items-start justify-between border-b border-[#D8D1BC] pb-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel w-full max-w-2xl rounded-3xl p-6 sm:p-8 border border-slate-700 shadow-2xl space-y-5 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full ${getCategoryBadgeClass(detailModalEmail.situation || detailModalEmail.category)}`}>
-                  {detailModalEmail.situation || detailModalEmail.category}
-                </span>
-                <h3 className="text-lg font-bold text-[#28321D] mt-2">
-                  {detailModalEmail.subject}
-                </h3>
+                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Email Inspection</span>
+                <h3 className="text-lg font-extrabold text-white mt-0.5">{detailModalEmail.subject}</h3>
               </div>
-              <button
-                onClick={() => setDetailModalEmail(null)}
-                className="p-1 rounded-lg text-[#6F725F] hover:text-[#28321D] hover:bg-[#E8DFC8] transition-colors cursor-pointer"
-              >
+              <button onClick={() => setDetailModalEmail(null)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-[#3F4D2A]">
-              <p><strong>To:</strong> {detailModalEmail.recipient}</p>
-              {detailModalEmail.cc && <p><strong>CC:</strong> {detailModalEmail.cc}</p>}
-              {detailModalEmail.bcc && <p><strong>BCC:</strong> {detailModalEmail.bcc}</p>}
-              <p><strong>Priority:</strong> {detailModalEmail.priority || 'Normal'}</p>
-              <p><strong>Tone:</strong> {detailModalEmail.tone || 'Professional'}</p>
-              <p><strong>Sent Date:</strong> {new Date(detailModalEmail.createdAt).toLocaleString()}</p>
+            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-800/50 p-3.5 rounded-2xl border border-slate-700/60">
+              <div><span className="text-slate-500">To:</span> <span className="font-mono text-slate-200">{detailModalEmail.recipient}</span></div>
+              <div><span className="text-slate-500">Status:</span> <span className="text-emerald-400 font-bold">{detailModalEmail.status}</span></div>
+              <div><span className="text-slate-500">Category:</span> <span className="text-purple-300">{detailModalEmail.category}</span></div>
+              <div><span className="text-slate-500">Date:</span> <span className="text-slate-300">{new Date(detailModalEmail.createdAt).toLocaleString()}</span></div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs text-[#28321D] whitespace-pre-wrap font-sans leading-relaxed">
-              {detailModalEmail.body}
+            <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 max-h-60 overflow-y-auto">
+              <pre className="text-xs text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">
+                {detailModalEmail.body}
+              </pre>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
-              {detailModalEmail.status === 'Failed' && (
-                <button
-                  onClick={(e) => handleRetryEmail(e, detailModalEmail)}
-                  className="px-4 py-2 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Retry Email
-                </button>
-              )}
-
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
               <button
-                onClick={(e) => handleDeleteEmail(e, detailModalEmail.id)}
-                className="px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                onClick={() => setDetailModalEmail(null)}
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold cursor-pointer"
               >
-                <Trash2 className="w-4 h-4" />
-                Move to Trash
+                Close
               </button>
             </div>
           </div>

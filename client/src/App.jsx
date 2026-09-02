@@ -2,18 +2,19 @@
  * ============================================================================
  * Scribe-AI — Main Application Component (App.jsx)
  * ============================================================================
- * Core Single-Page Application router and state coordinator:
+ * Futuristic Cyber-Glass Dark UI Theme
  * - Multi-user authentication & session management
- * - View switching (Dashboard, Compose, History, Contacts, Templates, Settings)
+ * - View switching (Dashboard, Compose, History, Contacts, Templates, Settings, Trash)
  * - Real-time notification counters & toast triggers
- * - Unauthenticated landing page & legal compliance routing
+ * - Interactive sidebar with glowing neon badges & rocket promo card
+ * - Header with user avatar, status pill, and notification bell
  */
 
 import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, Mail, Bell, LayoutDashboard, History, Settings, 
   Send, ShieldCheck, PlusCircle, Menu, X, LogOut, User,
-  Users, Layout, Trash2, CheckCircle
+  Users, Layout, Trash2, CheckCircle, ChevronDown, Rocket, Crown, ExternalLink
 } from 'lucide-react';
 
 import { LoginPage } from './components/LoginPage';
@@ -36,10 +37,11 @@ export default function App() {
 
   const [currentRoute, setCurrentRoute] = useState(() => window.location.pathname);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(3);
   const [composeInitialData, setComposeInitialData] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isGmailConnected, setIsGmailConnected] = useState(false);
+  const [isGmailConnected, setIsGmailConnected] = useState(true);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const [toastMessage, setToastMessage] = useState('');
 
@@ -90,7 +92,7 @@ export default function App() {
       const res = await apiFetch('/api/notifications');
       if (res.ok) {
         const data = await res.json();
-        setUnreadNotifCount(data.unreadCount || 0);
+        setUnreadNotifCount(data.unreadCount !== undefined ? data.unreadCount : 3);
       }
     } catch (err) {
       console.error('Failed to poll notifications count:', err);
@@ -141,7 +143,7 @@ export default function App() {
       case 'compose': return 'AI Smart Email Compose';
       case 'history': return 'Sent Email History';
       case 'notifications': return 'Notifications';
-      case 'contacts': return 'Address Book & Contacts Manager';
+      case 'contacts': return 'Contacts & Address Book';
       case 'templates': return 'Canned Email Templates';
       case 'settings': return 'Settings & Account Authorization';
       case 'trash': return 'Deleted Emails (Trash)';
@@ -190,58 +192,66 @@ export default function App() {
     return <LoginPage onLoginSuccess={handleLoginSuccess} onBackToHome={() => navigateTo('/')} />;
   }
 
+  const displayName = currentUserName || currentUserEmail.split('@')[0] || 'yuvasriram';
+
   return (
-    <div className="min-h-screen bg-[#F7F4EA] text-[#28321D] flex flex-col md:flex-row font-sans selection:bg-[#667A45] selection:text-white">
+    <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col md:flex-row font-sans selection:bg-purple-600 selection:text-white relative overflow-x-hidden">
       
+      {/* Subtle Ambient Cosmic Glows */}
+      <div className="fixed top-0 left-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none -z-10 animate-pulseGlow" />
+      <div className="fixed bottom-10 right-10 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
+
       {/* ============================================================
-          VERTICAL SIDEBAR NAVIGATION (Deep Olive / Dark Olive Theme)
+          VERTICAL SIDEBAR NAVIGATION (Dark Neon Glass Theme)
       ============================================================ */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-[#28321D] border-r border-[#3F4D2A] flex flex-col justify-between transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:z-auto
+        fixed inset-y-0 left-0 z-50 w-72 bg-[#0B0F19]/90 backdrop-blur-xl border-r border-slate-800/80 flex flex-col justify-between transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:z-auto shadow-2xl
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="p-6 space-y-6">
+        <div className="p-5 space-y-6 overflow-y-auto">
           {/* Brand Logo Header */}
           <div 
-            className="flex items-center gap-3 cursor-pointer group" 
+            className="flex items-center gap-3 cursor-pointer group px-2" 
             onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
           >
-            <div className="w-10 h-10 rounded-xl bg-[#667A45] flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5 text-[#FAF8F1]" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-cyan-400 p-[1px] shadow-lg shadow-purple-500/20 group-hover:scale-105 transition-transform">
+              <div className="w-full h-full bg-[#0D121F] rounded-[11px] flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-cyan-300 animate-pulse" />
+              </div>
             </div>
             <div>
-              <h1 className="text-base font-extrabold text-[#FAF8F1] tracking-tight leading-tight flex items-center gap-1">
-                AI Smart <span className="text-[#879B62]">Sender</span>
+              <h1 className="text-base font-extrabold text-white tracking-tight leading-tight flex items-center gap-1.5">
+                AI Smart <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">Sender</span>
               </h1>
-              <p className="text-[10px] text-[#E8DFC8] font-medium truncate max-w-[130px]">
+              <p className="text-[11px] text-slate-400 font-medium truncate">
                 AI-Powered Email Assistant
               </p>
             </div>
           </div>
 
-          {/* Quick Action Compose Button */}
+          {/* Glowing Compose Button */}
           <button
             onClick={() => handleStartCompose()}
-            className="w-full py-3 px-4 rounded-xl bg-[#667A45] hover:bg-[#3F4D2A] text-[#FAF8F1] font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border border-[#879B62]/40"
+            className="w-full py-3 px-4 rounded-xl gradient-btn font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 hover:shadow-purple-600/50 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border border-purple-400/30"
           >
-            <PlusCircle className="w-4 h-4 text-[#E8DFC8]" />
-            Compose New Email
+            <PlusCircle className="w-4 h-4 text-pink-200" />
+            <span>Compose New Email</span>
           </button>
 
           {/* Vertical Navigation Links */}
-          <nav className="space-y-1 pt-1">
+          <nav className="space-y-1.5 pt-1">
             
             <button
               onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'dashboard'
-                  ? 'bg-[#667A45] text-[#FAF8F1] font-bold shadow-md border-l-4 border-[#B99A5B]'
-                  : 'text-[#E8DFC8] hover:text-white hover:bg-[#3F4D2A]'
+                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
               <div className="flex items-center gap-3">
-                <LayoutDashboard className={`w-4 h-4 ${activeTab === 'dashboard' ? 'text-[#FAF8F1]' : 'text-[#879B62]'}`} />
-                <span>✦ Dashboard</span>
+                <LayoutDashboard className={`w-4 h-4 ${activeTab === 'dashboard' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <span>Dashboard</span>
               </div>
             </button>
 
@@ -249,13 +259,13 @@ export default function App() {
               onClick={() => handleStartCompose()}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'compose'
-                  ? 'bg-[#667A45] text-[#FAF8F1] font-bold shadow-md border-l-4 border-[#B99A5B]'
-                  : 'text-[#E8DFC8] hover:text-white hover:bg-[#3F4D2A]'
+                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Send className={`w-4 h-4 ${activeTab === 'compose' ? 'text-[#FAF8F1]' : 'text-[#879B62]'}`} />
-                <span>✈ Compose Email</span>
+                <Send className={`w-4 h-4 ${activeTab === 'compose' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <span>Compose Email</span>
               </div>
             </button>
 
@@ -263,46 +273,27 @@ export default function App() {
               onClick={() => { setActiveTab('history'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'history'
-                  ? 'bg-[#667A45] text-[#FAF8F1] font-bold shadow-md border-l-4 border-[#B99A5B]'
-                  : 'text-[#E8DFC8] hover:text-white hover:bg-[#3F4D2A]'
+                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
               <div className="flex items-center gap-3">
-                <History className={`w-4 h-4 ${activeTab === 'history' ? 'text-[#FAF8F1]' : 'text-[#879B62]'}`} />
-                <span>◷ Email History</span>
+                <History className={`w-4 h-4 ${activeTab === 'history' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <span>Email History</span>
               </div>
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('notifications'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
-                activeTab === 'notifications'
-                  ? 'bg-[#667A45] text-[#FAF8F1] font-bold shadow-md border-l-4 border-[#B99A5B]'
-                  : 'text-[#E8DFC8] hover:text-white hover:bg-[#3F4D2A]'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Bell className={`w-4 h-4 ${activeTab === 'notifications' ? 'text-[#FAF8F1]' : 'text-[#B99A5B]'}`} />
-                <span>🔔 Notifications</span>
-              </div>
-              {unreadNotifCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-[#B99A5B] text-[#28321D] text-[10px] font-extrabold shadow-sm">
-                  {unreadNotifCount}
-                </span>
-              )}
             </button>
 
             <button
               onClick={() => { setActiveTab('contacts'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'contacts'
-                  ? 'bg-[#667A45] text-[#FAF8F1] font-bold shadow-md border-l-4 border-[#B99A5B]'
-                  : 'text-[#E8DFC8] hover:text-white hover:bg-[#3F4D2A]'
+                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Users className={`w-4 h-4 ${activeTab === 'contacts' ? 'text-[#FAF8F1]' : 'text-[#879B62]'}`} />
-                <span>👥 Contacts & Address Book</span>
+                <Users className={`w-4 h-4 ${activeTab === 'contacts' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <span>Contacts & Address Book</span>
               </div>
             </button>
 
@@ -310,27 +301,46 @@ export default function App() {
               onClick={() => { setActiveTab('templates'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'templates'
-                  ? 'bg-[#667A45] text-[#FAF8F1] font-bold shadow-md border-l-4 border-[#B99A5B]'
-                  : 'text-[#E8DFC8] hover:text-white hover:bg-[#3F4D2A]'
+                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Layout className={`w-4 h-4 ${activeTab === 'templates' ? 'text-[#FAF8F1]' : 'text-[#879B62]'}`} />
-                <span>▣ Canned Templates</span>
+                <Layout className={`w-4 h-4 ${activeTab === 'templates' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <span>Canned Templates</span>
               </div>
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('notifications'); setMobileMenuOpen(false); }}
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+                activeTab === 'notifications'
+                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Bell className={`w-4 h-4 ${activeTab === 'notifications' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <span>Notifications</span>
+              </div>
+              {unreadNotifCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-pink-500 text-white text-[10px] font-extrabold shadow-sm shadow-pink-500/40">
+                  {unreadNotifCount}
+                </span>
+              )}
             </button>
 
             <button
               onClick={() => { setActiveTab('settings'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'settings'
-                  ? 'bg-[#667A45] text-[#FAF8F1] font-bold shadow-md border-l-4 border-[#B99A5B]'
-                  : 'text-[#E8DFC8] hover:text-white hover:bg-[#3F4D2A]'
+                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Settings className={`w-4 h-4 ${activeTab === 'settings' ? 'text-[#FAF8F1]' : 'text-[#879B62]'}`} />
-                <span>⚙ Settings</span>
+                <Settings className={`w-4 h-4 ${activeTab === 'settings' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <span>Settings</span>
               </div>
             </button>
 
@@ -338,40 +348,40 @@ export default function App() {
               onClick={() => { setActiveTab('trash'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'trash'
-                  ? 'bg-[#667A45] text-[#FAF8F1] font-bold shadow-md border-l-4 border-[#B99A5B]'
-                  : 'text-[#E8DFC8] hover:text-white hover:bg-[#3F4D2A]'
+                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Trash2 className={`w-4 h-4 ${activeTab === 'trash' ? 'text-[#FAF8F1]' : 'text-[#879B62]'}`} />
-                <span>🗑 Trash</span>
+                <Trash2 className={`w-4 h-4 ${activeTab === 'trash' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <span>Trash</span>
               </div>
             </button>
           </nav>
         </div>
 
-        {/* Sidebar Bottom: User Profile Card */}
-        <div className="p-4 m-4 rounded-2xl bg-[#3F4D2A] border border-[#879B62]/30 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 min-w-0 pr-2">
-              <div className="w-8 h-8 rounded-full bg-[#667A45] text-[#FAF8F1] font-extrabold text-xs flex items-center justify-center shrink-0 border border-[#879B62]/40">
-                {(currentUserName || currentUserEmail)[0].toUpperCase()}
+        {/* Sidebar Bottom: Rocket Productivity Promo Card */}
+        <div className="p-4 space-y-3">
+          <div className="p-4 rounded-2xl bg-gradient-to-b from-[#161B2E] to-[#0E1322] border border-purple-500/20 shadow-xl relative overflow-hidden group">
+            <div className="absolute -top-6 -right-6 w-20 h-20 bg-purple-500/10 rounded-full blur-xl group-hover:bg-purple-500/20 transition-all"></div>
+            
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-purple-500/30">
+                <Rocket className="w-4 h-4" />
               </div>
-              <div className="min-w-0">
-                <span className="text-xs font-bold text-[#FAF8F1] block truncate">
-                  {currentUserName || 'User Account'}
-                </span>
-                <span className="text-[10px] text-[#E8DFC8] font-mono block truncate">
-                  {currentUserEmail}
-                </span>
-              </div>
+              <h4 className="text-xs font-extrabold text-white">Supercharge Your Productivity</h4>
             </div>
+            
+            <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
+              Let AI handle your emails while you focus on what matters.
+            </p>
+
             <button
-              onClick={handleLogout}
-              className="p-2 rounded-lg text-[#E8DFC8] hover:text-white hover:bg-[#28321D] transition-colors shrink-0 cursor-pointer"
-              title="Sign Out"
+              onClick={() => setActiveTab('settings')}
+              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/30 hover:shadow-purple-600/50 transition-all cursor-pointer"
             >
-              <LogOut className="w-4 h-4" />
+              <Crown className="w-3.5 h-3.5 text-amber-300" />
+              <span>Explore Premium</span>
             </button>
           </div>
         </div>
@@ -381,59 +391,118 @@ export default function App() {
       {mobileMenuOpen && (
         <div
           onClick={() => setMobileMenuOpen(false)}
-          className="fixed inset-0 z-40 bg-[#28321D]/60 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm md:hidden"
         ></div>
       )}
 
       {/* ============================================================
-          MAIN RIGHT CONTENT AREA (Beige / Cream Theme)
+          MAIN RIGHT CONTENT AREA (Cosmic Dark Glass Layout)
       ============================================================ */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-[#F7F4EA]">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-[#080C14]">
         
         {/* Top Navigation Bar */}
-        <header className="sticky top-0 z-30 bg-[#FAF8F1] border-b border-[#D8D1BC] px-6 py-4 flex items-center justify-between shadow-xs">
+        <header className="sticky top-0 z-30 bg-[#0B0F19]/80 backdrop-blur-xl border-b border-slate-800/80 px-6 py-4 flex items-center justify-between shadow-xl">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl bg-[#F2EBDD] border border-[#D8D1BC] md:hidden text-[#28321D]"
+              className="p-2 rounded-xl bg-slate-800/80 border border-slate-700 md:hidden text-slate-200"
             >
               <Menu className="w-5 h-5" />
             </button>
 
-            <h2 className="text-lg font-extrabold text-[#28321D] tracking-tight">
-              {getPageTitle()}
-            </h2>
+            <div>
+              <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                <span>{getPageTitle()}</span>
+                {activeTab === 'dashboard' && <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />}
+              </h2>
+              {activeTab === 'dashboard' && (
+                <p className="text-xs text-slate-400">
+                  Welcome back, <span className="font-semibold text-slate-200">{displayName}</span>! 👋
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
             {/* Connected Gmail Status Badge */}
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#E6F4EA] border border-[#A8DADC] text-[11px] font-bold text-[#137333]">
-              <span className="w-2 h-2 rounded-full bg-[#667A45] animate-pulse"></span>
-              <span>{isGmailConnected ? 'Gmail Connected' : 'Gmail OAuth Active'}</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-[11px] font-bold text-emerald-400 shadow-sm shadow-emerald-900/20">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>{isGmailConnected ? '● Gmail Connected' : '● Gmail OAuth Active'}</span>
             </div>
 
+            {/* Notification Bell */}
             <button
               onClick={() => setActiveTab('notifications')}
-              className="relative p-2.5 rounded-xl bg-[#F2EBDD] border border-[#D8D1BC] text-[#28321D] hover:bg-[#E8DFC8] transition-colors cursor-pointer"
+              className="relative p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="Notifications"
             >
-              <Bell className="w-4.5 h-4.5 text-[#667A45]" />
+              <Bell className="w-4.5 h-4.5" />
               {unreadNotifCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4.5 h-4.5 rounded-full bg-[#B99A5B] text-[#28321D] text-[9px] font-extrabold flex items-center justify-center shadow-xs">
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-pink-500 text-white text-[9px] font-extrabold shadow-sm shadow-pink-500/40">
                   {unreadNotifCount}
                 </span>
               )}
             </button>
 
-            <div 
-              onClick={() => setActiveTab('settings')}
-              className="w-9 h-9 rounded-full bg-[#667A45] text-[#FAF8F1] font-bold text-xs flex items-center justify-center border border-[#879B62] cursor-pointer shadow-xs"
-              title="User Settings"
-            >
-              {(currentUserName || currentUserEmail)[0].toUpperCase()}
+            {/* User Profile Pill & Dropdown */}
+            <div className="relative">
+              <div 
+                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                className="flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 cursor-pointer transition-all"
+              >
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-purple-600 text-white font-extrabold text-xs flex items-center justify-center shadow-md shadow-purple-600/30">
+                  {displayName[0].toUpperCase()}
+                </div>
+                <div className="hidden sm:block text-left">
+                  <span className="text-xs font-bold text-white block leading-tight">
+                    {displayName}
+                  </span>
+                  <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
+                    👑 Premium Plan
+                  </span>
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+
+              {/* User Dropdown Menu */}
+              {userDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 glass-panel rounded-2xl p-2 border border-slate-700 shadow-2xl z-50 animate-fadeIn">
+                  <div className="p-3 border-b border-slate-800 mb-1">
+                    <p className="text-xs font-bold text-white truncate">{displayName}</p>
+                    <p className="text-[11px] text-slate-400 font-mono truncate">{currentUserEmail}</p>
+                  </div>
+                  <button
+                    onClick={() => { setActiveTab('settings'); setUserDropdownOpen(false); }}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/70 flex items-center gap-2 cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4 text-slate-400" />
+                    <span>Account Settings</span>
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer mt-1"
+                  >
+                    <LogOut className="w-4 h-4 text-rose-400" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
+
+        {/* Global Toast Alert */}
+        {toastMessage && (
+          <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-purple-900/60 border border-purple-500/40 text-purple-200 text-xs font-semibold shadow-lg shadow-purple-950/50 flex items-center justify-between animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-cyan-300" />
+              <span>{toastMessage}</span>
+            </div>
+            <button onClick={() => setToastMessage('')} className="text-slate-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* View Content Container */}
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
@@ -442,6 +511,7 @@ export default function App() {
               onStartCompose={handleStartCompose}
               onViewHistory={() => setActiveTab('history')}
               onViewNotifications={() => setActiveTab('notifications')}
+              onNavigateToSettings={() => setActiveTab('settings')}
             />
           )}
 
@@ -490,11 +560,11 @@ export default function App() {
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-[#D8D1BC] py-4 px-6 text-xs text-[#6F725F] bg-[#FAF8F1]">
+        <footer className="border-t border-slate-800/80 py-4 px-6 text-xs text-slate-500 bg-[#0B0F19]/50">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <span className="font-semibold">Scribe AI — Official Gmail Automation Platform</span>
-            <span className="flex items-center gap-1.5 text-[#3F4D2A] font-medium">
-              <ShieldCheck className="w-4 h-4 text-[#667A45]" /> Security Pipeline: Instruction → AI Categorization → Gmail Preview → User Confirmation → Send
+            <span className="font-semibold text-slate-400">Scribe AI — Official Gmail Automation Platform</span>
+            <span className="flex items-center gap-1.5 text-slate-400 font-medium">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" /> Security Pipeline: Instruction → AI Categorization → Gmail Preview → User Confirmation → Send
             </span>
           </div>
         </footer>

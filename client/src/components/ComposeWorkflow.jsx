@@ -1,72 +1,55 @@
-/**
- * ============================================================================
- * Scribe-AI — ComposeWorkflow Component
- * ============================================================================
- * An 11-step human-in-the-loop email composition interface that integrates:
- * - Natural language instruction capture
- * - Google Gemini AI situation classification & drafting
- * - Manual situation/priority/tone overrides
- * - Security verification & confirmation modal
- * - Official Gmail REST API dispatch via OAuth 2.0
- */
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Sparkles, Send, Edit3, RefreshCw, X, CheckCircle, ShieldAlert, Paperclip, 
-  AlertCircle, ArrowLeft, FileText, Check, ShieldCheck, Mail, Users, UserPlus, ExternalLink, ChevronDown, Key
+  Sparkles, Send, Check, AlertCircle, RefreshCw, Paperclip, X, 
+  ArrowLeft, ArrowRight, UserPlus, Eye, Edit3, ShieldCheck, ShieldAlert,
+  Calendar, FileText, Briefcase, HelpCircle, Users, ExternalLink, Heart
 } from 'lucide-react';
 import { apiFetch, safeParseResponse } from '../utils/api';
 
 const SUPPORTED_SITUATIONS = [
-  { id: '🚨 Emergency', label: '🚨 Emergency', category: 'Emergency', priority: 'High', tone: 'Urgent', badgeClass: 'badge-emergency' },
-  { id: '⚠️ Important / Necessary', label: '⚠️ Important / Necessary', category: 'Important', priority: 'High', tone: 'Professional', badgeClass: 'badge-important' },
-  { id: '💼 Official / Professional', label: '💼 Official / Professional', category: 'Official/Professional', priority: 'Normal', tone: 'Professional', badgeClass: 'badge-official' },
-  { id: '📅 Leave / Holiday', label: '📅 Leave / Holiday', category: 'Leave/Holiday', priority: 'Normal', tone: 'Professional', badgeClass: 'badge-leave' },
-  { id: '📄 Resume / Job Application', label: '📄 Resume / Job Application', category: 'Resume/Job Application', priority: 'Normal', tone: 'Formal', badgeClass: 'badge-resume' },
-  { id: '🔄 Follow-up', label: '🔄 Follow-up', category: 'Follow-up', priority: 'Normal', tone: 'Professional', badgeClass: 'badge-followup' },
-  { id: '💬 Casual', label: '💬 Casual', category: 'Casual', priority: 'Normal', tone: 'Friendly', badgeClass: 'badge-casual' },
-  { id: '🎉 Celebration / Occasion', label: '🎉 Celebration / Occasion', category: 'Occasion', priority: 'Normal', tone: 'Warm', badgeClass: 'badge-celebration' }
+  { id: '📅 Leave / Holiday', label: '📅 Leave / Holiday', tone: 'Polite', priority: 'Normal' },
+  { id: '🚨 Emergency', label: '🚨 Emergency', tone: 'Urgent', priority: 'High' },
+  { id: '📄 Resume / Job Application', label: '📄 Resume / Job Application', tone: 'Formal', priority: 'Normal' },
+  { id: '💼 Official / Professional', label: '💼 Official / Professional', tone: 'Professional', priority: 'Normal' },
+  { id: '🔄 Follow-up', label: '🔄 Follow-up', tone: 'Professional', priority: 'Normal' },
+  { id: '⚠️ Important / Necessary', label: '⚠️ Important / Necessary', tone: 'Urgent', priority: 'High' },
+  { id: '💬 Casual', label: '💬 Casual', tone: 'Casual', priority: 'Low' },
+  { id: '🎉 Celebration / Occasion', label: '🎉 Celebration / Occasion', tone: 'Warm', priority: 'Low' }
 ];
 
 export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavigateToSettings }) {
-  // Workflow Steps: 1 = Form, 2 = AI Processing, 3 = Preview, 4 = Confirm Modal, 5 = Sending, 6 = Success
   const [step, setStep] = useState(1);
-
-  // Form inputs
   const [instruction, setInstruction] = useState(initialData.instruction || '');
   const [recipient, setRecipient] = useState(initialData.recipient || '');
-  const [cc, setCc] = useState(initialData.cc || '');
-  const [bcc, setBcc] = useState(initialData.bcc || '');
-  const [showCcBcc, setShowCcBcc] = useState(!!(initialData.cc || initialData.bcc));
-  const [selectedFile, setSelectedFile] = useState(null);
-
-  // Situation & AI State
-  const [aiLoading, setAiLoading] = useState(false);
-  const [situation, setSituation] = useState('💼 Official / Professional');
-  const [situationSource, setSituationSource] = useState('ai'); // 'ai' or 'manual'
-  const [detectedCategory, setDetectedCategory] = useState('Official/Professional');
-  const [priority, setPriority] = useState('Normal');
-  const [tone, setTone] = useState('Professional');
-
-  // Draft Data
+  const [cc, setCc] = useState('');
+  const [bcc, setBcc] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  
+  const [detectedCategory, setDetectedCategory] = useState('');
+  const [situation, setSituation] = useState('');
+  const [situationSource, setSituationSource] = useState('auto');
+  const [tone, setTone] = useState('Professional');
+  const [priority, setPriority] = useState('Normal');
 
-  // Confirmation Modal State
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showCcBcc, setShowCcBcc] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [sentResult, setSentResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Sent Result
-  const [sentResult, setSentResult] = useState(null);
+  useEffect(() => {
+    if (initialData.instruction) setInstruction(initialData.instruction);
+    if (initialData.recipient) setRecipient(initialData.recipient);
+  }, [initialData]);
 
-  // STEP 1 -> STEP 2 & 3: AI Categorization and Generation
+  // STEP 1 -> STEP 2 -> STEP 3: Automatic AI Categorization & Content Generation
   const handleGenerateEmail = async (e) => {
     if (e) e.preventDefault();
-
-    const query = instruction.trim() || subject.trim();
-    if (!query) {
-      setErrorMessage('Please enter what you want to send or provide a subject.');
+    if (!instruction.trim() && !subject.trim()) {
+      setErrorMessage('Please describe what you want to send in the problem details.');
       return;
     }
     if (!recipient.trim()) {
@@ -76,95 +59,104 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
     setErrorMessage('');
     setAiLoading(true);
-    setStep(2); // AI Processing step with animation
+    setStep(2); // Show AI loading animation
 
     try {
-      // 1. Categorize Instruction & Detect Situation
+      // 1. Categorize situation
       const catRes = await apiFetch('/api/ai/categorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instruction: query, subject: subject.trim(), recipient: recipient.trim() })
+        body: JSON.stringify({ instruction: instruction || subject })
       });
       const catData = await safeParseResponse(catRes);
-      
-      const detectedSit = catData.situation || '💼 Official / Professional';
-      const sitObj = SUPPORTED_SITUATIONS.find(s => s.id === detectedSit || s.label === detectedSit) || SUPPORTED_SITUATIONS[2];
 
-      setSituation(sitObj.label);
-      setSituationSource('ai');
-      setDetectedCategory(catData.category || sitObj.category);
-      setPriority(catData.priority || sitObj.priority);
-      setTone(catData.tone || sitObj.tone);
+      const resolvedSituation = catData.situation || '💼 Official / Professional';
+      const resolvedCategory = catData.category || 'Official';
+      const resolvedTone = catData.tone || 'Professional';
+      const resolvedPriority = catData.priority || 'Normal';
 
-      // 2. Generate Draft based on detected situation
+      setSituation(resolvedSituation);
+      setDetectedCategory(resolvedCategory);
+      setTone(resolvedTone);
+      setPriority(resolvedPriority);
+      setSituationSource('auto');
+
+      // 2. Generate email subject & body
       const genRes = await apiFetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instruction: query,
-          subject: subject.trim(),
-          situation: sitObj.label,
-          category: sitObj.category,
-          priority: catData.priority || sitObj.priority,
-          tone: catData.tone || sitObj.tone,
-          recipient: recipient.trim()
+          instruction,
+          subject,
+          situation: resolvedSituation,
+          category: resolvedCategory,
+          tone: resolvedTone,
+          priority: resolvedPriority,
+          recipient
         })
       });
       const genData = await safeParseResponse(genRes);
 
-      setSubject(genData.subject || genData.suggested_subject || subject.trim() || 'Email Subject');
-      setBody(genData.body || genData.email_body || query);
-      setStep(3); // Step 3: Preview
+      if (genData.subject) setSubject(genData.subject);
+      if (genData.body || genData.email_body) setBody(genData.body || genData.email_body);
+
+      setStep(3); // Show preview screen
     } catch (err) {
       console.error('AI Generation Error:', err);
-      setErrorMessage(err.message || 'Unable to generate the email right now. Please try again.');
+      setErrorMessage(err.message || 'Unable to generate email. Please try again.');
       setStep(1);
     } finally {
       setAiLoading(false);
     }
   };
 
-  // Manual Situation Override & Automatic Email Regeneration
+  // Regeneration when user selects a different situation dropdown
   const handleManualSituationChange = async (newSitId) => {
-    const sitObj = SUPPORTED_SITUATIONS.find(s => s.id === newSitId || s.label === newSitId);
+    const sitObj = SUPPORTED_SITUATIONS.find(s => s.id === newSitId);
     if (!sitObj) return;
 
     setSituation(sitObj.label);
-    setSituationSource('manual');
-    setPriority(sitObj.priority);
     setTone(sitObj.tone);
-    setDetectedCategory(sitObj.category);
+    setPriority(sitObj.priority);
+    setSituationSource('manual');
 
-    setAiLoading(true);
-    const query = instruction.trim() || subject.trim();
     try {
+      setAiLoading(true);
       const res = await apiFetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instruction: query,
-          subject: subject.trim(),
+          instruction,
+          subject,
           situation: sitObj.label,
-          category: sitObj.category,
-          priority: sitObj.priority,
+          category: sitObj.id,
           tone: sitObj.tone,
-          recipient: recipient.trim()
+          priority: sitObj.priority,
+          recipient
         })
       });
       const data = await safeParseResponse(res);
-      setSubject(data.subject || data.suggested_subject || subject);
-      setBody(data.body || data.email_body || body);
+      if (data.subject) setSubject(data.subject);
+      if (data.body || data.email_body) setBody(data.body || data.email_body);
     } catch (err) {
-      console.error('Manual Situation Regeneration Error:', err);
+      console.error('Regenerate Error:', err);
     } finally {
       setAiLoading(false);
     }
   };
 
-  // STEP 3 -> STEP 4: Confirm & Send Trigger
+  // STEP 3 -> STEP 4: Trigger Security Confirmation Modal
   const handleStartSending = () => {
-    if (!subject.trim() || !body.trim()) {
-      setErrorMessage('Subject and Email Body cannot be empty.');
+    if (!recipient.trim()) {
+      setErrorMessage('Recipient email is required.');
+      return;
+    }
+    if (!subject.trim()) {
+      setErrorMessage('Email subject is required.');
+      return;
+    }
+    if (!body.trim()) {
+      setErrorMessage('Email body cannot be empty.');
       return;
     }
     setErrorMessage('');
@@ -212,10 +204,10 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn">
 
       {/* WORKFLOW STEP PROGRESS HEADER */}
-      <div className="glass-panel p-4 rounded-2xl border border-[#D8D1BC] flex items-center justify-between overflow-x-auto scrollbar-none gap-2">
+      <div className="glass-panel p-4 rounded-2xl border border-slate-800 flex items-center justify-between overflow-x-auto scrollbar-none gap-2 shadow-xl">
         {[
           { num: 1, label: 'Instruction' },
           { num: 2, label: 'AI Analysis' },
@@ -225,23 +217,23 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
         ].map((s) => (
           <div key={s.num} className="flex items-center gap-2 shrink-0">
             <div className={`w-7 h-7 rounded-full text-xs font-extrabold flex items-center justify-center transition-all ${
-              step >= s.num ? 'bg-[#667A45] text-[#FAF8F1] shadow-xs' : 'bg-[#F2EBDD] text-[#6F725F]'
+              step >= s.num ? 'bg-gradient-to-tr from-purple-600 to-blue-600 text-white shadow-md shadow-purple-600/30' : 'bg-slate-800 text-slate-400'
             }`}>
-              {step > s.num ? <Check className="w-4 h-4 text-[#FAF8F1]" /> : s.num}
+              {step > s.num ? <Check className="w-4 h-4 text-white" /> : s.num}
             </div>
-            <span className={`text-xs font-semibold ${step >= s.num ? 'text-[#28321D]' : 'text-[#6F725F]'}`}>
+            <span className={`text-xs font-semibold ${step >= s.num ? 'text-white' : 'text-slate-500'}`}>
               {s.label}
             </span>
-            {s.num < 5 && <div className="w-6 sm:w-10 h-0.5 bg-[#D8D1BC] mx-1" />}
+            {s.num < 5 && <div className="w-6 sm:w-10 h-0.5 bg-slate-800 mx-1" />}
           </div>
         ))}
       </div>
 
       {/* ERROR BANNER WITH RE-AUTHORIZE BUTTON */}
       {errorMessage && (
-        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center justify-between gap-3 animate-fadeIn flex-wrap">
+        <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center justify-between gap-3 animate-fadeIn flex-wrap shadow-lg">
           <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
             <span>{errorMessage}</span>
           </div>
           {(errorMessage.includes('Gmail') || errorMessage.includes('connect') || errorMessage.includes('OAuth') || errorMessage.includes('scopes') || errorMessage.includes('permission') || errorMessage.includes('revoked') || errorMessage.includes('expired')) && (
@@ -259,7 +251,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                   if (onNavigateToSettings) onNavigateToSettings();
                 }
               }}
-              className="px-4 py-2 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
+              className="px-4 py-2 rounded-xl gradient-btn text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer"
             >
               <ExternalLink className="w-4 h-4" />
               ⚡ Connect Google Gmail
@@ -270,13 +262,13 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
       {/* STEP 1: INSTRUCTION & RECIPIENTS FORM */}
       {step === 1 && (
-        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6">
-          <div className="border-b border-[#D8D1BC] pb-4">
-            <h2 className="text-2xl font-bold text-[#28321D] flex items-center gap-2">
-              <Sparkles className="w-6 h-6 text-[#667A45]" />
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6 shadow-2xl">
+          <div className="border-b border-slate-800 pb-4">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-cyan-400" />
               AI Smart Email Compose
             </h2>
-            <p className="text-xs text-[#6F725F] mt-1">
+            <p className="text-xs text-slate-400 mt-1">
               Describe what you want to send. Let AI create a professional email for you.
             </p>
           </div>
@@ -284,15 +276,15 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
           <form onSubmit={handleGenerateEmail} className="space-y-6">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-[#28321D] block">
-                  Recipient Email (To) <span className="text-red-600">*</span>
+                <label className="text-xs font-semibold text-slate-300 block">
+                  Recipient Email (To) <span className="text-rose-400">*</span>
                 </label>
 
                 {!showCcBcc && (
                   <button
                     type="button"
                     onClick={() => setShowCcBcc(true)}
-                    className="text-xs font-bold text-[#667A45] hover:text-[#3F4D2A] flex items-center gap-1 transition-colors cursor-pointer"
+                    className="text-xs font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors cursor-pointer"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
                     + Add CC / BCC
@@ -306,14 +298,14 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                 placeholder="client@example.com, manager@company.com, hr@firm.com"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl glass-input text-xs text-[#28321D] focus:ring-2 focus:ring-[#667A45]"
+                className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white"
               />
 
               {showCcBcc && (
-                <div className="p-4 rounded-xl bg-[#FAF8F1] border border-[#D8D1BC] space-y-3 animate-fadeIn">
+                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3 animate-fadeIn">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#3F4D2A] flex items-center gap-1.5">
-                      <Users className="w-4 h-4 text-[#667A45]" /> Extra Email Deliveries (CC & BCC)
+                    <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-purple-400" /> Extra Email Deliveries (CC & BCC)
                     </span>
                     <button
                       type="button"
@@ -322,7 +314,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                         setCc('');
                         setBcc('');
                       }}
-                      className="text-[10px] text-[#6F725F] hover:text-red-600 cursor-pointer"
+                      className="text-[10px] text-slate-400 hover:text-rose-400 cursor-pointer"
                     >
                       Hide CC/BCC
                     </button>
@@ -330,7 +322,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[11px] font-semibold text-[#28321D] block mb-1">
+                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">
                         CC (Carbon Copy)
                       </label>
                       <input
@@ -338,12 +330,12 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                         placeholder="lead@company.com, team@firm.com"
                         value={cc}
                         onChange={(e) => setCc(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg glass-input text-xs text-[#28321D]"
+                        className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-semibold text-[#28321D] block mb-1">
+                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">
                         BCC (Blind Carbon Copy)
                       </label>
                       <input
@@ -351,7 +343,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                         placeholder="archive@company.com, audit@firm.com"
                         value={bcc}
                         onChange={(e) => setBcc(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg glass-input text-xs text-[#28321D]"
+                        className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
                       />
                     </div>
                   </div>
@@ -361,8 +353,8 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold text-[#28321D] block">
-                  Subject / Topic <span className="text-[11px] font-normal text-[#6F725F]">(Optional — AI can generate automatically)</span>
+                <label className="text-xs font-bold text-slate-300 block">
+                  Subject / Topic <span className="text-[11px] font-normal text-slate-500">(Optional — AI can generate automatically)</span>
                 </label>
               </div>
               <input
@@ -370,41 +362,41 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                 placeholder="e.g. Request for 3 days leave due to illness, or Complaint about delayed delivery"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl glass-input text-xs text-[#28321D] focus:ring-2 focus:ring-[#667A45]"
+                className="w-full px-4 py-2.5 rounded-2xl glass-input text-xs text-white"
               />
             </div>
 
             <div>
-              <label className="text-xs font-bold text-[#28321D] block mb-1">
-                What do you want to send? / Problem Details <span className="text-red-600">*</span>
+              <label className="text-xs font-bold text-slate-300 block mb-1">
+                What do you want to send? / Problem Details <span className="text-rose-400">*</span>
               </label>
               <textarea
                 rows={4}
                 placeholder="Example: Request 3 days leave from tomorrow because of illness, and ask manager for approval."
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl glass-input text-xs text-[#28321D] focus:ring-2 focus:ring-[#667A45] leading-relaxed"
+                className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white leading-relaxed"
               />
             </div>
 
             {/* Optional Attachment */}
             <div>
-              <label className="text-xs font-semibold text-[#28321D] block mb-1 flex items-center gap-1.5">
-                <Paperclip className="w-4 h-4 text-[#667A45]" /> Attach Resume or Document (Optional)
+              <label className="text-xs font-semibold text-slate-300 block mb-1 flex items-center gap-1.5">
+                <Paperclip className="w-4 h-4 text-purple-400" /> Attach Resume or Document (Optional)
               </label>
               <input
                 type="file"
                 onChange={(e) => setSelectedFile(e.target.files[0])}
-                className="block w-full text-xs text-[#6F725F] file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#E8DFC8] file:text-[#3F4D2A] hover:file:bg-[#D8D1BC] file:cursor-pointer"
+                className="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-800 file:text-purple-300 hover:file:bg-slate-700 file:cursor-pointer"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#D8D1BC]">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
               {onCancel && (
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="px-5 py-2.5 rounded-xl bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#28321D] font-bold text-xs border border-[#D8D1BC] cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -413,9 +405,9 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
               <button
                 type="submit"
                 disabled={aiLoading}
-                className="px-8 py-3 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-8 py-3 rounded-xl gradient-btn text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Sparkles className="w-4 h-4 text-[#E8DFC8]" />
+                <Sparkles className="w-4 h-4 text-pink-200" />
                 {aiLoading ? 'Generating...' : 'Generate Email ✦'}
               </button>
             </div>
@@ -425,14 +417,14 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
       {/* STEP 2: AI PROCESSING ANIMATION */}
       {step === 2 && (
-        <div className="glass-panel p-12 rounded-3xl border border-[#D8D1BC] text-center space-y-4 animate-pulse">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-[#667A45] text-[#FAF8F1] flex items-center justify-center shadow-lg">
-            <Sparkles className="w-8 h-8 animate-spin-slow" />
+        <div className="glass-panel p-12 rounded-3xl border border-slate-800 text-center space-y-4 animate-pulse shadow-2xl">
+          <div className="w-16 h-16 mx-auto rounded-2xl gradient-btn flex items-center justify-center shadow-lg shadow-purple-600/40">
+            <Sparkles className="w-8 h-8 text-white animate-spin" />
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-xl font-extrabold text-[#28321D]">Creating Professional Email...</h3>
-            <div className="text-[#6F725F] text-xs max-w-md mx-auto space-y-1">
+            <h3 className="text-xl font-extrabold text-white">Creating Professional Email...</h3>
+            <div className="text-slate-400 text-xs max-w-md mx-auto space-y-1">
               <p>• Understanding instruction...</p>
               <p>• Detecting situation & priority...</p>
               <p>• Analyzing tone...</p>
@@ -444,56 +436,56 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
       {/* STEP 3: DETECTED SITUATION UI & EMAIL PREVIEW */}
       {step === 3 && (
-        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6">
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6 shadow-2xl">
           
           {/* AI EMAIL ANALYSIS CARD */}
-          <div className="p-5 rounded-2xl bg-[#FAF8F1] border border-[#D8D1BC] space-y-4 animate-fadeIn">
-            <div className="flex items-center justify-between border-b border-[#D8D1BC] pb-3">
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-[#667A45]" />
-                <h3 className="text-xs font-extrabold text-[#28321D] tracking-wider uppercase">AI EMAIL ANALYSIS</h3>
+                <Sparkles className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-xs font-extrabold text-white tracking-wider uppercase">AI EMAIL ANALYSIS</h3>
               </div>
 
-              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#E8DFC8] text-[#3F4D2A] border border-[#D8D1BC]">
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-950/60 text-purple-300 border border-purple-500/30">
                 {situationSource === 'manual' ? 'Status: Manually Selected' : 'Status: AI Detected'}
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div>
-                <span className="text-[10px] font-bold text-[#6F725F] uppercase tracking-wider block mb-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                   Detected Situation
                 </span>
-                <div className="text-base font-extrabold text-[#28321D]">
+                <div className="text-base font-extrabold text-white">
                   {situation}
                 </div>
               </div>
 
               <div>
-                <span className="text-[10px] font-bold text-[#6F725F] uppercase tracking-wider block mb-1">Priority</span>
-                <div className="text-sm font-bold text-[#28321D]">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Priority</span>
+                <div className="text-sm font-bold text-white">
                   {priority === 'High' ? '🔴 High' : priority === 'Medium' ? '🟡 Medium' : '🟢 Normal'}
                 </div>
               </div>
 
               <div>
-                <span className="text-[10px] font-bold text-[#6F725F] uppercase tracking-wider block mb-1">Tone</span>
-                <div className="text-sm font-bold text-[#28321D]">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Tone</span>
+                <div className="text-sm font-bold text-white">
                   {tone}
                 </div>
               </div>
             </div>
 
             {/* Change Situation & Tone Controls */}
-            <div className="pt-3 border-t border-[#D8D1BC] flex items-center justify-between gap-3 flex-wrap">
-              <span className="text-xs text-[#6F725F] font-semibold">
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+              <span className="text-xs text-slate-400 font-semibold">
                 Need a different situation or tone? Change to automatically regenerate:
               </span>
               <div className="flex items-center gap-2">
                 <select
                   value={situation}
                   onChange={(e) => handleManualSituationChange(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl bg-[#FFFFFF] text-xs font-bold text-[#3F4D2A] border border-[#D8D1BC] cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 text-xs font-bold text-purple-300 border border-slate-700 cursor-pointer"
                 >
                   <option value="" disabled>Change Situation ▼</option>
                   {SUPPORTED_SITUATIONS.map(s => (
@@ -507,19 +499,19 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
           </div>
 
           {/* GMAIL-STYLE EMAIL PREVIEW CARD */}
-          <div className="rounded-2xl border border-[#D8D1BC] bg-[#FFFFFF] overflow-hidden shadow-lg">
+          <div className="rounded-2xl border border-slate-800 bg-[#0E1322] overflow-hidden shadow-xl">
             {/* Header Toolbar */}
-            <div className="bg-[#FAF8F1] px-6 py-3 border-b border-[#D8D1BC] flex items-center justify-between">
+            <div className="bg-slate-900/80 px-6 py-3 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-[#667A45]" />
-                <span className="text-xs font-bold text-[#28321D] tracking-wider">EMAIL PREVIEW</span>
+                <Mail className="w-4 h-4 text-purple-400" />
+                <span className="text-xs font-bold text-white tracking-wider">EMAIL PREVIEW</span>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsEditing(!isEditing)}
                   className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                    isEditing ? 'bg-[#667A45] text-[#FAF8F1]' : 'bg-[#FAF8F1] text-[#28321D] border border-[#D8D1BC] hover:bg-[#E8DFC8]'
+                    isEditing ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
                   }`}
                 >
                   <Edit3 className="w-3.5 h-3.5" />
@@ -530,28 +522,28 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
             <div className="p-6 space-y-4 text-xs">
               {/* Recipient Rows */}
-              <div className="space-y-2 pb-3 border-b border-[#D8D1BC]">
+              <div className="space-y-2 pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2">
-                  <span className="text-[#6F725F] font-bold w-12 shrink-0">To:</span>
-                  <span className="text-[#3F4D2A] font-mono font-bold">{recipient}</span>
+                  <span className="text-slate-500 font-bold w-12 shrink-0">To:</span>
+                  <span className="text-cyan-300 font-mono font-bold">{recipient}</span>
                 </div>
                 {cc && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[#6F725F] font-bold w-12 shrink-0">CC:</span>
-                    <span className="text-[#28321D] font-mono">{cc}</span>
+                    <span className="text-slate-500 font-bold w-12 shrink-0">CC:</span>
+                    <span className="text-slate-300 font-mono">{cc}</span>
                   </div>
                 )}
                 {bcc && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[#6F725F] font-bold w-12 shrink-0">BCC:</span>
-                    <span className="text-[#28321D] font-mono">{bcc}</span>
+                    <span className="text-slate-500 font-bold w-12 shrink-0">BCC:</span>
+                    <span className="text-slate-300 font-mono">{bcc}</span>
                   </div>
                 )}
               </div>
 
               {/* Subject Line */}
               <div>
-                <label className="text-[10px] font-bold text-[#6F725F] uppercase tracking-wider block mb-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                   Subject Line
                 </label>
                 {isEditing ? (
@@ -559,10 +551,10 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                     type="text"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg glass-input text-xs text-[#28321D] font-bold"
+                    className="w-full px-3 py-2 rounded-lg glass-input text-xs text-white font-bold"
                   />
                 ) : (
-                  <div className="p-3 rounded-lg bg-[#FAF8F1] border border-[#D8D1BC] text-[#28321D] font-bold text-sm">
+                  <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-white font-bold text-sm">
                     {subject}
                   </div>
                 )}
@@ -570,7 +562,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
               {/* Body Content */}
               <div>
-                <label className="text-[10px] font-bold text-[#6F725F] uppercase tracking-wider block mb-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                   Email Body
                 </label>
                 {isEditing ? (
@@ -578,10 +570,10 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                     rows={12}
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg glass-input text-xs text-[#28321D] leading-relaxed font-sans"
+                    className="w-full px-3 py-2 rounded-lg glass-input text-xs text-white leading-relaxed font-sans"
                   />
                 ) : (
-                  <div className="p-4 rounded-lg bg-[#FAF8F1] border border-[#D8D1BC] text-[#28321D] whitespace-pre-wrap leading-relaxed font-sans text-xs">
+                  <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-200 whitespace-pre-wrap leading-relaxed font-sans text-xs">
                     {body}
                   </div>
                 )}
@@ -589,12 +581,12 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
               {/* Attached file tag */}
               {selectedFile && (
-                <div className="p-3 rounded-lg bg-[#E6F4EA] border border-[#A8DADC] text-[#137333] flex items-center justify-between">
+                <div className="p-3 rounded-xl bg-purple-950/60 border border-purple-500/30 text-purple-300 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Paperclip className="w-4 h-4 text-[#667A45]" />
+                    <Paperclip className="w-4 h-4 text-purple-400" />
                     <span>Attached: <strong>{selectedFile.name}</strong> ({(selectedFile.size / 1024).toFixed(1)} KB)</span>
                   </div>
-                  <button onClick={() => setSelectedFile(null)} className="text-[#6F725F] hover:text-red-600">
+                  <button onClick={() => setSelectedFile(null)} className="text-slate-400 hover:text-rose-400">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -606,7 +598,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
           <div className="flex items-center justify-between gap-4 pt-2">
             <button
               onClick={() => setStep(1)}
-              className="px-5 py-2.5 rounded-xl bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#28321D] border border-[#D8D1BC] text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to Edit Instruction
@@ -615,9 +607,9 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
             <button
               onClick={handleStartSending}
               disabled={aiLoading}
-              className="px-8 py-3 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer"
+              className="px-8 py-3 rounded-xl gradient-btn text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer"
             >
-              <ShieldCheck className="w-4 h-4 text-[#E8DFC8]" />
+              <ShieldCheck className="w-4 h-4 text-pink-200" />
               Confirm & Send Email ✈
             </button>
           </div>
@@ -626,64 +618,64 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
       {/* STEP 4: CONFIRMATION SECURITY MODAL */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#28321D]/60 backdrop-blur-sm animate-fadeIn">
-          <div className="glass-panel max-w-lg w-full p-6 sm:p-8 rounded-3xl border border-[#D8D1BC] space-y-6 shadow-2xl">
-            <div className="flex items-center gap-3 text-[#28321D] border-b border-[#D8D1BC] pb-4">
-              <div className="w-10 h-10 rounded-xl bg-[#667A45]/20 border border-[#879B62]/40 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-6 h-6 text-[#667A45]" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="glass-panel max-w-lg w-full p-6 sm:p-8 rounded-3xl border border-slate-700 space-y-6 shadow-2xl">
+            <div className="flex items-center gap-3 text-white border-b border-slate-800 pb-4">
+              <div className="w-10 h-10 rounded-xl bg-purple-950/60 border border-purple-500/30 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-6 h-6 text-purple-400" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-[#28321D]">Final Security Confirmation</h3>
-                <p className="text-xs text-[#6F725F]">Please review before sending via Gmail API</p>
+                <h3 className="text-lg font-bold text-white">Final Security Confirmation</h3>
+                <p className="text-xs text-slate-400">Please review before sending via Gmail API</p>
               </div>
             </div>
 
-            <div className="space-y-3 text-xs bg-[#FAF8F1] p-4 rounded-xl border border-[#D8D1BC]">
+            <div className="space-y-3 text-xs bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
               <div className="flex items-center justify-between">
-                <span className="text-[#6F725F]">Situation:</span>
-                <span className="font-bold text-[#28321D]">{situation}</span>
+                <span className="text-slate-500">Situation:</span>
+                <span className="font-bold text-white">{situation}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[#6F725F]">Priority:</span>
-                <span className="font-bold text-[#28321D]">{priority === 'High' ? '🔴 High' : priority === 'Medium' ? '🟡 Medium' : '🟢 Normal'}</span>
+                <span className="text-slate-500">Priority:</span>
+                <span className="font-bold text-white">{priority === 'High' ? '🔴 High' : priority === 'Medium' ? '🟡 Medium' : '🟢 Normal'}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[#6F725F]">Recipient (To):</span>
-                <span className="font-mono font-bold text-[#3F4D2A]">{recipient}</span>
+                <span className="text-slate-500">Recipient (To):</span>
+                <span className="font-mono font-bold text-cyan-300">{recipient}</span>
               </div>
               {cc && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[#6F725F]">CC:</span>
-                  <span className="font-mono text-[#28321D]">{cc}</span>
+                  <span className="text-slate-500">CC:</span>
+                  <span className="font-mono text-slate-300">{cc}</span>
                 </div>
               )}
               {bcc && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[#6F725F]">BCC:</span>
-                  <span className="font-mono text-[#28321D]">{bcc}</span>
+                  <span className="text-slate-500">BCC:</span>
+                  <span className="font-mono text-slate-300">{bcc}</span>
                 </div>
               )}
               <div className="flex items-center justify-between">
-                <span className="text-[#6F725F]">Subject:</span>
-                <span className="font-bold text-[#28321D] truncate max-w-[200px]">{subject}</span>
+                <span className="text-slate-500">Subject:</span>
+                <span className="font-bold text-white truncate max-w-[200px]">{subject}</span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-[#92400E] text-[11px] flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-[#92400E] shrink-0" />
+            <div className="p-3 rounded-xl bg-amber-950/60 border border-amber-500/30 text-amber-300 text-[11px] flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
               <span>Clicking "Authorize & Send Now" will transmit this message directly to the recipient via your Gmail API credentials.</span>
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 onClick={() => setShowConfirmModal(false)}
-                className="px-4 py-2.5 rounded-xl bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#28321D] text-xs font-bold border border-[#D8D1BC] cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 cursor-pointer"
               >
                 Cancel / Edit
               </button>
               <button
                 onClick={handleFinalConfirmedSend}
-                className="px-6 py-2.5 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] transition-transform cursor-pointer"
+                className="px-6 py-2.5 rounded-xl gradient-btn text-white font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] transition-transform cursor-pointer"
               >
                 <Send className="w-4 h-4" />
                 Authorize & Send Now
@@ -695,14 +687,14 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
       {/* STEP 5: SENDING PROGRESS ANIMATION */}
       {step === 5 && (
-        <div className="glass-panel p-12 rounded-3xl border border-[#D8D1BC] text-center space-y-4 animate-pulse">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-[#667A45] text-[#FAF8F1] flex items-center justify-center shadow-lg">
-            <Send className="w-8 h-8 animate-bounce" />
+        <div className="glass-panel p-12 rounded-3xl border border-slate-800 text-center space-y-4 animate-pulse shadow-2xl">
+          <div className="w-16 h-16 mx-auto rounded-2xl gradient-btn flex items-center justify-center shadow-lg shadow-purple-600/40">
+            <Send className="w-8 h-8 text-white animate-bounce" />
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-xl font-bold text-[#28321D]">Transmitting Email via Gmail API...</h3>
-            <p className="text-[#6F725F] text-xs max-w-md mx-auto">
+            <h3 className="text-xl font-bold text-white">Transmitting Email via Gmail API...</h3>
+            <p className="text-slate-400 text-xs max-w-md mx-auto">
               Authenticating Google OAuth credentials, encoding MIME headers, and completing email delivery.
             </p>
           </div>
@@ -711,31 +703,31 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
       {/* STEP 6: SENT SUCCESS SCREEN */}
       {step === 6 && (
-        <div className="glass-panel p-8 sm:p-12 rounded-3xl border border-[#A8DADC] text-center space-y-6 animate-fadeIn">
-          <div className="w-20 h-20 mx-auto rounded-2xl bg-[#E6F4EA] border border-[#A8DADC] flex items-center justify-center shadow-md">
-            <CheckCircle className="w-10 h-10 text-[#137333]" />
+        <div className="glass-panel p-8 sm:p-12 rounded-3xl border border-emerald-500/30 text-center space-y-6 animate-fadeIn shadow-2xl">
+          <div className="w-20 h-20 mx-auto rounded-2xl bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-center shadow-lg shadow-emerald-900/30">
+            <Check className="w-10 h-10 text-emerald-400" />
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-2xl font-extrabold text-[#28321D]">Email Sent Successfully!</h3>
-            <p className="text-[#6F725F] text-xs max-w-md mx-auto">
-              Your email was successfully delivered to <strong className="text-[#3F4D2A] font-mono">{recipient}</strong> and recorded in your account email history.
+            <h3 className="text-2xl font-extrabold text-white">Email Sent Successfully!</h3>
+            <p className="text-slate-400 text-xs max-w-md mx-auto">
+              Your email was successfully delivered to <strong className="text-cyan-300 font-mono">{recipient}</strong> and recorded in your account email history.
             </p>
           </div>
 
           {sentResult && (
-            <div className="max-w-md mx-auto p-4 rounded-2xl bg-[#FAF8F1] border border-[#D8D1BC] text-xs text-left space-y-2 font-mono">
+            <div className="max-w-md mx-auto p-4 rounded-2xl bg-slate-900/60 border border-slate-800 text-xs text-left space-y-2 font-mono">
               <div className="flex justify-between">
-                <span className="text-[#6F725F]">Status:</span>
-                <span className="text-[#137333] font-bold">✓ Sent</span>
+                <span className="text-slate-500">Status:</span>
+                <span className="text-emerald-400 font-bold">✓ Sent</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#6F725F]">Situation:</span>
-                <span className="text-[#28321D] font-bold">{situation}</span>
+                <span className="text-slate-500">Situation:</span>
+                <span className="text-purple-300 font-bold">{situation}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#6F725F]">Gmail Message ID:</span>
-                <span className="text-[#3F4D2A] truncate max-w-[200px]">{sentResult.gmailMessageId || 'N/A'}</span>
+                <span className="text-slate-500">Gmail Message ID:</span>
+                <span className="text-slate-300 truncate max-w-[200px]">{sentResult.gmailMessageId || 'N/A'}</span>
               </div>
             </div>
           )}
@@ -753,7 +745,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                 setSelectedFile(null);
                 setSentResult(null);
               }}
-              className="px-6 py-3 rounded-xl gradient-btn text-[#FAF8F1] font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] cursor-pointer"
+              className="px-6 py-3 rounded-xl gradient-btn text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-[1.02] cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
               Compose Another Email
@@ -762,7 +754,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
             {onComplete && (
               <button
                 onClick={onComplete}
-                className="px-6 py-3 rounded-xl bg-[#FAF8F1] hover:bg-[#E8DFC8] text-[#28321D] border border-[#D8D1BC] font-bold text-xs cursor-pointer"
+                className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-bold text-xs cursor-pointer"
               >
                 Go to Dashboard
               </button>
