@@ -26,7 +26,38 @@ const STATUS_FILTERS = [
   'Draft'
 ];
 
+/**
+ * Calculates dynamic greeting based on the user's local device time
+ * - 5:00 AM – 11:59 AM: Good morning!
+ * - 12:00 PM – 4:59 PM: Good afternoon!
+ * - 5:00 PM – 8:59 PM: Good evening!
+ * - 9:00 PM – 4:59 AM: Good night!
+ */
+export function getTimeBasedGreeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) {
+    return 'Good morning! What do you want to send today?';
+  }
+  if (hour >= 12 && hour < 17) {
+    return 'Good afternoon! What do you want to send today?';
+  }
+  if (hour >= 17 && hour < 21) {
+    return 'Good evening! What do you want to send today?';
+  }
+  return 'Good night! What do you want to send today?';
+}
+
 export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings }) {
+  const [greeting, setGreeting] = useState(() => getTimeBasedGreeting());
+
+  useEffect(() => {
+    // Update greeting every 60s to ensure smooth time-boundary transitions
+    const interval = setInterval(() => {
+      setGreeting(getTimeBasedGreeting());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [stats, setStats] = useState({
     totalEmails: 0,
     sentToday: 0,
@@ -380,7 +411,7 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings 
           </div>
           <div>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-[#28321D] tracking-tight">
-              Good morning! What do you want to send today?
+              {greeting}
             </h1>
             <p className="text-[#6F725F] text-xs sm:text-sm mt-1 font-medium">
               Manage your emails intelligently. Enter a short instruction — AI classifies, generates, previews, and dispatches via Gmail.
