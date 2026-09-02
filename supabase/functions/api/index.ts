@@ -710,12 +710,12 @@ serve(async (req: Request) => {
       const userEmail = req.headers.get("x-user-email") || "";
       const state = btoa(`${userEmail}:${Date.now()}`);
 
-      // prompt=consent forces Google to display the permissions checkbox screen even if user previously authorized
+      // prompt=select_account lets the user pick their account and connects directly without repeated re-consent prompts
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
         clientId
       )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(
         scopes
-      )}&access_type=offline&prompt=consent%20select_account&include_granted_scopes=true&state=${encodeURIComponent(state)}`;
+      )}&access_type=offline&prompt=select_account&include_granted_scopes=true&state=${encodeURIComponent(state)}`;
 
       return jsonResponse({ success: true, configured: true, url: googleAuthUrl });
     }
