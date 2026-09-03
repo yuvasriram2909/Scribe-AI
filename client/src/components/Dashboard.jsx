@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
+import { subscribeToEmailChanges } from '../utils/supabaseClient';
 
 const CATEGORIES_LIST = [
   { id: 'All', label: 'All Situations' },
@@ -140,13 +141,21 @@ export function Dashboard({
     checkConnectionStatus();
     checkPushNotificationSupport();
 
-    // Real-time live polling every 5 seconds
+    // Instant update via Supabase Realtime channel on Email changes
+    const unsubscribeEmail = subscribeToEmailChanges(localStorage.getItem('userEmail') || '', () => {
+      fetchDashboardData();
+    });
+
+    // Fallback sync polling every 10 seconds
     const interval = setInterval(() => {
       fetchDashboardData();
       checkConnectionStatus();
-    }, 5000);
+    }, 10000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (typeof unsubscribeEmail === 'function') unsubscribeEmail();
+      clearInterval(interval);
+    };
   }, [selectedCategory, selectedStatus, searchQuery]);
 
   const checkPushNotificationSupport = async () => {

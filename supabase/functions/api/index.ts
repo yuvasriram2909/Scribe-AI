@@ -1329,6 +1329,44 @@ serve(async (req: Request) => {
       return jsonResponse({ success: true, message: "Gmail account disconnected successfully." });
     }
 
+    if (path === "/auth/app-password" && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+
+      const body = await req.json().catch(() => ({}));
+      const { gmailEmail, appPassword } = body;
+      if (!gmailEmail || !appPassword) {
+        return errorResponse("Gmail Email and App Password are required.");
+      }
+
+      const cleanEmail = gmailEmail.trim().toLowerCase();
+      const cleanPass = appPassword.trim().replace(/\s+/g, "");
+
+      await supabase.from("GmailAccount").delete().eq("userId", user.id);
+      const encryptedPass = await encryptToken(cleanPass);
+
+      const { data: account, error: createErr } = await supabase.from("GmailAccount").insert({
+        id: crypto.randomUUID(),
+        userId: user.id,
+        gmailEmail: cleanEmail,
+        encryptedAccessToken: "APP_PASSWORD",
+        encryptedRefreshToken: `APPPASSWORD:${encryptedPass}`,
+        status: "CONNECTED",
+        updatedAt: new Date().toISOString()
+      }).select().single();
+
+      if (createErr) {
+        return errorResponse("Failed to save App Password: " + createErr.message, 500);
+      }
+
+      return jsonResponse({
+        success: true,
+        message: "Gmail App Password saved successfully!",
+        connectedEmail: account.gmailEmail,
+        authMethod: "app_password"
+      });
+    }
+
     // ----------------------------------------------------
     // Send Email via Gmail REST API (POST /auth/send-email, /emails/send, /email/send)
     // ----------------------------------------------------
@@ -2080,7 +2118,30 @@ RULES:
     }
 
     if (path === "/push/subscribe" && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      const body = await req.json().catch(() => ({}));
+      const { subscription } = body;
+      if (user && subscription?.endpoint) {
+        const { endpoint, keys } = subscription;
+        await supabase.from("PushSubscription").upsert({
+          userId: user.id,
+          endpoint,
+          p256dh: keys?.p256dh || "",
+          auth: keys?.auth || "",
+          updatedAt: new Date().toISOString()
+        }, { onConflict: "endpoint" }).catch((e: any) => console.warn("Push subscription upsert:", e));
+      }
       return jsonResponse({ success: true, message: "Subscribed to push notifications." });
+    }
+
+    if (path === "/push/unsubscribe" && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      const body = await req.json().catch(() => ({}));
+      const { endpoint } = body;
+      if (user && endpoint) {
+        await supabase.from("PushSubscription").delete().eq("endpoint", endpoint).eq("userId", user.id).catch(() => {});
+      }
+      return jsonResponse({ success: true, message: "Unsubscribed from push notifications." });
     }
 
     // Default 404 for unmatched paths

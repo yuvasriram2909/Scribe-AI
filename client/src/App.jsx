@@ -30,6 +30,7 @@ import { PublicLandingPage } from './components/PublicLandingPage';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { TermsOfService } from './components/TermsOfService';
 import { apiFetch } from './utils/api';
+import { subscribeToNotificationChanges } from './utils/supabaseClient';
 
 export default function App() {
   const [currentUserEmail, setCurrentUserEmail] = useState(() => localStorage.getItem('userEmail') || '');
@@ -138,8 +139,17 @@ export default function App() {
     if (currentUserEmail) {
       fetchUnreadNotifs();
       checkGmailConnection();
-      const interval = setInterval(fetchUnreadNotifs, 10000);
-      return () => clearInterval(interval);
+
+      // Instant updates via Supabase Realtime channel
+      const unsubscribe = subscribeToNotificationChanges(currentUserEmail, () => {
+        fetchUnreadNotifs();
+      });
+
+      const interval = setInterval(fetchUnreadNotifs, 20000);
+      return () => {
+        if (typeof unsubscribe === 'function') unsubscribe();
+        clearInterval(interval);
+      };
     }
   }, [currentUserEmail]);
 

@@ -11,8 +11,7 @@
     "db:push": "cd server && npx prisma db push",
     "db:seed": "cd server && node src/seed.js",
     "build": "cd client && npm install && npm run build",
-    "vercel-build": "cd client && npm install && npm run build && cd ../server && npm install && npx prisma generate",
-    "postinstall": "cd server && npm install && npx prisma generate"
+    "vercel-build": "cd client && npm install && npm run build"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.0",

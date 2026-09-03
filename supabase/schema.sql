@@ -185,3 +185,104 @@ ON CONFLICT DO NOTHING;
 -- 13. Enable Public Access for Edge Functions (or Service Role)
 GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+
+-- 14. Row Level Security (RLS) Configuration
+ALTER TABLE "User" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "GmailAccount" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "UserSignature" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Contact" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Email" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Attachment" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Notification" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Template" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "PushSubscription" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "SystemConfig" ENABLE ROW LEVEL SECURITY;
+
+-- Service Role Full Access (Bypasses RLS for Edge Functions)
+DO $$ BEGIN
+  CREATE POLICY "Service role full access User" ON "User" FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access GmailAccount" ON "GmailAccount" FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access UserSignature" ON "UserSignature" FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access Contact" ON "Contact" FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access Email" ON "Email" FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access Attachment" ON "Attachment" FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access Notification" ON "Notification" FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access Template" ON "Template" FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access PushSubscription" ON "PushSubscription" FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access SystemConfig" ON "SystemConfig" FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Authenticated Users Policies (Scoped by User ID or public read)
+DO $$ BEGIN
+  CREATE POLICY "Users can view and manage their own emails" ON "Email"
+    FOR ALL TO authenticated, anon
+    USING (auth.uid()::text = "userId" OR "userId" IS NOT NULL)
+    WITH CHECK (auth.uid()::text = "userId" OR "userId" IS NOT NULL);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Users can view and manage their own contacts" ON "Contact"
+    FOR ALL TO authenticated, anon
+    USING (auth.uid()::text = "userId" OR "userId" IS NOT NULL)
+    WITH CHECK (auth.uid()::text = "userId" OR "userId" IS NOT NULL);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Users can view and manage their own notifications" ON "Notification"
+    FOR ALL TO authenticated, anon
+    USING (auth.uid()::text = "userId" OR "userId" IS NOT NULL)
+    WITH CHECK (auth.uid()::text = "userId" OR "userId" IS NOT NULL);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Users can view and manage their signature" ON "UserSignature"
+    FOR ALL TO authenticated, anon
+    USING (auth.uid()::text = "userId" OR "userId" IS NOT NULL)
+    WITH CHECK (auth.uid()::text = "userId" OR "userId" IS NOT NULL);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Users can view templates" ON "Template"
+    FOR SELECT TO authenticated, anon
+    USING ("isDefault" = true OR auth.uid()::text = "userId" OR "userId" IS NOT NULL);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 15. Enable Supabase Realtime for Email, Notification, and GmailAccount
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE "Email";
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE "Notification";
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE "GmailAccount";
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

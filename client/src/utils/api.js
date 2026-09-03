@@ -69,7 +69,21 @@ export function setCustomBackendUrl(url) {
  */
 export async function apiFetch(url, options = {}) {
   const userEmail = localStorage.getItem('userEmail') || '';
-  const authToken = localStorage.getItem('authToken') || (userEmail ? btoa(userEmail) : '');
+  let authToken = localStorage.getItem('authToken');
+  if (!authToken) {
+    try {
+      const supaAuth = localStorage.getItem('sb-bjxjorlxjijssrqjosed-auth-token');
+      if (supaAuth) {
+        const parsed = JSON.parse(supaAuth);
+        if (parsed?.access_token) {
+          authToken = parsed.access_token;
+        }
+      }
+    } catch (_) {}
+  }
+  if (!authToken && userEmail) {
+    authToken = btoa(userEmail);
+  }
 
   const rawBase = getApiBaseUrl().replace(/\/+$/, '');
   
@@ -88,7 +102,7 @@ export async function apiFetch(url, options = {}) {
 
   const headers = {
     'x-user-email': userEmail,
-    'Authorization': `Bearer ${authToken}`,
+    'Authorization': `Bearer ${authToken || ''}`,
     ...customHeaders
   };
 
