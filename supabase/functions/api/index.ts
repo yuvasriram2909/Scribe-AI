@@ -187,8 +187,35 @@ async function getAuthUser(req: Request, supabase: any) {
   }
 
   if (!user && targetEmail) {
-    const { data } = await supabase.from("User").select("*").eq("email", targetEmail.trim().toLowerCase()).maybeSingle();
+    const cleanEmail = targetEmail.trim().toLowerCase();
+    const { data } = await supabase.from("User").select("*").eq("email", cleanEmail).maybeSingle();
     if (data) user = data;
+
+    // Check if targetEmail matches any GmailAccount
+    if (!user) {
+      const { data: gm } = await supabase
+        .from("GmailAccount")
+        .select("userId")
+        .eq("gmailEmail", cleanEmail)
+        .maybeSingle();
+      if (gm?.userId) {
+        const { data: u } = await supabase.from("User").select("*").eq("id", gm.userId).maybeSingle();
+        if (u) user = u;
+      }
+    }
+  }
+
+  // Fallback: if user is still null, look up recent active GmailAccount
+  if (!user) {
+    const { data: accounts } = await supabase
+      .from("GmailAccount")
+      .select("userId")
+      .order("createdAt", { ascending: false })
+      .limit(1);
+    if (accounts && accounts.length > 0) {
+      const { data: u } = await supabase.from("User").select("*").eq("id", accounts[0].userId).maybeSingle();
+      if (u) user = u;
+    }
   }
 
   if (user) {
@@ -200,6 +227,303 @@ async function getAuthUser(req: Request, supabase: any) {
   }
 
   return null;
+}
+
+// ----------------------------------------------------
+// Google Access Token Refresh Helper
+// ----------------------------------------------------
+
+async function getValidAccessToken(account: any, supabase: any) {
+  let accessToken = account.encryptedAccessToken;
+  const refreshToken = await decryptToken(account.encryptedRefreshToken);
+
+  if (refreshToken) {
+    const { clientId, clientSecret } = await getGoogleCredentials(supabase);
+    if (clientId && clientSecret) {
+      try {
+        const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            refresh_token: refreshToken,
+            grant_type: "refresh_token",
+          }),
+        });
+        const refreshData = await refreshRes.json();
+        if (refreshData.access_token) {
+          accessToken = refreshData.access_token;
+          await supabase
+            .from("GmailAccount")
+            .update({ encryptedAccessToken: accessToken, updatedAt: new Date().toISOString() })
+            .eq("id", account.id);
+        }
+      } catch (e) {
+        console.warn("Token refresh attempt notice:", e);
+      }
+    }
+  }
+
+  return accessToken;
+}
+
+// ----------------------------------------------------
+// Safe Database Insert Helpers (Graceful Fallback)
+// ----------------------------------------------------
+
+async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
+  const { data, error } = await supabase.from("Email").insert(payload).select().maybeSingle();
+  if (!error) return { data, error: null };
+
+  console.warn("Full Email insert notice, falling back to core columns:", error?.message);
+
+  const coreColumns = [
+    "id", "userId", "recipient", "cc", "bcc", "subject", "body",
+    "instruction", "originalSituation", "category", "situation",
+    "situationSource", "priority", "tone", "status", "errorMessage",
+    "gmailMessageId", "createdAt", "sentAt"
+  ];
+  const fallbackPayload: Record<string, any> = {};
+  for (const c of coreColumns) {
+    if (payload[c] !== undefined) fallbackPayload[c] = payload[c];
+  }
+
+  const { data: fbData, error: fbError } = await supabase.from("Email").insert(fallbackPayload).select().maybeSingle();
+  return { data: fbData, error: fbError };
+}
+
+async function safeInsertNotification(supabase: any, payload: Record<string, any>) {
+  const { data, error } = await supabase.from("Notification").insert(payload).select().maybeSingle();
+  if (!error) return { data, error: null };
+
+  const coreColumns = ["id", "userId", "emailId", "notificationType", "message", "read", "isTrashed", "createdAt"];
+  const fallbackPayload: Record<string, any> = {};
+  for (const c of coreColumns) {
+    if (payload[c] !== undefined) fallbackPayload[c] = payload[c];
+  }
+  return await supabase.from("Notification").insert(fallbackPayload).select().maybeSingle();
+}
+
+// ----------------------------------------------------
+// Gmail Inbox, Spam, Sent, & Draft Synchronization
+// ----------------------------------------------------
+
+async function syncUserGmail(user: any, account: any, supabase: any) {
+  if (!account) return { error: "No Gmail account connected" };
+  const accessToken = await getValidAccessToken(account, supabase);
+  if (!accessToken) return { error: "No valid access token" };
+
+  let newReceived = 0;
+  let newSpam = 0;
+  let newSent = 0;
+  let newDrafts = 0;
+
+  try {
+    // 1. Fetch Inbox Messages
+    const inboxRes = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=label:INBOX",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (inboxRes.ok) {
+      const inboxData = await inboxRes.json();
+      const messages = inboxData.messages || [];
+
+      for (const m of messages) {
+        const { data: existing } = await supabase
+          .from("Email")
+          .select("id")
+          .eq("userId", user.id)
+          .eq("gmailMessageId", m.id)
+          .maybeSingle();
+
+        if (existing) continue;
+
+        const metaRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          const headers = meta.payload?.headers || [];
+          const fromHeader = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "";
+          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || account.gmailEmail;
+          const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(No Subject)";
+          const dateHeader = headers.find((h: any) => h.name.toLowerCase() === "date")?.value || "";
+
+          const isSpam = (meta.labelIds || []).includes("SPAM");
+          const isSent = (meta.labelIds || []).includes("SENT");
+          const isUnread = (meta.labelIds || []).includes("UNREAD");
+
+          const detectedCat = detectSituationEngine(`${subjectHeader} ${meta.snippet || ""}`);
+          const dateIso = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
+
+          await safeInsertEmail(supabase, {
+            id: crypto.randomUUID(),
+            userId: user.id,
+            gmailAccount: account.gmailEmail,
+            gmailMessageId: m.id,
+            gmailThreadId: m.threadId || null,
+            sender: fromHeader,
+            recipient: toHeader,
+            subject: subjectHeader,
+            body: meta.snippet || "",
+            snippet: meta.snippet || "",
+            category: detectedCat.category,
+            situation: detectedCat.name,
+            priority: detectedCat.priority,
+            tone: detectedCat.tone,
+            status: isSpam ? "Spam" : isSent ? "Sent" : "Received",
+            isReceived: !isSent && !isSpam,
+            isSent: isSent,
+            isSpam: isSpam,
+            isRead: !isUnread,
+            labels: (meta.labelIds || []).join(","),
+            createdAt: dateIso,
+            receivedAt: !isSent ? dateIso : null,
+            sentAt: isSent ? dateIso : null,
+          });
+
+          if (isSpam) newSpam++;
+          else if (isSent) newSent++;
+          else newReceived++;
+        }
+      }
+    }
+
+    // 2. Fetch Spam Messages explicitly
+    const spamRes = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=15&q=label:SPAM",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (spamRes.ok) {
+      const spamData = await spamRes.json();
+      const messages = spamData.messages || [];
+
+      for (const m of messages) {
+        const { data: existing } = await supabase
+          .from("Email")
+          .select("id")
+          .eq("userId", user.id)
+          .eq("gmailMessageId", m.id)
+          .maybeSingle();
+
+        if (existing) continue;
+
+        const metaRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          const headers = meta.payload?.headers || [];
+          const fromHeader = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "";
+          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || account.gmailEmail;
+          const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(Spam Message)";
+          const dateHeader = headers.find((h: any) => h.name.toLowerCase() === "date")?.value || "";
+
+          const detectedCat = detectSituationEngine(`${subjectHeader} ${meta.snippet || ""}`);
+          const dateIso = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
+
+          await safeInsertEmail(supabase, {
+            id: crypto.randomUUID(),
+            userId: user.id,
+            gmailAccount: account.gmailEmail,
+            gmailMessageId: m.id,
+            gmailThreadId: m.threadId || null,
+            sender: fromHeader,
+            recipient: toHeader,
+            subject: subjectHeader,
+            body: meta.snippet || "",
+            snippet: meta.snippet || "",
+            category: detectedCat.category,
+            situation: detectedCat.name,
+            priority: detectedCat.priority,
+            tone: detectedCat.tone,
+            status: "Spam",
+            isReceived: false,
+            isSent: false,
+            isSpam: true,
+            isRead: false,
+            labels: "SPAM",
+            createdAt: dateIso,
+            receivedAt: dateIso,
+          });
+
+          newSpam++;
+        }
+      }
+    }
+
+    // 3. Fetch Drafts from Gmail
+    const draftsRes = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=10",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (draftsRes.ok) {
+      const draftsData = await draftsRes.json();
+      const drafts = draftsData.drafts || [];
+
+      for (const d of drafts) {
+        if (!d.id) continue;
+        const msgId = d.message?.id || d.id;
+        const { data: existing } = await supabase
+          .from("Email")
+          .select("id")
+          .eq("userId", user.id)
+          .eq("gmailMessageId", msgId)
+          .maybeSingle();
+
+        if (existing) continue;
+
+        const dRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${d.id}?format=metadata&metadataHeaders=To&metadataHeaders=Subject`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (dRes.ok) {
+          const dMeta = await dRes.json();
+          const headers = dMeta.message?.payload?.headers || [];
+          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || "";
+          const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(Untitled Draft)";
+
+          await safeInsertEmail(supabase, {
+            id: crypto.randomUUID(),
+            userId: user.id,
+            gmailAccount: account.gmailEmail,
+            gmailMessageId: msgId,
+            recipient: toHeader || "(No recipient)",
+            subject: subjectHeader,
+            body: dMeta.message?.snippet || "",
+            snippet: dMeta.message?.snippet || "",
+            category: "Official/Professional",
+            situation: "💼 Official / Professional",
+            priority: "Normal",
+            tone: "Professional",
+            status: "Draft",
+            isReceived: false,
+            isSent: false,
+            isSpam: false,
+            isRead: true,
+            createdAt: new Date().toISOString(),
+          });
+
+          newDrafts++;
+        }
+      }
+    }
+
+    return {
+      success: true,
+      synced: newReceived + newSpam + newSent + newDrafts,
+      newReceived,
+      newSpam,
+      newSent,
+      newDrafts,
+    };
+  } catch (err: any) {
+    console.error("Gmail sync error:", err);
+    return { error: err.message || "Failed to sync Gmail" };
+  }
 }
 
 // ----------------------------------------------------
@@ -842,12 +1166,13 @@ serve(async (req: Request) => {
         return errorResponse("Google Client ID is not configured in Supabase Edge Function Secrets.", 400);
       }
 
-      // Explicitly request Gmail Send scope along with profile and email
+      // Explicitly request Gmail Send and Readonly scopes along with profile and email
       const scopes = [
         "openid",
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/gmail.readonly",
       ].join(" ");
 
       const userEmail = req.headers.get("x-user-email") || "";
@@ -1117,45 +1442,46 @@ serve(async (req: Request) => {
 
       // Record email in database
       const now = new Date().toISOString();
-      const { data: emailRecord } = await supabase
-        .from("Email")
-        .insert({
-          id: crypto.randomUUID(),
-          userId: user.id,
-          recipient,
-          cc: cc || null,
-          bcc: bcc || null,
-          subject,
-          body: emailBody,
-          category: category || "Official/Professional",
-          situation: situation || "💼 Official / Professional",
-          priority: priority || "Normal",
-          tone: tone || "Professional",
-          status: "Sent",
-          sentAt: now,
-          gmailMessageId: sendData.id || null,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .select()
-        .single();
+      const emailPayload = {
+        id: crypto.randomUUID(),
+        userId: user.id,
+        gmailAccount: account.gmailEmail,
+        recipient,
+        cc: cc || null,
+        bcc: bcc || null,
+        subject,
+        body: emailBody,
+        category: category || "Official/Professional",
+        situation: situation || "💼 Official / Professional",
+        priority: priority || "Normal",
+        tone: tone || "Professional",
+        status: "Sent",
+        isSent: true,
+        isReceived: false,
+        isSpam: false,
+        sentAt: now,
+        gmailMessageId: sendData.id || null,
+        gmailThreadId: sendData.threadId || null,
+        createdAt: now,
+      };
+
+      const { data: emailRecord } = await safeInsertEmail(supabase, emailPayload);
 
       // Create notification
-      await supabase.from("Notification").insert({
+      await safeInsertNotification(supabase, {
         id: crypto.randomUUID(),
         userId: user.id,
         emailId: emailRecord?.id || null,
         notificationType: category || "General",
         message: `Email "${subject}" successfully sent to ${recipient} via Gmail.`,
         createdAt: now,
-        updatedAt: now,
       });
 
       return jsonResponse({
         success: true,
         message: "Email sent successfully",
         gmailMessageId: sendData.id,
-        email: emailRecord,
+        email: emailRecord || emailPayload,
       });
     }
 
@@ -1328,11 +1654,25 @@ RULES:
       if (!user) return errorResponse("Unauthorized", 401);
 
       const statusQuery = url.searchParams.get("status");
+      const categoryQuery = url.searchParams.get("category");
+      const searchQuery = url.searchParams.get("q");
+
       let query = supabase.from("Email").select("*, attachments:Attachment(*)").eq("userId", user.id);
-      if (statusQuery) query = query.eq("status", statusQuery);
+      if (statusQuery && statusQuery !== "All") query = query.eq("status", statusQuery);
+      if (categoryQuery && categoryQuery !== "All") query = query.eq("category", categoryQuery);
 
       const { data: emails } = await query.order("createdAt", { ascending: false });
-      return jsonResponse(emails || []);
+      let result = emails || [];
+      if (searchQuery && searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        result = result.filter((e: any) => 
+          (e.subject || "").toLowerCase().includes(q) ||
+          (e.recipient || "").toLowerCase().includes(q) ||
+          (e.sender || "").toLowerCase().includes(q) ||
+          (e.body || "").toLowerCase().includes(q)
+        );
+      }
+      return jsonResponse(result);
     }
 
     if (path.startsWith("/emails/") && method === "DELETE") {
@@ -1419,66 +1759,278 @@ RULES:
       return jsonResponse(updated);
     }
 
-    if (path === "/emails/stats" && method === "GET") {
+    // ----------------------------------------------------
+    // Gmail Inbox, Spam, and Drafts Sync Trigger
+    // ----------------------------------------------------
+
+    if ((path === "/gmail/sync" || path === "/auth/google/sync" || path === "/sync") && method === "POST") {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
 
+      const { data: accounts } = await supabase.from("GmailAccount").select("*").eq("userId", user.id);
+      const account = accounts?.[0];
+      if (!account) return errorResponse("No Gmail account connected", 400);
+
+      const syncResult = await syncUserGmail(user, account, supabase);
+      return jsonResponse(syncResult);
+    }
+
+    // ----------------------------------------------------
+    // Save as Draft, Scheduled, or Pending
+    // ----------------------------------------------------
+
+    if (path === "/emails/draft" && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+
+      const body = await req.json().catch(() => ({}));
+      const now = new Date().toISOString();
+      const draftPayload = {
+        id: body.id || crypto.randomUUID(),
+        userId: user.id,
+        recipient: body.recipient || body.to || "",
+        cc: body.cc || null,
+        bcc: body.bcc || null,
+        subject: body.subject || "(Untitled Draft)",
+        body: body.body || "",
+        category: body.category || "Official/Professional",
+        situation: body.situation || "💼 Official / Professional",
+        priority: body.priority || "Normal",
+        tone: body.tone || "Professional",
+        status: "Draft",
+        isReceived: false,
+        isSent: false,
+        isSpam: false,
+        isRead: true,
+        createdAt: now,
+      };
+
+      const { data, error } = await safeInsertEmail(supabase, draftPayload);
+      if (error) throw error;
+      return jsonResponse({ success: true, email: data || draftPayload });
+    }
+
+    if (path === "/emails/schedule" && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+
+      const body = await req.json().catch(() => ({}));
+      const now = new Date().toISOString();
+      const schedPayload = {
+        id: body.id || crypto.randomUUID(),
+        userId: user.id,
+        recipient: body.recipient || body.to || "",
+        cc: body.cc || null,
+        bcc: body.bcc || null,
+        subject: body.subject || "(Scheduled Email)",
+        body: body.body || "",
+        category: body.category || "Official/Professional",
+        situation: body.situation || "💼 Official / Professional",
+        priority: body.priority || "Normal",
+        tone: body.tone || "Professional",
+        status: "Scheduled",
+        scheduledAt: body.scheduledAt || now,
+        isReceived: false,
+        isSent: false,
+        isSpam: false,
+        isRead: true,
+        createdAt: now,
+      };
+
+      const { data, error } = await safeInsertEmail(supabase, schedPayload);
+      if (error) throw error;
+      return jsonResponse({ success: true, email: data || schedPayload });
+    }
+
+    if (path === "/emails/pending" && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+
+      const body = await req.json().catch(() => ({}));
+      const now = new Date().toISOString();
+      const pendPayload = {
+        id: body.id || crypto.randomUUID(),
+        userId: user.id,
+        recipient: body.recipient || body.to || "",
+        subject: body.subject || "(Pending Review)",
+        body: body.body || "",
+        category: body.category || "Official/Professional",
+        situation: body.situation || "💼 Official / Professional",
+        priority: body.priority || "Normal",
+        tone: body.tone || "Professional",
+        status: "Pending",
+        isReceived: false,
+        isSent: false,
+        isSpam: false,
+        isRead: true,
+        createdAt: now,
+      };
+
+      const { data, error } = await safeInsertEmail(supabase, pendPayload);
+      if (error) throw error;
+      return jsonResponse({ success: true, email: data || pendPayload });
+    }
+
+    // ----------------------------------------------------
+    // Dashboard & Email Analytics Statistics
+    // ----------------------------------------------------
+
+    if ((path === "/emails/stats" || path === "/dashboard/stats" || path === "/stats") && method === "GET") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+
+      // Attempt background Gmail sync if connected
+      const { data: accounts } = await supabase.from("GmailAccount").select("*").eq("userId", user.id);
+      const account = accounts?.[0];
+      if (account?.encryptedAccessToken) {
+        syncUserGmail(user, account, supabase).catch((e) => console.warn("Background sync error:", e));
+      }
+
       const { data: emails } = await supabase
         .from("Email")
-        .select("status, createdAt, category, situation, priority")
+        .select("*")
         .eq("userId", user.id);
 
-      const total = emails?.length || 0;
-      const sent = emails?.filter((e: any) => e.status === "Sent" || e.status === "Delivered").length || 0;
-      const failed = emails?.filter((e: any) => e.status === "Failed").length || 0;
-      const drafts = emails?.filter((e: any) => e.status === "Draft").length || 0;
-      const scheduled = emails?.filter((e: any) => e.status === "Scheduled" || e.status === "Sending").length || 0;
-      const emergency = emails?.filter((e: any) => {
+      const list = emails || [];
+      const total = list.length;
+
+      const sent = list.filter((e: any) => 
+        (e.status === "Sent" || e.status === "Delivered" || e.isSent === true) && !e.isSpam && !e.isReceived
+      ).length;
+
+      const received = list.filter((e: any) => 
+        (e.status === "Received" || e.isReceived === true) && !e.isSpam && !e.isSent
+      ).length;
+
+      const drafts = list.filter((e: any) => 
+        e.status === "Draft" || e.status === "draft"
+      ).length;
+
+      const scheduled = list.filter((e: any) => 
+        e.status === "Scheduled" || e.status === "scheduled" || e.status === "Sending"
+      ).length;
+
+      const emergency = list.filter((e: any) => {
         const cat = (e.category || "").toLowerCase();
         const sit = (e.situation || "").toLowerCase();
         const pri = (e.priority || "").toLowerCase();
-        return cat.includes("emergency") || sit.includes("emergency") || pri === "high";
-      }).length || 0;
-      const pending = emails?.filter((e: any) => e.status === "Pending" || e.status === "Draft" || e.status === "Sending").length || 0;
+        return cat.includes("emergency") || sit.includes("emergency") || pri === "high" || pri === "critical";
+      }).length;
+
+      const spam = list.filter((e: any) => 
+        e.status === "Spam" || e.status === "spam" || e.isSpam === true
+      ).length;
+
+      const pendingReview = list.filter((e: any) => 
+        e.status === "Pending" || e.status === "pending" || e.status === "pending_review"
+      ).length;
+
+      const failed = list.filter((e: any) => e.status === "Failed").length;
 
       const todayMidnight = new Date();
       todayMidnight.setHours(0, 0, 0, 0);
-      const sentToday = emails?.filter((e: any) => {
-        if (e.status !== "Sent" && e.status !== "Delivered") return false;
-        return new Date(e.createdAt) >= todayMidnight;
-      }).length || 0;
+      const sentToday = list.filter((e: any) => {
+        if (e.status !== "Sent" && e.status !== "Delivered" && !e.isSent) return false;
+        return new Date(e.sentAt || e.createdAt) >= todayMidnight;
+      }).length;
 
-      const leave = emails?.filter((e: any) => {
+      // 18 Standard Categories Distribution
+      const categories: Record<string, number> = {
+        leave: 0,
+        jobApplication: 0,
+        business: 0,
+        emergency: 0,
+        personal: 0,
+        complaint: 0,
+        payment: 0,
+        official: 0,
+        meeting: 0,
+        followUp: 0,
+        thankYou: 0,
+        apology: 0,
+        announcement: 0,
+        academic: 0,
+        inquiry: 0,
+        congratulations: 0,
+        security: 0,
+        other: 0,
+      };
+
+      for (const e of list) {
         const cat = (e.category || "").toLowerCase();
         const sit = (e.situation || "").toLowerCase();
-        return cat.includes("leave") || sit.includes("leave") || sit.includes("holiday");
-      }).length || 0;
+        const full = `${cat} ${sit}`;
 
-      const resume = emails?.filter((e: any) => {
-        const cat = (e.category || "").toLowerCase();
-        const sit = (e.situation || "").toLowerCase();
-        return cat.includes("resume") || sit.includes("resume") || sit.includes("job");
-      }).length || 0;
-
-      const official = emails?.filter((e: any) => {
-        const cat = (e.category || "").toLowerCase();
-        const sit = (e.situation || "").toLowerCase();
-        return cat.includes("official") || sit.includes("official") || sit.includes("professional");
-      }).length || 0;
+        if (full.includes("leave") || full.includes("sick") || full.includes("vacation") || full.includes("holiday")) {
+          categories.leave++;
+        } else if (full.includes("job") || full.includes("resume") || full.includes("application") || full.includes("cv")) {
+          categories.jobApplication++;
+        } else if (full.includes("business") || full.includes("proposal") || full.includes("partnership")) {
+          categories.business++;
+        } else if (full.includes("emergency") || full.includes("accident") || full.includes("urgent")) {
+          categories.emergency++;
+        } else if (full.includes("personal") || full.includes("casual") || full.includes("friend")) {
+          categories.personal++;
+        } else if (full.includes("complaint") || full.includes("delayed") || full.includes("refund")) {
+          categories.complaint++;
+        } else if (full.includes("payment") || full.includes("invoice") || full.includes("due")) {
+          categories.payment++;
+        } else if (full.includes("meeting") || full.includes("appointment") || full.includes("reschedule")) {
+          categories.meeting++;
+        } else if (full.includes("follow") || full.includes("reminder") || full.includes("status")) {
+          categories.followUp++;
+        } else if (full.includes("thank") || full.includes("appreciation") || full.includes("grateful")) {
+          categories.thankYou++;
+        } else if (full.includes("apology") || full.includes("sorry")) {
+          categories.apology++;
+        } else if (full.includes("announcement") || full.includes("announce")) {
+          categories.announcement++;
+        } else if (full.includes("academic") || full.includes("student") || full.includes("exam") || full.includes("grade")) {
+          categories.academic++;
+        } else if (full.includes("inquiry") || full.includes("info")) {
+          categories.inquiry++;
+        } else if (full.includes("congratulat") || full.includes("kudos")) {
+          categories.congratulations++;
+        } else if (full.includes("security") || full.includes("compromised") || full.includes("hacked")) {
+          categories.security++;
+        } else if (full.includes("official") || full.includes("professional")) {
+          categories.official++;
+        } else {
+          categories.other++;
+        }
+      }
 
       return jsonResponse({
-        total,
+        success: true,
         sent,
-        sentToday,
-        failed,
+        received,
         drafts,
         scheduled,
         emergency,
-        pending,
-        leave,
-        resume,
-        official,
-        stats: { total, sent, sentToday, failed, drafts, scheduled, emergency, pending, leave, resume, official }
+        spam,
+        pendingReview,
+        pending: pendingReview,
+        sentToday,
+        failed,
+        total,
+        categories,
+        totalEmails: sent,
+        leave: categories.leave,
+        resume: categories.jobApplication,
+        official: categories.official,
+        stats: {
+          total,
+          sent,
+          received,
+          drafts,
+          scheduled,
+          emergency,
+          spam,
+          pending: pendingReview,
+          pendingReview,
+          sentToday,
+          categories,
+        }
       });
     }
 

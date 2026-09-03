@@ -65,11 +65,16 @@ CREATE INDEX IF NOT EXISTS "Contact_userId_idx" ON "Contact"("userId");
 CREATE TABLE IF NOT EXISTS "Email" (
     "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     "userId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE CASCADE,
+    "gmailAccount" TEXT,
+    "gmailMessageId" TEXT,
+    "gmailThreadId" TEXT,
+    "sender" TEXT,
     "recipient" TEXT NOT NULL,
     "cc" TEXT,
     "bcc" TEXT,
     "subject" TEXT NOT NULL,
     "body" TEXT NOT NULL,
+    "snippet" TEXT,
     "instruction" TEXT,
     "originalSituation" TEXT,
     "category" TEXT NOT NULL DEFAULT 'Official/Professional',
@@ -78,13 +83,38 @@ CREATE TABLE IF NOT EXISTS "Email" (
     "priority" TEXT NOT NULL DEFAULT 'Normal',
     "tone" TEXT NOT NULL DEFAULT 'Professional',
     "status" TEXT NOT NULL DEFAULT 'Draft',
+    "isReceived" BOOLEAN NOT NULL DEFAULT false,
+    "isSent" BOOLEAN NOT NULL DEFAULT true,
+    "isSpam" BOOLEAN NOT NULL DEFAULT false,
+    "isRead" BOOLEAN NOT NULL DEFAULT true,
+    "labels" TEXT,
     "errorMessage" TEXT,
-    "gmailMessageId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "sentAt" TIMESTAMP(3)
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "sentAt" TIMESTAMP(3),
+    "receivedAt" TIMESTAMP(3),
+    "scheduledAt" TIMESTAMP(3)
 );
 CREATE INDEX IF NOT EXISTS "Email_userId_idx" ON "Email"("userId");
 CREATE INDEX IF NOT EXISTS "Email_createdAt_idx" ON "Email"("createdAt");
+CREATE INDEX IF NOT EXISTS "Email_status_idx" ON "Email"("status");
+CREATE INDEX IF NOT EXISTS "Email_category_idx" ON "Email"("category");
+CREATE UNIQUE INDEX IF NOT EXISTS "Email_userId_gmailMessageId_idx" ON "Email"("userId", "gmailMessageId") WHERE "gmailMessageId" IS NOT NULL;
+
+-- Safe Column Migrations for Existing Tables
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "gmailAccount" TEXT;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "gmailThreadId" TEXT;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "sender" TEXT;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "snippet" TEXT;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "labels" TEXT;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "isReceived" BOOLEAN DEFAULT false;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "isSent" BOOLEAN DEFAULT true;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "isSpam" BOOLEAN DEFAULT false;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "isRead" BOOLEAN DEFAULT true;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "receivedAt" TIMESTAMP(3);
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "scheduledAt" TIMESTAMP(3);
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP;
 
 -- 7. Attachments Table
 CREATE TABLE IF NOT EXISTS "Attachment" (

@@ -99,6 +99,11 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('gmail') === 'connected' || params.get('auth') === 'success') {
+      const emailParam = params.get('email');
+      if (emailParam) {
+        localStorage.setItem('userEmail', emailParam.toLowerCase().trim());
+        setCurrentUserEmail(emailParam.toLowerCase().trim());
+      }
       setActiveTab('dashboard');
       setToastMessage('✓ Gmail Connected Successfully!');
       window.history.replaceState({}, '', window.location.pathname);

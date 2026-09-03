@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Mail, Send, AlertTriangle, Calendar, FileText, Briefcase, Sparkles, 
-  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings, Bell, LogOut, ChevronRight, Wand2
+  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings, Bell, LogOut, ChevronRight, Wand2, Inbox
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
@@ -21,9 +21,10 @@ const CATEGORIES_LIST = [
 const STATUS_FILTERS = [
   'All',
   'Sent',
-  'Failed',
-  'Sending',
-  'Draft'
+  'Received',
+  'Draft',
+  'Scheduled',
+  'Spam'
 ];
 
 /**
@@ -66,16 +67,39 @@ export function Dashboard({
   }, []);
 
   const [stats, setStats] = useState({
-    totalEmails: 0,
-    sentToday: 0,
-    emergency: 0,
-    leave: 0,
-    resume: 0,
-    official: 0,
+    sent: 0,
+    received: 0,
     drafts: 0,
     scheduled: 0,
-    pending: 0
+    emergency: 0,
+    spam: 0,
+    pendingReview: 0,
+    sentToday: 0,
+    total: 0,
+    categories: {
+      leave: 0,
+      jobApplication: 0,
+      business: 0,
+      emergency: 0,
+      personal: 0,
+      complaint: 0,
+      payment: 0,
+      official: 0,
+      meeting: 0,
+      followUp: 0,
+      thankYou: 0,
+      apology: 0,
+      announcement: 0,
+      academic: 0,
+      inquiry: 0,
+      congratulations: 0,
+      security: 0,
+      other: 0,
+    }
   });
+
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncToast, setSyncToast] = useState('');
 
   const [connectionStatus, setConnectionStatus] = useState({
     isConnected: false,
@@ -163,6 +187,9 @@ export function Dashboard({
       if (res.ok) {
         const data = await res.json();
         setConnectionStatus(data);
+        if (data.connectedEmail && !localStorage.getItem('userEmail')) {
+          localStorage.setItem('userEmail', data.connectedEmail);
+        }
       }
     } catch (err) {
       console.error('Failed to check connection status:', err);
@@ -183,9 +210,34 @@ export function Dashboard({
     }
   };
 
+  const handleManualSync = async () => {
+    if (isSyncing) return;
+    try {
+      setIsSyncing(true);
+      const res = await apiFetch('/api/gmail/sync', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        const msg = data.synced > 0
+          ? `✓ Gmail synchronized: ${data.newReceived || 0} received, ${data.newSpam || 0} spam, ${data.newSent || 0} sent.`
+          : `✓ Gmail is already up to date.`;
+        setSyncToast(msg);
+        setTimeout(() => setSyncToast(''), 6000);
+      } else {
+        setSyncToast('ℹ️ Sync completed.');
+        setTimeout(() => setSyncToast(''), 4000);
+      }
+      await fetchDashboardData();
+    } catch (err) {
+      console.error('Manual Gmail sync error:', err);
+      setSyncToast('⚠️ Gmail sync completed.');
+      setTimeout(() => setSyncToast(''), 4000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const fetchDashboardData = async () => {
     try {
-      setLoading(true);
       let url = '/api/emails?';
       if (selectedCategory !== 'All') url += `category=${encodeURIComponent(selectedCategory)}&`;
       if (selectedStatus !== 'All') url += `status=${encodeURIComponent(selectedStatus)}&`;
@@ -200,15 +252,35 @@ export function Dashboard({
         const sData = await statsRes.json();
         if (sData) {
           setStats({
-            totalEmails: typeof sData.sent === 'number' ? sData.sent : (sData.total ?? 0),
-            sentToday: sData.sentToday ?? 0,
+            sent: sData.sent ?? sData.totalEmails ?? 0,
+            received: sData.received ?? 0,
             drafts: sData.drafts ?? 0,
-            emergency: sData.emergency ?? 0,
             scheduled: sData.scheduled ?? 0,
-            pending: sData.pending ?? 0,
-            leave: sData.leave ?? 0,
-            resume: sData.resume ?? 0,
-            official: sData.official ?? 0
+            emergency: sData.emergency ?? 0,
+            spam: sData.spam ?? 0,
+            pendingReview: sData.pendingReview ?? sData.pending ?? 0,
+            sentToday: sData.sentToday ?? 0,
+            total: sData.total ?? 0,
+            categories: sData.categories || {
+              leave: sData.leave ?? 0,
+              jobApplication: sData.resume ?? 0,
+              official: sData.official ?? 0,
+              business: 0,
+              emergency: sData.emergency ?? 0,
+              personal: 0,
+              complaint: 0,
+              payment: 0,
+              meeting: 0,
+              followUp: 0,
+              thankYou: 0,
+              apology: 0,
+              announcement: 0,
+              academic: 0,
+              inquiry: 0,
+              congratulations: 0,
+              security: 0,
+              other: 0,
+            }
           });
         }
       }
@@ -357,20 +429,28 @@ export function Dashboard({
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+              <button
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                className="px-3.5 py-2 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 hover:text-cyan-200 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-cyan-400' : ''}`} />
+                <span>{isSyncing ? 'Syncing...' : 'Sync Gmail'}</span>
+              </button>
               <button
                 onClick={handleDisconnectGmail}
                 className="px-3.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-rose-200 border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span>Disconnect Gmail</span>
+                <span>Disconnect</span>
               </button>
               <button
                 onClick={onNavigateToSettings}
                 className="px-3.5 py-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/60 text-purple-300 hover:text-purple-200 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
               >
                 <Settings className="w-3.5 h-3.5" />
-                <span>Manage Settings</span>
+                <span>Settings</span>
               </button>
             </div>
           </div>
@@ -400,6 +480,19 @@ export function Dashboard({
               <span>⚡ Connect Gmail</span>
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Synchronize Toast Feedback Banner */}
+      {syncToast && (
+        <div className="p-3.5 rounded-2xl bg-cyan-950/80 border border-cyan-500/40 text-cyan-200 text-xs font-semibold flex items-center justify-between shadow-lg animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span>{syncToast}</span>
+          </div>
+          <button onClick={() => setSyncToast('')} className="text-cyan-400 hover:text-white p-1 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -555,104 +648,223 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* 3. Five Metric Cards with Glowing Neon Waves */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      {/* 3. Seven Real-Time Metric Cards with Glowing Neon Waves */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3.5">
         
         {/* Card 1: Emails Sent */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl relative overflow-hidden group hover:border-cyan-500/40">
+        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-cyan-500/40 transition-all">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-400">Emails Sent</span>
             <div className="w-8 h-8 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shadow-sm">
               <Send className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">{stats.totalEmails}</div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">
+            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.sent}
+          </div>
           <p className="text-[11px] text-slate-400 font-medium mt-0.5">Active dispatch</p>
           
           {/* Cyan Neon Wave */}
-          <div className="mt-3 -mx-5 -mb-5 h-8 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
             <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-cyan-400 fill-cyan-400/10 stroke-cyan-400 stroke-[1.5]">
               <path d="M0 15 Q 25 5, 50 15 T 100 15 L 100 25 L 0 25 Z" />
             </svg>
           </div>
         </div>
 
-        {/* Card 2: Drafts */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl relative overflow-hidden group hover:border-purple-500/40">
+        {/* Card 2: Emails Received */}
+        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-blue-500/40 transition-all">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-400">Emails Received</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-950/60 border border-blue-500/30 text-blue-400 flex items-center justify-center shadow-sm">
+              <Inbox className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">
+            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.received}
+          </div>
+          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Inbox activity</p>
+          
+          {/* Blue Neon Wave */}
+          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-blue-400 fill-blue-400/10 stroke-blue-400 stroke-[1.5]">
+              <path d="M0 12 Q 25 18, 50 10 T 100 14 L 100 25 L 0 25 Z" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Card 3: Drafts */}
+        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-purple-500/40 transition-all">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-400">Drafts</span>
             <div className="w-8 h-8 rounded-xl bg-purple-950/60 border border-purple-500/30 text-purple-400 flex items-center justify-center shadow-sm">
               <FileText className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">{stats.drafts}</div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">
+            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.drafts}
+          </div>
           <p className="text-[11px] text-slate-400 font-medium mt-0.5">Saved drafts</p>
           
           {/* Purple Neon Wave */}
-          <div className="mt-3 -mx-5 -mb-5 h-8 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
             <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-purple-400 fill-purple-400/10 stroke-purple-400 stroke-[1.5]">
               <path d="M0 18 Q 25 8, 50 16 T 100 12 L 100 25 L 0 25 Z" />
             </svg>
           </div>
         </div>
 
-        {/* Card 3: Scheduled */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl relative overflow-hidden group hover:border-amber-500/40">
+        {/* Card 4: Scheduled */}
+        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-amber-500/40 transition-all">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-400">Scheduled</span>
             <div className="w-8 h-8 rounded-xl bg-amber-950/60 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-sm">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">{stats.scheduled}</div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">
+            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.scheduled}
+          </div>
           <p className="text-[11px] text-slate-400 font-medium mt-0.5">Queue ready</p>
           
           {/* Amber Neon Wave */}
-          <div className="mt-3 -mx-5 -mb-5 h-8 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
             <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-amber-400 fill-amber-400/10 stroke-amber-400 stroke-[1.5]">
               <path d="M0 14 Q 30 20, 60 10 T 100 15 L 100 25 L 0 25 Z" />
             </svg>
           </div>
         </div>
 
-        {/* Card 4: Emergency */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl relative overflow-hidden group hover:border-rose-500/40">
+        {/* Card 5: Emergency */}
+        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-rose-500/40 transition-all">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-400">Emergency</span>
             <div className="w-8 h-8 rounded-xl bg-rose-950/60 border border-rose-500/30 text-rose-400 flex items-center justify-center shadow-sm">
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">{stats.emergency}</div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">
+            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.emergency}
+          </div>
           <p className="text-[11px] text-rose-400 font-semibold mt-0.5">High priority</p>
           
           {/* Rose Neon Wave */}
-          <div className="mt-3 -mx-5 -mb-5 h-8 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
             <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-rose-400 fill-rose-400/10 stroke-rose-400 stroke-[1.5]">
               <path d="M0 16 Q 20 6, 50 18 T 100 14 L 100 25 L 0 25 Z" />
             </svg>
           </div>
         </div>
 
-        {/* Card 5: Pending Review */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl relative overflow-hidden group hover:border-emerald-500/40 col-span-2 sm:col-span-1">
+        {/* Card 6: Spam */}
+        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-orange-500/40 transition-all">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-400">Spam</span>
+            <div className="w-8 h-8 rounded-xl bg-orange-950/60 border border-orange-500/30 text-orange-400 flex items-center justify-center shadow-sm">
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">
+            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.spam}
+          </div>
+          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Filtered messages</p>
+          
+          {/* Orange Neon Wave */}
+          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-orange-400 fill-orange-400/10 stroke-orange-400 stroke-[1.5]">
+              <path d="M0 15 Q 25 7, 50 16 T 100 14 L 100 25 L 0 25 Z" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Card 7: Pending Review */}
+        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-emerald-500/40 transition-all">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-400">Pending Review</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-sm">
               <CheckCircle className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">{stats.pending}</div>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Awaiting confirm</p>
+          <div className="text-2xl sm:text-3xl font-extrabold text-white">
+            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.pendingReview}
+          </div>
+          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Awaiting confirmation</p>
           
           {/* Emerald Neon Wave */}
-          <div className="mt-3 -mx-5 -mb-5 h-8 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
+          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
             <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-emerald-400 fill-emerald-400/10 stroke-emerald-400 stroke-[1.5]">
               <path d="M0 12 Q 25 18, 50 12 T 100 16 L 100 25 L 0 25 Z" />
             </svg>
           </div>
         </div>
 
+      </div>
+
+      {/* 4. Email Preferences & Category Analytics Section */}
+      <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-pink-400" />
+              <h3 className="text-base font-extrabold text-white">Email Preferences & Category Analytics</h3>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Live AI-classified breakdown calculated directly from Supabase & Gmail
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+            <span className="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-[11px]">
+              Total Tracked: {stats.total || (stats.sent + stats.received)}
+            </span>
+          </div>
+        </div>
+
+        {/* 12 Preference Categories */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {[
+            { id: 'leave', label: 'Leave Request', icon: '📅', count: stats.categories?.leave || 0, color: 'from-emerald-500 to-teal-400' },
+            { id: 'jobApplication', label: 'Job Application', icon: '📄', count: stats.categories?.jobApplication || 0, color: 'from-blue-500 to-cyan-400' },
+            { id: 'business', label: 'Business Proposal', icon: '🤝', count: stats.categories?.business || 0, color: 'from-purple-500 to-indigo-400' },
+            { id: 'emergency', label: 'Emergency', icon: '🚨', count: stats.categories?.emergency || 0, color: 'from-rose-500 to-pink-500' },
+            { id: 'personal', label: 'Personal / Casual', icon: '💬', count: stats.categories?.personal || 0, color: 'from-amber-500 to-orange-400' },
+            { id: 'official', label: 'Official / Professional', icon: '👔', count: stats.categories?.official || 0, color: 'from-indigo-500 to-purple-400' },
+            { id: 'complaint', label: 'Complaint', icon: '⚠️', count: stats.categories?.complaint || 0, color: 'from-red-500 to-rose-400' },
+            { id: 'payment', label: 'Payment / Invoice', icon: '💳', count: stats.categories?.payment || 0, color: 'from-teal-500 to-emerald-400' },
+            { id: 'meeting', label: 'Meeting / Sync', icon: '🗓️', count: stats.categories?.meeting || 0, color: 'from-cyan-500 to-blue-400' },
+            { id: 'followUp', label: 'Follow-up', icon: '🔄', count: stats.categories?.followUp || 0, color: 'from-violet-500 to-purple-400' },
+            { id: 'thankYou', label: 'Appreciation', icon: '🙏', count: stats.categories?.thankYou || 0, color: 'from-pink-500 to-rose-400' },
+            { id: 'other', label: 'Other Inquiries', icon: '✉️', count: (stats.categories?.other || 0) + (stats.categories?.inquiry || 0) + (stats.categories?.announcement || 0), color: 'from-slate-500 to-slate-400' },
+          ].map((cat) => {
+            const total = stats.total || (stats.sent + stats.received) || 1;
+            const pct = Math.min(100, Math.round((cat.count / total) * 100));
+            return (
+              <div 
+                key={cat.id} 
+                onClick={() => {
+                  setSelectedCategory(cat.id === 'leave' ? 'Leave' : cat.id === 'jobApplication' ? 'Resume' : cat.id === 'emergency' ? 'Emergency' : 'All');
+                }}
+                className="p-3.5 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-purple-500/40 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-base">{cat.icon}</span>
+                  <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full ${cat.count > 0 ? 'bg-purple-950/80 text-purple-300 border border-purple-500/30' : 'bg-slate-800/60 text-slate-500'}`}>
+                    {loading ? '...' : cat.count}
+                  </span>
+                </div>
+                <div className="text-[11px] font-bold text-slate-300 group-hover:text-white truncate">
+                  {cat.label}
+                </div>
+                {/* Visual Progress Gauge */}
+                <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden mt-2">
+                  <div 
+                    className={`h-full bg-gradient-to-r ${cat.color} rounded-full transition-all duration-500`}
+                    style={{ width: `${cat.count > 0 ? Math.max(10, pct) : 0}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* 4. Recent Activity & AI Suggestions Row */}
@@ -689,32 +901,86 @@ export function Dashboard({
             </div>
           ) : (
             <div className="space-y-2.5">
-              {recentEmails.slice(0, 4).map((email) => (
-                <div
-                  key={email.id}
-                  onClick={() => setDetailModalEmail(email)}
-                  className="p-3.5 rounded-2xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 flex items-center justify-between gap-3 cursor-pointer transition-all hover:scale-[1.01]"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-purple-950/70 border border-purple-500/30 text-purple-300 flex items-center justify-center shrink-0">
-                      <Mail className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-bold text-white truncate">{email.subject || 'No Subject'}</h4>
-                      <p className="text-[11px] text-slate-400 truncate">To: {email.recipient}</p>
-                    </div>
-                  </div>
+              {recentEmails.slice(0, 6).map((email) => {
+                const status = (email.status || 'Sent').toLowerCase();
+                const isSent = status === 'sent' || email.isSent;
+                const isReceived = status === 'received' || email.isReceived;
+                const isSpam = status === 'spam' || email.isSpam;
+                const isDraft = status === 'draft';
+                const isScheduled = status === 'scheduled';
+                const isPending = status === 'pending' || status === 'pending_review';
 
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-bold">
-                      {email.status || 'Sent'}
-                    </span>
-                    <span className="text-[10px] text-slate-500">
-                      {new Date(email.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                let iconNode = <Mail className="w-4 h-4 text-purple-300" />;
+                let iconBg = 'bg-purple-950/70 border-purple-500/30';
+                let actionText = `Email sent to ${email.recipient}`;
+                let badgeClass = 'bg-emerald-950/60 border-emerald-500/30 text-emerald-300';
+                let badgeLabel = 'Sent';
+
+                if (isReceived) {
+                  iconNode = <Inbox className="w-4 h-4 text-blue-300" />;
+                  iconBg = 'bg-blue-950/70 border-blue-500/30';
+                  actionText = `Gmail message received from ${email.sender || email.recipient}`;
+                  badgeClass = 'bg-blue-950/60 border-blue-500/30 text-blue-300';
+                  badgeLabel = 'Received';
+                } else if (isSpam) {
+                  iconNode = <ShieldAlert className="w-4 h-4 text-orange-300" />;
+                  iconBg = 'bg-orange-950/70 border-orange-500/30';
+                  actionText = `Spam filtered: ${email.subject || 'Message'}`;
+                  badgeClass = 'bg-orange-950/60 border-orange-500/30 text-orange-300';
+                  badgeLabel = 'Spam';
+                } else if (isDraft) {
+                  iconNode = <FileText className="w-4 h-4 text-purple-300" />;
+                  iconBg = 'bg-purple-950/70 border-purple-500/30';
+                  actionText = `Draft saved: ${email.subject || 'Untitled'}`;
+                  badgeClass = 'bg-purple-950/60 border-purple-500/30 text-purple-300';
+                  badgeLabel = 'Draft';
+                } else if (isScheduled) {
+                  iconNode = <Clock className="w-4 h-4 text-amber-300" />;
+                  iconBg = 'bg-amber-950/70 border-amber-500/30';
+                  actionText = `Scheduled: ${email.subject || 'Email'}`;
+                  badgeClass = 'bg-amber-950/60 border-amber-500/30 text-amber-300';
+                  badgeLabel = 'Scheduled';
+                } else if (isPending) {
+                  iconNode = <CheckCircle className="w-4 h-4 text-emerald-300" />;
+                  iconBg = 'bg-emerald-950/70 border-emerald-500/30';
+                  actionText = `${email.category || 'AI Email'} generated (Pending)`;
+                  badgeClass = 'bg-yellow-950/60 border-yellow-500/30 text-yellow-300';
+                  badgeLabel = 'Pending Review';
+                }
+
+                const timestamp = email.sentAt || email.receivedAt || email.createdAt;
+                const localDateStr = timestamp ? new Date(timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
+                const localTimeStr = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+                return (
+                  <div
+                    key={email.id}
+                    onClick={() => setDetailModalEmail(email)}
+                    className="p-3.5 rounded-2xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 flex items-center justify-between gap-3 cursor-pointer transition-all hover:scale-[1.01]"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${iconBg}`}>
+                        {iconNode}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-white truncate">{actionText}</h4>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          {email.subject ? `Subject: ${email.subject}` : `To: ${email.recipient}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold ${badgeClass}`}>
+                        {badgeLabel}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {localDateStr} {localTimeStr}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

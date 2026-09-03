@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, Send, Check, AlertCircle, RefreshCw, Paperclip, X, 
   ArrowLeft, ArrowRight, UserPlus, Eye, Edit3, ShieldCheck, ShieldAlert,
-  Calendar, FileText, Briefcase, HelpCircle, Users, ExternalLink, Heart, Mail
+  Calendar, FileText, Briefcase, HelpCircle, Users, ExternalLink, Heart, Mail, Clock
 } from 'lucide-react';
 import { apiFetch, safeParseResponse } from '../utils/api';
 import { 
@@ -66,6 +66,90 @@ export function ComposeWorkflow({
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [draftToast, setDraftToast] = useState('');
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleTime, setScheduleTime] = useState('');
+
+  // Register Pending Review when entering Step 3 Preview
+  useEffect(() => {
+    if (step === 3 && subject && body && recipient) {
+      apiFetch('/api/emails/pending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient,
+          subject,
+          body,
+          category: detectedCategory,
+          situation,
+          priority,
+          tone
+        })
+      }).catch((e) => console.warn('Pending review track notice:', e));
+    }
+  }, [step, subject, body, recipient]);
+
+  const handleSaveDraft = async () => {
+    if (!recipient.trim() && !subject.trim()) {
+      updateState({ errorMessage: 'Please enter a recipient or subject to save a draft.' });
+      return;
+    }
+    try {
+      const res = await apiFetch('/api/emails/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient,
+          cc,
+          bcc,
+          subject: subject || '(Untitled Draft)',
+          body: body || '',
+          category: detectedCategory,
+          situation,
+          priority,
+          tone
+        })
+      });
+      if (res.ok) {
+        setDraftToast('✓ Draft successfully saved in Supabase database!');
+        setTimeout(() => setDraftToast(''), 4000);
+      }
+    } catch (e) {
+      console.error('Save draft error:', e);
+    }
+  };
+
+  const handleConfirmSchedule = async () => {
+    if (!recipient.trim()) {
+      updateState({ errorMessage: 'Please enter a valid recipient email before scheduling.' });
+      return;
+    }
+    try {
+      const res = await apiFetch('/api/emails/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient,
+          cc,
+          bcc,
+          subject: subject || '(Scheduled Email)',
+          body: body || '',
+          category: detectedCategory,
+          situation,
+          priority,
+          tone,
+          scheduledAt: scheduleTime ? new Date(scheduleTime).toISOString() : new Date(Date.now() + 3600000).toISOString()
+        })
+      });
+      if (res.ok) {
+        setShowScheduleModal(false);
+        setDraftToast('✓ Email successfully scheduled in Supabase queue!');
+        setTimeout(() => setDraftToast(''), 4000);
+      }
+    } catch (e) {
+      console.error('Schedule error:', e);
+    }
+  };
 
   // Automatic AI Generation Trigger (when autoGenerate === true from Dashboard)
   useEffect(() => {
@@ -525,6 +609,18 @@ export function ComposeWorkflow({
       {step === 3 && (
         <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6 shadow-2xl">
           
+          {draftToast && (
+            <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 text-xs font-semibold flex items-center justify-between shadow-lg animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{draftToast}</span>
+              </div>
+              <button onClick={() => setDraftToast('')} className="text-emerald-400 hover:text-white p-1 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* UPGRADED 5-FACET AI EMAIL ANALYSIS CARD */}
           <div className="p-5 sm:p-6 rounded-3xl bg-[#0E1424]/90 backdrop-blur-xl border border-purple-500/20 space-y-5 shadow-2xl animate-fadeIn">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -757,23 +853,90 @@ export function ComposeWorkflow({
           </div>
 
           {/* ACTION BUTTONS */}
-          <div className="flex items-center justify-between gap-4 pt-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
             <button
               onClick={() => updateState({ step: 1 })}
-              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Edit Instruction
+              Back to Instruction
             </button>
 
-            <button
-              onClick={handleStartSending}
-              disabled={aiLoading}
-              className="px-8 py-3 rounded-xl gradient-btn text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer"
-            >
-              <ShieldCheck className="w-4 h-4 text-pink-200" />
-              Confirm & Send Email ✈
-            </button>
+            <div className="flex items-center gap-2.5 flex-wrap justify-end">
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                className="px-4 py-2.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/60 text-purple-300 border border-purple-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              >
+                <FileText className="w-4 h-4 text-purple-400" />
+                <span>Save Draft</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowScheduleModal(true)}
+                className="px-4 py-2.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/60 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              >
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>Schedule Send</span>
+              </button>
+
+              <button
+                onClick={handleStartSending}
+                disabled={aiLoading}
+                className="px-6 py-2.5 rounded-xl gradient-btn text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4 text-pink-200" />
+                Confirm & Send Email ✈
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SCHEDULE MODAL */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="glass-panel max-w-md w-full p-6 rounded-3xl border border-slate-700 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">Schedule Email Dispatch</h3>
+              </div>
+              <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-white p-1 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold text-slate-300">
+                Choose Scheduled Date & Time:
+              </label>
+              <input
+                type="datetime-local"
+                value={scheduleTime}
+                onChange={(e) => setScheduleTime(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-800 text-white text-xs border border-slate-700 focus:outline-none focus:border-amber-500"
+              />
+              <p className="text-[11px] text-slate-400">
+                Your email will be queued in Supabase as "Scheduled" and will appear on the dashboard queue.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setShowScheduleModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmSchedule}
+                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold cursor-pointer shadow-lg shadow-amber-500/20"
+              >
+                Save Schedule
+              </button>
+            </div>
           </div>
         </div>
       )}
