@@ -25,6 +25,8 @@ export function EmailHistory({ onReuseEmail }) {
 
   useEffect(() => {
     fetchEmails();
+    const interval = setInterval(fetchEmails, 8000);
+    return () => clearInterval(interval);
   }, [selectedCategory, selectedStatus, searchQuery]);
 
   const fetchEmails = async () => {

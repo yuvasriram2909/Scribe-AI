@@ -1287,20 +1287,60 @@ RULES:
 
       const { data: emails } = await supabase
         .from("Email")
-        .select("status, createdAt, category, situation")
+        .select("status, createdAt, category, situation, priority")
         .eq("userId", user.id);
 
       const total = emails?.length || 0;
       const sent = emails?.filter((e: any) => e.status === "Sent" || e.status === "Delivered").length || 0;
       const failed = emails?.filter((e: any) => e.status === "Failed").length || 0;
       const drafts = emails?.filter((e: any) => e.status === "Draft").length || 0;
+      const scheduled = emails?.filter((e: any) => e.status === "Scheduled" || e.status === "Sending").length || 0;
+      const emergency = emails?.filter((e: any) => {
+        const cat = (e.category || "").toLowerCase();
+        const sit = (e.situation || "").toLowerCase();
+        const pri = (e.priority || "").toLowerCase();
+        return cat.includes("emergency") || sit.includes("emergency") || pri === "high";
+      }).length || 0;
+      const pending = emails?.filter((e: any) => e.status === "Pending" || e.status === "Draft" || e.status === "Sending").length || 0;
+
+      const todayMidnight = new Date();
+      todayMidnight.setHours(0, 0, 0, 0);
+      const sentToday = emails?.filter((e: any) => {
+        if (e.status !== "Sent" && e.status !== "Delivered") return false;
+        return new Date(e.createdAt) >= todayMidnight;
+      }).length || 0;
+
+      const leave = emails?.filter((e: any) => {
+        const cat = (e.category || "").toLowerCase();
+        const sit = (e.situation || "").toLowerCase();
+        return cat.includes("leave") || sit.includes("leave") || sit.includes("holiday");
+      }).length || 0;
+
+      const resume = emails?.filter((e: any) => {
+        const cat = (e.category || "").toLowerCase();
+        const sit = (e.situation || "").toLowerCase();
+        return cat.includes("resume") || sit.includes("resume") || sit.includes("job");
+      }).length || 0;
+
+      const official = emails?.filter((e: any) => {
+        const cat = (e.category || "").toLowerCase();
+        const sit = (e.situation || "").toLowerCase();
+        return cat.includes("official") || sit.includes("official") || sit.includes("professional");
+      }).length || 0;
 
       return jsonResponse({
         total,
         sent,
+        sentToday,
         failed,
         drafts,
-        stats: { total, sent, failed, drafts }
+        scheduled,
+        emergency,
+        pending,
+        leave,
+        resume,
+        official,
+        stats: { total, sent, sentToday, failed, drafts, scheduled, emergency, pending, leave, resume, official }
       });
     }
 

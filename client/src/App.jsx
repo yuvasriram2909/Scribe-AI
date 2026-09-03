@@ -37,10 +37,10 @@ export default function App() {
 
   const [currentRoute, setCurrentRoute] = useState(() => window.location.pathname);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [unreadNotifCount, setUnreadNotifCount] = useState(3);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [composeInitialData, setComposeInitialData] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isGmailConnected, setIsGmailConnected] = useState(true);
+  const [isGmailConnected, setIsGmailConnected] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const [toastMessage, setToastMessage] = useState('');
@@ -92,7 +92,7 @@ export default function App() {
       const res = await apiFetch('/api/notifications');
       if (res.ok) {
         const data = await res.json();
-        setUnreadNotifCount(data.unreadCount !== undefined ? data.unreadCount : 3);
+        setUnreadNotifCount(typeof data.unreadCount === 'number' ? data.unreadCount : 0);
       }
     } catch (err) {
       console.error('Failed to poll notifications count:', err);
@@ -105,9 +105,12 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setIsGmailConnected(!!data.isConnected);
+      } else {
+        setIsGmailConnected(false);
       }
     } catch (err) {
       console.error('Failed to check auth status:', err);
+      setIsGmailConnected(false);
     }
   };
 
@@ -192,7 +195,7 @@ export default function App() {
     return <LoginPage onLoginSuccess={handleLoginSuccess} onBackToHome={() => navigateTo('/')} />;
   }
 
-  const displayName = currentUserName || currentUserEmail.split('@')[0] || 'yuvasriram';
+  const displayName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'User');
 
   return (
     <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col md:flex-row font-sans selection:bg-purple-600 selection:text-white relative overflow-x-hidden">

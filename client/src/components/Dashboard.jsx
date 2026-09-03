@@ -59,21 +59,21 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings,
   }, []);
 
   const [stats, setStats] = useState({
-    totalEmails: 128,
-    sentToday: 128,
-    emergency: 3,
-    leave: 12,
-    resume: 8,
-    official: 95,
-    drafts: 12,
-    scheduled: 8,
-    pending: 5
+    totalEmails: 0,
+    sentToday: 0,
+    emergency: 0,
+    leave: 0,
+    resume: 0,
+    official: 0,
+    drafts: 0,
+    scheduled: 0,
+    pending: 0
   });
 
   const [connectionStatus, setConnectionStatus] = useState({
-    isConnected: true,
-    status: 'CONNECTED',
-    connectedEmail: localStorage.getItem('userEmail') || 'yuvasriram2909@gmail.com'
+    isConnected: false,
+    status: 'DISCONNECTED',
+    connectedEmail: null
   });
 
   const [showPushBanner, setShowPushBanner] = useState(false);
@@ -98,6 +98,14 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings,
     fetchDashboardData();
     checkConnectionStatus();
     checkPushNotificationSupport();
+
+    // Real-time live polling every 5 seconds
+    const interval = setInterval(() => {
+      fetchDashboardData();
+      checkConnectionStatus();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [selectedCategory, selectedStatus, searchQuery]);
 
   const checkPushNotificationSupport = async () => {
@@ -174,13 +182,17 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings,
       if (statsRes.ok) {
         const sData = await statsRes.json();
         if (sData) {
-          setStats(prev => ({
-            ...prev,
-            totalEmails: sData.total || prev.totalEmails,
-            sentToday: sData.sent || prev.sentToday,
-            drafts: sData.drafts || prev.drafts,
-            emergency: sData.emergency || prev.emergency,
-          }));
+          setStats({
+            totalEmails: typeof sData.sent === 'number' ? sData.sent : (sData.total ?? 0),
+            sentToday: sData.sentToday ?? 0,
+            drafts: sData.drafts ?? 0,
+            emergency: sData.emergency ?? 0,
+            scheduled: sData.scheduled ?? 0,
+            pending: sData.pending ?? 0,
+            leave: sData.leave ?? 0,
+            resume: sData.resume ?? 0,
+            official: sData.official ?? 0
+          });
         }
       }
 
@@ -298,7 +310,7 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings,
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Connected account: <span className="font-mono text-slate-200 font-semibold">{connectionStatus.connectedEmail || 'yuvasriram2909@gmail.com'}</span>
+                  Connected account: <span className="font-mono text-slate-200 font-semibold">{connectionStatus.connectedEmail || localStorage.getItem('userEmail') || 'Account Active'}</span>
                 </p>
               </div>
             </div>
