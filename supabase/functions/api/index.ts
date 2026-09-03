@@ -211,74 +211,212 @@ interface SituationConfig {
   name: string;
   category: string;
   priority: string;
+  importance: string;
+  urgency: string;
   tone: string;
   keywords: string[];
 }
 
 const SUPPORTED_SITUATIONS: SituationConfig[] = [
   {
-    id: "🚨 Emergency",
+    id: "leave_request",
+    name: "📅 Leave Request",
+    category: "Leave Request",
+    priority: "MEDIUM",
+    importance: "MEDIUM",
+    urgency: "Normal response",
+    tone: "Formal + Respectful + Polite",
+    keywords: ["leave", "sick", "fever", "illness", "vacation", "day off", "days off", "holiday", "unwell", "out of office", "doctor appointment", "hospitalized", "absent", "absence", "permission"]
+  },
+  {
+    id: "emergency",
     name: "🚨 Emergency",
     category: "Emergency",
-    priority: "High",
-    tone: "Urgent",
-    keywords: ["emergency", "hospital", "doctor", "accident", "urgent personal", "unexpected absence", "medical"]
+    priority: "CRITICAL",
+    importance: "CRITICAL",
+    urgency: "Immediate attention",
+    tone: "Urgent + Respectful + Concise",
+    keywords: ["accident", "emergency", "urgent personal", "immediate attention", "critical incident", "hospital", "casualty", "leave immediately", "urgent departure", "family emergency"]
   },
   {
-    id: "⚠️ Important / Necessary",
-    name: "⚠️ Important / Necessary",
-    category: "Important",
-    priority: "High",
-    tone: "Professional",
-    keywords: ["important", "deadline", "time-sensitive", "critical", "required approval", "salary", "payment", "dues"]
+    id: "job_application",
+    name: "💼 Job Application",
+    category: "Job Application",
+    priority: "HIGH",
+    importance: "HIGH",
+    urgency: "Normal response",
+    tone: "Formal + Professional + Confident",
+    keywords: ["job application", "applying for", "software developer", "role", "position", "vacancy", "hiring manager", "job opening", "candidate", "apply"]
   },
   {
-    id: "💼 Official / Professional",
-    name: "💼 Official / Professional",
-    category: "Official/Professional",
-    priority: "Normal",
-    tone: "Professional",
-    keywords: ["project update", "meeting", "client", "work from home", "wfh", "delay", "formal request", "extension"]
+    id: "resume_submission",
+    name: "📄 Resume / Document Submission",
+    category: "Resume / Document Submission",
+    priority: "HIGH",
+    importance: "HIGH",
+    urgency: "Normal response",
+    tone: "Formal + Concise + Professional",
+    keywords: ["resume", "cv", "curriculum vitae", "portfolio", "send my resume", "attached resume", "document submission", "credentials"]
   },
   {
-    id: "📅 Leave / Holiday",
-    name: "📅 Leave / Holiday",
-    category: "Leave/Holiday",
-    priority: "Normal",
-    tone: "Polite",
-    keywords: ["leave", "vacation", "holiday", "sick", "illness", "day off", "permission", "out of office", "unwell"]
+    id: "complaint",
+    name: "⚠️ Complaint",
+    category: "Complaint",
+    priority: "HIGH",
+    importance: "HIGH",
+    urgency: "Prompt response",
+    tone: "Firm + Professional + Polite",
+    keywords: ["complaint", "delayed", "delay", "compensation", "refund", "poor service", "defective", "damaged", "unacceptable", "dissatisfied", "issue with product", "grievance"]
   },
   {
-    id: "📄 Resume / Job Application",
-    name: "📄 Resume / Job Application",
-    category: "Resume/Job Application",
-    priority: "Normal",
-    tone: "Formal",
-    keywords: ["resume", "cv", "job application", "applying", "role", "position", "internship", "vacancy"]
+    id: "meeting",
+    name: "🗓️ Meeting / Appointment",
+    category: "Meeting / Appointment",
+    priority: "MEDIUM",
+    importance: "MEDIUM",
+    urgency: "Prompt response",
+    tone: "Polite + Professional",
+    keywords: ["meeting", "reschedule", "appointment", "move meeting", "schedule", "call", "sync", "zoom", "google meet", "catch up on call"]
   },
   {
-    id: "🔄 Follow-up",
-    name: "🔄 Follow-up",
-    category: "Follow-up",
-    priority: "Normal",
-    tone: "Professional",
-    keywords: ["follow-up", "follow up", "checking in", "reminder", "status update", "pending"]
+    id: "follow_up",
+    name: "🔄 Reminder / Follow-up",
+    category: "Reminder / Follow-up",
+    priority: "MEDIUM",
+    importance: "MEDIUM",
+    urgency: "Prompt response",
+    tone: "Professional + Polite + Firm",
+    keywords: ["follow up", "follow-up", "following up", "reminder", "checking in", "status update on", "gentle reminder", "pending response"]
   },
   {
-    id: "💬 Casual",
-    name: "💬 Casual",
-    category: "Casual",
-    priority: "Normal",
-    tone: "Friendly",
-    keywords: ["casual", "hey", "catch up", "informal", "coffee", "lunch"]
+    id: "payment_invoice",
+    name: "💳 Payment / Invoice",
+    category: "Payment / Invoice",
+    priority: "HIGH",
+    importance: "HIGH",
+    urgency: "Prompt response",
+    tone: "Professional + Firm",
+    keywords: ["invoice", "payment", "due date", "pay by", "billing", "remittance", "dues", "receipt", "wire transfer", "fees"]
   },
   {
-    id: "🎉 Celebration / Occasion",
-    name: "🎉 Celebration / Occasion",
-    category: "Occasion",
-    priority: "Normal",
-    tone: "Warm",
-    keywords: ["birthday", "congratulat", "anniversary", "festival", "greeting", "farewell", "welcome", "thank you"]
+    id: "security_account",
+    name: "🛡️ Security / Account",
+    category: "Security / Account",
+    priority: "CRITICAL",
+    importance: "CRITICAL",
+    urgency: "Immediate attention",
+    tone: "Urgent + Serious + Professional",
+    keywords: ["compromised", "hacked", "security breach", "unauthorized access", "stolen", "password reset", "security alert", "account locked", "phishing"]
+  },
+  {
+    id: "thank_you",
+    name: "🙏 Thank You / Appreciation",
+    category: "Thank You / Appreciation",
+    priority: "LOW",
+    importance: "LOW",
+    urgency: "No immediate action",
+    tone: "Warm + Appreciative",
+    keywords: ["thanks", "thank you", "grateful", "appreciate", "helping me", "thankful", "great help", "gratitude"]
+  },
+  {
+    id: "personal_casual",
+    name: "💬 Personal / Casual",
+    category: "Personal / Casual",
+    priority: "LOW",
+    importance: "LOW",
+    urgency: "Prompt response",
+    tone: "Friendly + Casual",
+    keywords: ["friend", "reach late", "minutes late", "running late", "catch up", "coffee", "lunch", "dinner", "hang out", "weekend", "casual"]
+  },
+  {
+    id: "official_professional",
+    name: "👔 Professional / Official",
+    category: "Professional / Official",
+    priority: "HIGH",
+    importance: "HIGH",
+    urgency: "Normal response",
+    tone: "Formal + Professional",
+    keywords: ["official", "formal", "company policy", "management", "hr department", "board", "formal communication", "authorized"]
+  },
+  {
+    id: "announcement",
+    name: "📢 Announcement",
+    category: "Announcement",
+    priority: "MEDIUM",
+    importance: "MEDIUM",
+    urgency: "No immediate action",
+    tone: "Professional + Informative",
+    keywords: ["announcement", "announce", "broadcasting", "pleased to announce", "we are launching", "all hands", "upcoming event", "notice to all"]
+  },
+  {
+    id: "apology",
+    name: "🙇 Apology",
+    category: "Apology",
+    priority: "MEDIUM",
+    importance: "MEDIUM",
+    urgency: "Prompt response",
+    tone: "Apologetic + Respectful + Sincere",
+    keywords: ["sorry", "apologize", "apology", "regret", "inconvenience caused", "oversight", "my mistake", "pardon"]
+  },
+  {
+    id: "academic_student",
+    name: "🎓 Academic / Student",
+    category: "Academic / Student",
+    priority: "HIGH",
+    importance: "HIGH",
+    urgency: "Normal response",
+    tone: "Formal + Respectful + Polite",
+    keywords: ["professor", "teacher", "assignment", "exam", "grade", "class", "university", "college", "course", "phd", "student"]
+  },
+  {
+    id: "business_proposal",
+    name: "🤝 Business Proposal",
+    category: "Business Proposal",
+    priority: "HIGH",
+    importance: "HIGH",
+    urgency: "Prompt response",
+    tone: "Professional + Persuasive + Confident",
+    keywords: ["proposal", "partnership", "collaboration", "business proposal", "quotation", "rfp", "pitch", "vendor offer"]
+  },
+  {
+    id: "inquiry_info",
+    name: "❓ Inquiry / Information Request",
+    category: "Inquiry / Information Request",
+    priority: "MEDIUM",
+    importance: "MEDIUM",
+    urgency: "Normal response",
+    tone: "Polite + Professional + Clear",
+    keywords: ["inquire", "inquiry", "could you provide", "requesting information", "details regarding", "price quote", "brochure", "clarification"]
+  },
+  {
+    id: "congratulations",
+    name: "🎉 Congratulations",
+    category: "Congratulations",
+    priority: "LOW",
+    importance: "LOW",
+    urgency: "No immediate action",
+    tone: "Warm + Enthusiastic + Friendly",
+    keywords: ["congratulations", "congrats", "kudos", "well done", "promotion", "achievement", "award", "celebrating"]
+  },
+  {
+    id: "marketing_promotion",
+    name: "🚀 Marketing / Promotion",
+    category: "Marketing / Promotion",
+    priority: "LOW",
+    importance: "LOW",
+    urgency: "No immediate action",
+    tone: "Persuasive + Engaging + Professional",
+    keywords: ["special offer", "discount", "limited time", "promo", "promotion", "exclusive offer", "new feature", "sale"]
+  },
+  {
+    id: "status_update",
+    name: "📊 Status / Progress Update",
+    category: "Status / Progress Update",
+    priority: "MEDIUM",
+    importance: "MEDIUM",
+    urgency: "Normal response",
+    tone: "Professional + Clear + Concise",
+    keywords: ["status update", "progress update", "milestone", "sprint update", "weekly report", "project status", "deliverables"]
   }
 ];
 

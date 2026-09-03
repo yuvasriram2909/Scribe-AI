@@ -5,16 +5,25 @@ import {
   Calendar, FileText, Briefcase, HelpCircle, Users, ExternalLink, Heart, Mail
 } from 'lucide-react';
 import { apiFetch, safeParseResponse } from '../utils/api';
+import { 
+  EMAIL_CATEGORIES, 
+  classifyEmailIntent, 
+  generateIntelligentEmail 
+} from '../utils/aiEngine';
 
-const SUPPORTED_SITUATIONS = [
-  { id: '📅 Leave / Holiday', label: '📅 Leave / Holiday', tone: 'Polite', priority: 'Normal' },
-  { id: '🚨 Emergency', label: '🚨 Emergency', tone: 'Urgent', priority: 'High' },
-  { id: '📄 Resume / Job Application', label: '📄 Resume / Job Application', tone: 'Formal', priority: 'Normal' },
-  { id: '💼 Official / Professional', label: '💼 Official / Professional', tone: 'Professional', priority: 'Normal' },
-  { id: '🔄 Follow-up', label: '🔄 Follow-up', tone: 'Professional', priority: 'Normal' },
-  { id: '⚠️ Important / Necessary', label: '⚠️ Important / Necessary', tone: 'Urgent', priority: 'High' },
-  { id: '💬 Casual', label: '💬 Casual', tone: 'Casual', priority: 'Low' },
-  { id: '🎉 Celebration / Occasion', label: '🎉 Celebration / Occasion', tone: 'Warm', priority: 'Low' }
+const AVAILABLE_TONES = [
+  'Formal',
+  'Professional',
+  'Polite',
+  'Friendly',
+  'Casual',
+  'Warm',
+  'Persuasive',
+  'Apologetic',
+  'Urgent',
+  'Firm',
+  'Respectful',
+  'Concise'
 ];
 
 export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavigateToSettings }) {
@@ -27,11 +36,15 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
   const [body, setBody] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   
-  const [detectedCategory, setDetectedCategory] = useState('');
-  const [situation, setSituation] = useState('');
+  // Upgraded 5-Facet AI Analysis State
+  const [emailType, setEmailType] = useState('Professional / Official');
+  const [detectedCategory, setDetectedCategory] = useState('Professional / Official');
+  const [situation, setSituation] = useState('💼 Official / Professional');
   const [situationSource, setSituationSource] = useState('auto');
   const [tone, setTone] = useState('Professional');
-  const [priority, setPriority] = useState('Normal');
+  const [priority, setPriority] = useState('MEDIUM');
+  const [importance, setImportance] = useState('MEDIUM');
+  const [urgency, setUrgency] = useState('Normal response');
 
   const [aiLoading, setAiLoading] = useState(false);
   const [showCcBcc, setShowCcBcc] = useState(false);
@@ -45,7 +58,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
     if (initialData.recipient) setRecipient(initialData.recipient);
   }, [initialData]);
 
-  // STEP 1 -> STEP 2 -> STEP 3: Automatic AI Categorization & Content Generation
+  // STEP 1 -> STEP 2 -> STEP 3: Automatic AI Intent Classification & Fact-Grounded Generation
   const handleGenerateEmail = async (e) => {
     if (e) e.preventDefault();
     if (!instruction.trim() && !subject.trim()) {
@@ -62,43 +75,51 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
     setStep(2); // Show AI loading animation
 
     try {
-      // 1. Categorize situation
-      const catRes = await apiFetch('/api/ai/categorize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instruction: instruction || subject })
+      // 1. High-precision local classification & factual generation
+      const localResult = generateIntelligentEmail({
+        instruction: instruction || subject,
+        userSubject: subject,
+        recipient,
+        hasAttachment: !!selectedFile,
+        senderName: localStorage.getItem('userName') || ''
       });
-      const catData = await safeParseResponse(catRes);
 
-      const resolvedSituation = catData.situation || '💼 Official / Professional';
-      const resolvedCategory = catData.category || 'Official';
-      const resolvedTone = catData.tone || 'Professional';
-      const resolvedPriority = catData.priority || 'Normal';
-
-      setSituation(resolvedSituation);
-      setDetectedCategory(resolvedCategory);
-      setTone(resolvedTone);
-      setPriority(resolvedPriority);
+      setEmailType(localResult.category);
+      setDetectedCategory(localResult.category);
+      setSituation(localResult.situation);
+      setTone(localResult.tone);
+      setPriority(localResult.priority);
+      setImportance(localResult.priority);
+      setUrgency(localResult.urgency);
       setSituationSource('auto');
 
-      // 2. Generate email subject & body
-      const genRes = await apiFetch('/api/ai/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instruction,
-          subject,
-          situation: resolvedSituation,
-          category: resolvedCategory,
-          tone: resolvedTone,
-          priority: resolvedPriority,
-          recipient
-        })
-      });
-      const genData = await safeParseResponse(genRes);
+      if (localResult.subject) setSubject(localResult.subject);
+      if (localResult.body) setBody(localResult.body);
 
-      if (genData.subject) setSubject(genData.subject);
-      if (genData.body || genData.email_body) setBody(genData.body || genData.email_body);
+      // 2. Attempt backend pass-through for Gemini enhancement if available
+      try {
+        const genRes = await apiFetch('/api/ai/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instruction,
+            subject: localResult.subject,
+            situation: localResult.situation,
+            category: localResult.category,
+            tone: localResult.tone,
+            priority: localResult.priority,
+            urgency: localResult.urgency,
+            recipient
+          })
+        });
+        const genData = await safeParseResponse(genRes);
+        if (genData && genData.body && !genData.error) {
+          if (genData.subject) setSubject(genData.subject);
+          setBody(genData.body || genData.email_body);
+        }
+      } catch (apiErr) {
+        console.warn('Backend generation note (using local intelligence):', apiErr);
+      }
 
       setStep(3); // Show preview screen
     } catch (err) {
@@ -110,39 +131,59 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
     }
   };
 
-  // Regeneration when user selects a different situation dropdown
-  const handleManualSituationChange = async (newSitId) => {
-    const sitObj = SUPPORTED_SITUATIONS.find(s => s.id === newSitId);
-    if (!sitObj) return;
+  // Regeneration when user selects a different category from dropdown
+  const handleManualSituationChange = (newCatId) => {
+    const catObj = EMAIL_CATEGORIES.find(c => c.id === newCatId || c.name === newCatId);
+    if (!catObj) return;
 
-    setSituation(sitObj.label);
-    setTone(sitObj.tone);
-    setPriority(sitObj.priority);
+    setSituationSource('manual');
+    setEmailType(catObj.name);
+    setDetectedCategory(catObj.name);
+    setSituation(`${catObj.icon} ${catObj.name}`);
+    setTone(catObj.defaultTone);
+    setPriority(catObj.importance);
+    setImportance(catObj.importance);
+    setUrgency(catObj.urgency);
+
+    const reGen = generateIntelligentEmail({
+      instruction: instruction || subject,
+      userSubject: subject,
+      recipient,
+      hasAttachment: !!selectedFile,
+      customCategory: catObj.id,
+      customTone: catObj.defaultTone,
+      customPriority: catObj.importance,
+      senderName: localStorage.getItem('userName') || ''
+    });
+
+    if (reGen.subject) setSubject(reGen.subject);
+    if (reGen.body) setBody(reGen.body);
+  };
+
+  // Regeneration when user selects a different tone
+  const handleManualToneChange = (newTone) => {
+    setTone(newTone);
     setSituationSource('manual');
 
-    try {
-      setAiLoading(true);
-      const res = await apiFetch('/api/ai/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instruction,
-          subject,
-          situation: sitObj.label,
-          category: sitObj.id,
-          tone: sitObj.tone,
-          priority: sitObj.priority,
-          recipient
-        })
-      });
-      const data = await safeParseResponse(res);
-      if (data.subject) setSubject(data.subject);
-      if (data.body || data.email_body) setBody(data.body || data.email_body);
-    } catch (err) {
-      console.error('Regenerate Error:', err);
-    } finally {
-      setAiLoading(false);
-    }
+    const reGen = generateIntelligentEmail({
+      instruction: instruction || subject,
+      userSubject: subject,
+      recipient,
+      hasAttachment: !!selectedFile,
+      customCategory: detectedCategory,
+      customTone: newTone,
+      customPriority: priority,
+      senderName: localStorage.getItem('userName') || ''
+    });
+
+    if (reGen.body) setBody(reGen.body);
+  };
+
+  // Update priority without breaking structure
+  const handleManualPriorityChange = (newPriority) => {
+    setPriority(newPriority);
+    setImportance(newPriority);
+    setSituationSource('manual');
   };
 
   // STEP 3 -> STEP 4: Trigger Security Confirmation Modal
@@ -210,7 +251,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
       <div className="glass-panel p-4 rounded-2xl border border-slate-800 flex items-center justify-between overflow-x-auto scrollbar-none gap-2 shadow-xl">
         {[
           { num: 1, label: 'Instruction' },
-          { num: 2, label: 'AI Analysis' },
+          { num: 2, label: 'AI Intelligence' },
           { num: 3, label: 'Email Preview' },
           { num: 4, label: 'Review & Confirm' },
           { num: 5, label: 'Sent' }
@@ -266,10 +307,10 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
           <div className="border-b border-slate-800 pb-4">
             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-cyan-400" />
-              AI Smart Email Compose
+              AI Intelligent Email Compose
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Describe what you want to send. Let AI create a professional email for you.
+              Enter what you want to communicate. Scribe AI will classify the intent, determine tone & importance, and generate a professional, fact-grounded email.
             </p>
           </div>
 
@@ -354,12 +395,12 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-bold text-slate-300 block">
-                  Subject / Topic <span className="text-[11px] font-normal text-slate-500">(Optional — AI can generate automatically)</span>
+                  Subject / Topic <span className="text-[11px] font-normal text-slate-500">(Optional — AI generates automatically based on intent)</span>
                 </label>
               </div>
               <input
                 type="text"
-                placeholder="e.g. Request for 3 days leave due to illness, or Complaint about delayed delivery"
+                placeholder="e.g. Leave Request for 3 Days Due to Illness, or Complaint about delayed delivery"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-2xl glass-input text-xs text-white"
@@ -368,11 +409,11 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
             <div>
               <label className="text-xs font-bold text-slate-300 block mb-1">
-                What do you want to send? / Problem Details <span className="text-rose-400">*</span>
+                What do you want to communicate? / Instruction <span className="text-rose-400">*</span>
               </label>
               <textarea
                 rows={4}
-                placeholder="Example: Request 3 days leave from tomorrow because of illness, and ask manager for approval."
+                placeholder="Example: I am sick and need leave for 3 days, or My father had an accident and I need to leave immediately."
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
                 className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white leading-relaxed"
@@ -382,7 +423,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
             {/* Optional Attachment */}
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1 flex items-center gap-1.5">
-                <Paperclip className="w-4 h-4 text-purple-400" /> Attach Resume or Document (Optional)
+                <Paperclip className="w-4 h-4 text-purple-400" /> Attach Document or Resume (Optional)
               </label>
               <input
                 type="file"
@@ -408,7 +449,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                 className="px-8 py-3 rounded-xl gradient-btn text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Sparkles className="w-4 h-4 text-pink-200" />
-                {aiLoading ? 'Generating...' : 'Generate Email ✦'}
+                {aiLoading ? 'Analyzing & Generating...' : 'Generate Intelligent Email ✦'}
               </button>
             </div>
           </form>
@@ -423,76 +464,141 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-xl font-extrabold text-white">Creating Professional Email...</h3>
+            <h3 className="text-xl font-extrabold text-white">Scribe AI Engine Analyzing Request...</h3>
             <div className="text-slate-400 text-xs max-w-md mx-auto space-y-1">
-              <p>• Understanding instruction...</p>
-              <p>• Detecting situation & priority...</p>
-              <p>• Analyzing tone...</p>
-              <p>• Preparing preview...</p>
+              <p>• Classifying email intent (20 categories)...</p>
+              <p>• Determining optimal tone & recipient relationship...</p>
+              <p>• Detecting importance & urgency level...</p>
+              <p>• Formatting structure & generating clear subject...</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* STEP 3: DETECTED SITUATION UI & EMAIL PREVIEW */}
+      {/* STEP 3: UPGRADED 5-FACET AI ANALYSIS & GMAIL PREVIEW */}
       {step === 3 && (
         <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6 shadow-2xl">
           
-          {/* AI EMAIL ANALYSIS CARD */}
-          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4 animate-fadeIn">
+          {/* UPGRADED 5-FACET AI EMAIL ANALYSIS CARD */}
+          <div className="p-5 sm:p-6 rounded-3xl bg-[#0E1424]/90 backdrop-blur-xl border border-purple-500/20 space-y-5 shadow-2xl animate-fadeIn">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-cyan-400" />
-                <h3 className="text-xs font-extrabold text-white tracking-wider uppercase">AI EMAIL ANALYSIS</h3>
+                <h3 className="text-xs font-extrabold text-white tracking-wider uppercase">AI EMAIL INTELLIGENCE ANALYSIS</h3>
               </div>
 
-              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-950/60 text-purple-300 border border-purple-500/30">
-                {situationSource === 'manual' ? 'Status: Manually Selected' : 'Status: AI Detected'}
+              <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-purple-950/70 text-purple-300 border border-purple-500/30">
+                {situationSource === 'manual' ? 'Status: User Configured' : 'Status: AI Classified'}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Detected Situation
+            {/* 5 Distinct Analysis Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
+              
+              {/* 1. Email Type */}
+              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  📧 Email Type
                 </span>
-                <div className="text-base font-extrabold text-white">
-                  {situation}
+                <div className="text-xs font-extrabold text-white truncate" title={emailType}>
+                  {emailType || 'Professional'}
                 </div>
               </div>
 
-              <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Priority</span>
-                <div className="text-sm font-bold text-white">
-                  {priority === 'High' ? '🔴 High' : priority === 'Medium' ? '🟡 Medium' : '🟢 Normal'}
+              {/* 2. Detected Situation */}
+              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  🎯 Situation
+                </span>
+                <div className="text-xs font-extrabold text-cyan-300 truncate" title={situation}>
+                  {situation || 'Official'}
                 </div>
               </div>
 
-              <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Tone</span>
-                <div className="text-sm font-bold text-white">
+              {/* 3. Priority / Importance */}
+              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  🔥 Priority
+                </span>
+                <div className="text-xs font-extrabold">
+                  {priority === 'CRITICAL' ? (
+                    <span className="text-rose-400 flex items-center gap-1 font-bold">🚨 CRITICAL</span>
+                  ) : priority === 'HIGH' || priority === 'High' ? (
+                    <span className="text-amber-400 flex items-center gap-1 font-bold">🔥 HIGH</span>
+                  ) : priority === 'MEDIUM' || priority === 'Medium' ? (
+                    <span className="text-cyan-400 flex items-center gap-1 font-bold">⚡ MEDIUM</span>
+                  ) : (
+                    <span className="text-emerald-400 flex items-center gap-1 font-bold">🟢 LOW</span>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. Tone */}
+              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  💬 Tone
+                </span>
+                <div className="text-xs font-extrabold text-purple-300 truncate" title={tone}>
                   {tone}
                 </div>
               </div>
+
+              {/* 5. Urgency */}
+              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1 col-span-2 sm:col-span-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  ⏱ Urgency
+                </span>
+                <div className="text-xs font-extrabold text-pink-300 truncate" title={urgency}>
+                  {urgency || 'Normal response'}
+                </div>
+              </div>
+
             </div>
 
-            {/* Change Situation & Tone Controls */}
-            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3 flex-wrap">
-              <span className="text-xs text-slate-400 font-semibold">
-                Need a different situation or tone? Change to automatically regenerate:
+            {/* Change Situation, Tone, & Priority Overrides */}
+            <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <span className="text-slate-400 font-semibold text-[11px]">
+                Want to adjust parameters? Change below to automatically regenerate:
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Category Dropdown (20 categories) */}
                 <select
-                  value={situation}
+                  value={EMAIL_CATEGORIES.find(c => c.name === emailType || c.name === detectedCategory)?.id || ''}
                   onChange={(e) => handleManualSituationChange(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 text-xs font-bold text-purple-300 border border-slate-700 cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 text-[11px] font-bold text-cyan-300 border border-slate-700 cursor-pointer"
                 >
-                  <option value="" disabled>Change Situation ▼</option>
-                  {SUPPORTED_SITUATIONS.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
+                  <option value="" disabled>Change Category (20 Types) ▼</option>
+                  {EMAIL_CATEGORIES.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.icon} {c.name}
                     </option>
                   ))}
+                </select>
+
+                {/* Tone Dropdown (12 tones) */}
+                <select
+                  value={AVAILABLE_TONES.find(t => tone.includes(t)) || ''}
+                  onChange={(e) => handleManualToneChange(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 text-[11px] font-bold text-purple-300 border border-slate-700 cursor-pointer"
+                >
+                  <option value="" disabled>Change Tone ▼</option>
+                  {AVAILABLE_TONES.map(t => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Priority Dropdown (4 levels) */}
+                <select
+                  value={priority.toUpperCase()}
+                  onChange={(e) => handleManualPriorityChange(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 text-[11px] font-bold text-amber-300 border border-slate-700 cursor-pointer"
+                >
+                  <option value="LOW">🟢 Low</option>
+                  <option value="MEDIUM">⚡ Medium</option>
+                  <option value="HIGH">🔥 High</option>
+                  <option value="CRITICAL">🚨 Critical</option>
                 </select>
               </div>
             </div>
@@ -632,12 +738,12 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
             <div className="space-y-3 text-xs bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Situation:</span>
-                <span className="font-bold text-white">{situation}</span>
+                <span className="text-slate-500">Email Type:</span>
+                <span className="font-bold text-white">{emailType}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">Priority:</span>
-                <span className="font-bold text-white">{priority === 'High' ? '🔴 High' : priority === 'Medium' ? '🟡 Medium' : '🟢 Normal'}</span>
+                <span className="font-bold text-white">{priority}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">Recipient (To):</span>
@@ -722,8 +828,8 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                 <span className="text-emerald-400 font-bold">✓ Sent</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Situation:</span>
-                <span className="text-purple-300 font-bold">{situation}</span>
+                <span className="text-slate-500">Email Type:</span>
+                <span className="text-purple-300 font-bold">{emailType}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Gmail Message ID:</span>
