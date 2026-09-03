@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Mail, ArrowRight, ShieldCheck, User, Eye, EyeOff, KeyRound, CheckCircle2 } from 'lucide-react';
 import { apiFetch, safeParseResponse } from '../utils/api';
+import { signInWithGoogle, signUpWithPassword, signInWithPassword } from '../utils/supabaseClient';
 
 export function LoginPage({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
@@ -27,6 +28,16 @@ export function LoginPage({ onLoginSuccess }) {
     try {
       setGoogleLoading(true);
       setError('');
+
+      // 1. Try official Supabase Auth Google Sign-In
+      try {
+        await signInWithGoogle();
+        return; // Redirecting to Google OAuth
+      } catch (supaErr) {
+        console.warn('Supabase Auth direct Google OAuth notice, using Edge Function OAuth fallback:', supaErr?.message);
+      }
+
+      // 2. Fallback to Edge Function Google OAuth flow (which auto-provisions user in auth.users)
       const res = await apiFetch('/api/auth/google/start');
       const data = await safeParseResponse(res);
       if (data && data.url) {
@@ -75,7 +86,18 @@ export function LoginPage({ onLoginSuccess }) {
 
     try {
       if (isSignUpMode) {
-        // Register flow
+        // Register flow with Supabase Auth (auth.users)
+        let registeredViaSupabase = false;
+        try {
+          const res = await signUpWithPassword(email.trim(), password.trim(), name.trim());
+          if (res?.user) {
+            registeredViaSupabase = true;
+          }
+        } catch (supaSignUpErr) {
+          console.warn('Supabase signUp notice, trying API registration:', supaSignUpErr?.message);
+        }
+
+        // Also register with API for dual-table compatibility
         const res = await apiFetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -88,35 +110,58 @@ export function LoginPage({ onLoginSuccess }) {
         });
 
         const data = await safeParseResponse(res);
-        if (!res.ok || data.error) {
+        if (!res.ok && !registeredViaSupabase && data.error) {
           throw new Error(data.error || 'Registration failed. Please try again.');
         }
 
-        setSuccessMessage('Account created successfully! Please log in with your credentials.');
+        setSuccessMessage('Account created successfully in Supabase Auth! You can now log in.');
         setIsSignUpMode(false);
         setPassword('');
         setConfirmPassword('');
       } else {
-        // Login flow
-        const res = await apiFetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: email.trim(),
-            password: password.trim()
-          })
-        });
-
-        const data = await safeParseResponse(res);
-        if (!res.ok || data.error) {
-          throw new Error(data.error || 'Invalid email or password.');
+        // Login flow with Supabase Auth
+        let loggedInUser = null;
+        try {
+          const authRes = await signInWithPassword(email.trim(), password.trim());
+          if (authRes?.session) {
+            const supaUser = authRes.session.user;
+            loggedInUser = {
+              id: supaUser.id,
+              email: supaUser.email,
+              name: supaUser.user_metadata?.full_name || supaUser.user_metadata?.name || email.split('@')[0]
+            };
+            if (authRes.session.access_token) {
+              localStorage.setItem('authToken', authRes.session.access_token);
+            }
+          }
+        } catch (supaSignInErr) {
+          console.warn('Supabase signIn notice, falling back to API login:', supaSignInErr?.message);
         }
 
-        if (data.token) localStorage.setItem('authToken', data.token);
-        if (data.user?.email) localStorage.setItem('userEmail', data.user.email);
-        if (data.user?.name) localStorage.setItem('userName', data.user.name);
+        if (!loggedInUser) {
+          // Fallback to API login
+          const res = await apiFetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: email.trim(),
+              password: password.trim()
+            })
+          });
 
-        onLoginSuccess(data.user || { email: email.trim(), name: data.user?.name || email.split('@')[0] });
+          const data = await safeParseResponse(res);
+          if (!res.ok || data.error) {
+            throw new Error(data.error || 'Invalid email or password.');
+          }
+
+          if (data.token) localStorage.setItem('authToken', data.token);
+          loggedInUser = data.user || { email: email.trim(), name: email.split('@')[0] };
+        }
+
+        if (loggedInUser.email) localStorage.setItem('userEmail', loggedInUser.email);
+        if (loggedInUser.name) localStorage.setItem('userName', loggedInUser.name);
+
+        onLoginSuccess(loggedInUser);
       }
     } catch (err) {
       console.error('Authentication error:', err);

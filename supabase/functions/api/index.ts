@@ -164,14 +164,36 @@ async function getAuthUser(req: Request, supabase: any) {
   const authHeader = req.headers.get("authorization") || "";
   if (authHeader.startsWith("Bearer ")) {
     const token = authHeader.substring(7).trim();
+
+    // 1. Primary: Verify official Supabase Auth JWT
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.getUser(token);
+      if (!authErr && authData?.user) {
+        const supaUser = authData.user;
+        const { data: profile } = await supabase.from("profiles").select("*").eq("id", supaUser.id).maybeSingle();
+        const { data: connections } = await supabase.from("gmail_connections").select("*").eq("user_id", supaUser.id);
+        const { data: legacyAccounts } = await supabase.from("GmailAccount").select("*").eq("userId", supaUser.id);
+
+        return {
+          id: supaUser.id,
+          email: (supaUser.email || profile?.email || targetEmail || "").toLowerCase(),
+          name: profile?.full_name || supaUser.user_metadata?.full_name || supaUser.user_metadata?.name || (supaUser.email || "").split("@")[0] || "User",
+          profile: profile || null,
+          gmailAccounts: connections && connections.length > 0 ? connections : legacyAccounts || [],
+          gmailConnections: connections || [],
+          isSupabaseAuth: true,
+        };
+      }
+    } catch (_) {}
+
+    // Fallback: parse JWT payload for email/id
     try {
       const parts = token.split(".");
       if (parts.length === 3) {
         const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
         if (payload.email) targetEmail = payload.email.toLowerCase();
-        if (payload.id) targetId = payload.id;
+        if (payload.sub || payload.id) targetId = payload.sub || payload.id;
       } else {
-        // Base64 encoded email token fallback
         try {
           const raw = atob(token);
           if (raw.includes("@")) targetEmail = raw.toLowerCase();
@@ -180,6 +202,28 @@ async function getAuthUser(req: Request, supabase: any) {
     } catch (_) {}
   }
 
+  // 2. Check auth.users by targetEmail or targetId
+  if (targetEmail) {
+    try {
+      const cleanEmail = targetEmail.trim().toLowerCase();
+      const { data: profile } = await supabase.from("profiles").select("*").eq("email", cleanEmail).maybeSingle();
+      if (profile) {
+        const { data: connections } = await supabase.from("gmail_connections").select("*").eq("user_id", profile.id);
+        const { data: legacyAccounts } = await supabase.from("GmailAccount").select("*").eq("userId", profile.id);
+        return {
+          id: profile.id,
+          email: cleanEmail,
+          name: profile.full_name || cleanEmail.split("@")[0],
+          profile,
+          gmailAccounts: connections && connections.length > 0 ? connections : legacyAccounts || [],
+          gmailConnections: connections || [],
+          isSupabaseAuth: true,
+        };
+      }
+    } catch (_) {}
+  }
+
+  // 3. Fallback: legacy User table
   let user: any = null;
   if (targetId) {
     const { data } = await supabase.from("User").select("*").eq("id", targetId).maybeSingle();
@@ -190,39 +234,15 @@ async function getAuthUser(req: Request, supabase: any) {
     const cleanEmail = targetEmail.trim().toLowerCase();
     const { data } = await supabase.from("User").select("*").eq("email", cleanEmail).maybeSingle();
     if (data) user = data;
-
-    // Check if targetEmail matches any GmailAccount
-    if (!user) {
-      const { data: gm } = await supabase
-        .from("GmailAccount")
-        .select("userId")
-        .eq("gmailEmail", cleanEmail)
-        .maybeSingle();
-      if (gm?.userId) {
-        const { data: u } = await supabase.from("User").select("*").eq("id", gm.userId).maybeSingle();
-        if (u) user = u;
-      }
-    }
-  }
-
-  // Fallback: if user is still null, look up recent active GmailAccount
-  if (!user) {
-    const { data: accounts } = await supabase
-      .from("GmailAccount")
-      .select("userId")
-      .order("createdAt", { ascending: false })
-      .limit(1);
-    if (accounts && accounts.length > 0) {
-      const { data: u } = await supabase.from("User").select("*").eq("id", accounts[0].userId).maybeSingle();
-      if (u) user = u;
-    }
   }
 
   if (user) {
     const { data: sig } = await supabase.from("UserSignature").select("*").eq("userId", user.id).maybeSingle();
     const { data: accounts } = await supabase.from("GmailAccount").select("*").eq("userId", user.id);
+    const { data: connections } = await supabase.from("gmail_connections").select("*").eq("user_id", user.id);
     user.signature = sig ? [sig] : [];
-    user.gmailAccounts = accounts || [];
+    user.gmailAccounts = connections && connections.length > 0 ? connections : accounts || [];
+    user.gmailConnections = connections || [];
     return user;
   }
 
@@ -1307,19 +1327,56 @@ serve(async (req: Request) => {
         } catch (_) {}
       }
 
-      // Find or create User in database
+      const now = new Date().toISOString();
+
+      // 1. Primary: Ensure user exists in Supabase Auth (auth.users)
+      let authUserId: string | null = null;
+      try {
+        const { data: userList } = await supabase.auth.admin.listUsers({ perPage: 100 });
+        const existingAuthUser = userList?.users?.find(
+          (u: any) => u.email?.toLowerCase() === authorizedEmail.toLowerCase()
+        );
+
+        if (existingAuthUser) {
+          authUserId = existingAuthUser.id;
+        } else {
+          const { data: createdUser, error: createAuthErr } = await supabase.auth.admin.createUser({
+            email: authorizedEmail.toLowerCase(),
+            email_confirm: true,
+            user_metadata: { full_name: googleName, name: googleName },
+          });
+          if (createdUser?.user) {
+            authUserId = createdUser.user.id;
+          } else {
+            console.warn("auth.admin.createUser notice:", createAuthErr?.message);
+          }
+        }
+      } catch (authAdminEx: any) {
+        console.warn("auth.admin error:", authAdminEx?.message);
+      }
+
+      const effectiveUserId = authUserId || crypto.randomUUID();
+
+      // 2. Ensure profile exists in public.profiles
+      await supabase.from("profiles").upsert({
+        id: effectiveUserId,
+        email: authorizedEmail.toLowerCase(),
+        full_name: googleName,
+        updated_at: now,
+      }, { onConflict: "id" }).catch(() => {});
+
+      // 3. Dual-save to legacy User table
       let { data: user } = await supabase
         .from("User")
         .select("id, email")
         .eq("email", authorizedEmail.toLowerCase())
         .maybeSingle();
 
-      const now = new Date().toISOString();
       if (!user) {
         const { data: newUser } = await supabase
           .from("User")
           .insert({
-            id: crypto.randomUUID(),
+            id: effectiveUserId,
             name: googleName,
             email: authorizedEmail.toLowerCase(),
             createdAt: now,
@@ -1332,13 +1389,13 @@ serve(async (req: Request) => {
         // Auto signature
         await supabase.from("UserSignature").insert({
           id: crypto.randomUUID(),
-          userId: user.id,
+          userId: effectiveUserId,
           name: googleName,
           preferredTone: "Professional",
           enabled: true,
           createdAt: now,
           updatedAt: now,
-        });
+        }).catch(() => {});
       }
 
       // Preserve existing refresh token if Google didn't return one during incremental re-auth
@@ -1346,25 +1403,45 @@ serve(async (req: Request) => {
       if (tokenData.refresh_token) {
         encryptedRefreshToken = await encryptToken(tokenData.refresh_token);
       } else {
-        const { data: existingAccount } = await supabase
-          .from("GmailAccount")
-          .select("encryptedRefreshToken")
-          .eq("userId", user.id)
+        const { data: existingConn } = await supabase
+          .from("gmail_connections")
+          .select("refresh_token_encrypted")
+          .eq("user_id", effectiveUserId)
           .maybeSingle();
-        if (existingAccount?.encryptedRefreshToken) {
-          encryptedRefreshToken = existingAccount.encryptedRefreshToken;
+        if (existingConn?.refresh_token_encrypted) {
+          encryptedRefreshToken = existingConn.refresh_token_encrypted;
+        } else {
+          const { data: existingAccount } = await supabase
+            .from("GmailAccount")
+            .select("encryptedRefreshToken")
+            .eq("userId", user?.id || effectiveUserId)
+            .maybeSingle();
+          if (existingAccount?.encryptedRefreshToken) {
+            encryptedRefreshToken = existingAccount.encryptedRefreshToken;
+          }
         }
       }
 
       const grantedScope = tokenData.scope || "";
       const hasGmailSend = grantedScope.includes("gmail.send") || grantedScope.includes("mail.google.com");
 
-      // Remove existing account record for this user and insert updated
-      await supabase.from("GmailAccount").delete().eq("userId", user.id);
+      // Save into canonical gmail_connections table
+      await supabase.from("gmail_connections").upsert({
+        user_id: effectiveUserId,
+        gmail_email: authorizedEmail.toLowerCase(),
+        provider: "google",
+        access_token_encrypted: tokenData.access_token || "",
+        refresh_token_encrypted: encryptedRefreshToken,
+        scopes: grantedScope.split(" "),
+        updated_at: now,
+      }, { onConflict: "user_id,gmail_email" }).catch((e: any) => console.warn("gmail_connections upsert:", e));
+
+      // Remove existing account record for this user and insert updated (legacy compatibility)
+      await supabase.from("GmailAccount").delete().eq("userId", user?.id || effectiveUserId);
 
       await supabase.from("GmailAccount").insert({
         id: crypto.randomUUID(),
-        userId: user.id,
+        userId: user?.id || effectiveUserId,
         gmailEmail: authorizedEmail,
         encryptedAccessToken: tokenData.access_token || "",
         encryptedRefreshToken,
@@ -1378,14 +1455,72 @@ serve(async (req: Request) => {
         return Response.redirect(`${frontendUrl}?gmail=missing_scopes`, 302);
       }
 
-      return Response.redirect(`${frontendUrl}?gmail=connected&email=${encodeURIComponent(authorizedEmail)}`, 302);
+      // Generate Supabase Auth session / magic link for instant client-side session login
+      let authLink = "";
+      if (authUserId) {
+        try {
+          const { data: linkData } = await supabase.auth.admin.generateLink({
+            type: "magiclink",
+            email: authorizedEmail.toLowerCase(),
+          });
+          if (linkData?.properties?.action_link) {
+            authLink = linkData.properties.action_link;
+          }
+        } catch (_) {}
+      }
+
+      return Response.redirect(
+        `${frontendUrl}?gmail=connected&email=${encodeURIComponent(authorizedEmail)}&user_id=${effectiveUserId}${authLink ? `&auth_link=${encodeURIComponent(authLink)}` : ""}`,
+        302
+      );
+    }
+
+    if (path === "/auth/google/save-session-tokens" && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+
+      const body = await req.json().catch(() => ({}));
+      const { providerToken, providerRefreshToken, email } = body;
+
+      const userEmail = (email || user.email).toLowerCase().trim();
+      const now = new Date().toISOString();
+
+      let encAccess = providerToken || "";
+      let encRefresh = "";
+      if (providerRefreshToken) {
+        encRefresh = await encryptToken(providerRefreshToken);
+      }
+
+      await supabase.from("gmail_connections").upsert({
+        user_id: user.id,
+        gmail_email: userEmail,
+        provider: "google",
+        access_token_encrypted: encAccess,
+        refresh_token_encrypted: encRefresh || undefined,
+        updated_at: now,
+      }, { onConflict: "user_id,gmail_email" }).catch((e: any) => console.warn("save-session-tokens error:", e));
+
+      await supabase.from("GmailAccount").delete().eq("userId", user.id).catch(() => {});
+      await supabase.from("GmailAccount").insert({
+        id: crypto.randomUUID(),
+        userId: user.id,
+        gmailEmail: userEmail,
+        encryptedAccessToken: encAccess,
+        encryptedRefreshToken: encRefresh,
+        status: "CONNECTED",
+        createdAt: now,
+        updatedAt: now,
+      }).catch(() => {});
+
+      return jsonResponse({ success: true, message: "Tokens encrypted and saved into gmail_connections." });
     }
 
     if (path === "/auth/google/disconnect" && (method === "POST" || method === "DELETE")) {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
 
-      await supabase.from("GmailAccount").delete().eq("userId", user.id);
+      await supabase.from("gmail_connections").delete().eq("user_id", user.id).catch(() => {});
+      await supabase.from("GmailAccount").delete().eq("userId", user.id).catch(() => {});
       return jsonResponse({ success: true, message: "Gmail account disconnected successfully." });
     }
 
@@ -1459,18 +1594,30 @@ serve(async (req: Request) => {
         return errorResponse("Recipient (to), Subject, and Body are required.");
       }
 
-      const { data: accounts } = await supabase
-        .from("GmailAccount")
+      // 1. Resolve connected account from gmail_connections or GmailAccount
+      let connection: any = null;
+      const { data: conns } = await supabase
+        .from("gmail_connections")
         .select("*")
-        .eq("userId", user.id);
+        .eq("user_id", user.id);
+      if (conns && conns.length > 0) connection = conns[0];
 
-      const account = accounts?.[0];
-      if (!account || (!account.encryptedAccessToken && !account.encryptedRefreshToken)) {
+      if (!connection) {
+        const { data: accounts } = await supabase
+          .from("GmailAccount")
+          .select("*")
+          .eq("userId", user.id);
+        if (accounts && accounts.length > 0) connection = accounts[0];
+      }
+
+      const connectedEmail = connection?.gmail_email || connection?.gmailEmail;
+      if (!connection || (!connection.access_token_encrypted && !connection.encryptedAccessToken && !connection.refresh_token_encrypted && !connection.encryptedRefreshToken)) {
         return errorResponse("Gmail account is not connected. Please connect Google first.", 400);
       }
 
-      let accessToken = account.encryptedAccessToken;
-      const refreshToken = await decryptToken(account.encryptedRefreshToken);
+      let accessToken = connection.access_token_encrypted || connection.encryptedAccessToken;
+      const rawRefresh = connection.refresh_token_encrypted || connection.encryptedRefreshToken;
+      const refreshToken = await decryptToken(rawRefresh);
 
       // Refresh Google Access Token if refresh token is available
       if (refreshToken) {
@@ -1489,20 +1636,28 @@ serve(async (req: Request) => {
           const refreshData = await refreshRes.json();
           if (refreshData.access_token) {
             accessToken = refreshData.access_token;
-            await supabase
-              .from("GmailAccount")
-              .update({ encryptedAccessToken: accessToken, updatedAt: new Date().toISOString() })
-              .eq("id", account.id);
+            if (connection.id) {
+              await supabase
+                .from("gmail_connections")
+                .update({ access_token_encrypted: accessToken, updated_at: new Date().toISOString() })
+                .eq("id", connection.id)
+                .catch(() => {});
+              await supabase
+                .from("GmailAccount")
+                .update({ encryptedAccessToken: accessToken, updatedAt: new Date().toISOString() })
+                .eq("id", connection.id)
+                .catch(() => {});
+            }
           }
         }
       }
 
       // Encode RFC 2822 MIME Email
       const emailLines = [
-        `From: ${account.gmailEmail}`,
+        `From: ${connectedEmail}`,
         `To: ${recipient}`,
-        cc ? `Cc: ${cc}` : "",
-        bcc ? `Bcc: ${bcc}` : "",
+        cc ? `Cc: ${Array.isArray(cc) ? cc.join(", ") : cc}` : "",
+        bcc ? `Bcc: ${Array.isArray(bcc) ? bcc.join(", ") : bcc}` : "",
         `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
         "MIME-Version: 1.0",
         "Content-Type: text/plain; charset=UTF-8",
@@ -1534,6 +1689,31 @@ serve(async (req: Request) => {
         } else if (sendRes.status === 401 || errorMsg.includes("invalid_grant") || errorMsg.includes("Token has been expired")) {
           userSafeError = "Your Gmail connection has expired. Please reconnect Gmail.";
         }
+
+        const now = new Date().toISOString();
+        const failedId = crypto.randomUUID();
+        // Log failure to emails and email_events
+        await supabase.from("emails").insert({
+          id: failedId,
+          user_id: user.id,
+          recipient_email: recipient,
+          subject,
+          body: emailBody,
+          status: "failed",
+          direction: "sent",
+          created_at: now,
+          updated_at: now,
+        }).catch(() => {});
+
+        await supabase.from("email_events").insert({
+          id: crypto.randomUUID(),
+          user_id: user.id,
+          email_id: failedId,
+          event_type: "failed",
+          metadata: { recipient, subject, error: userSafeError },
+          created_at: now,
+        }).catch(() => {});
+
         return jsonResponse({
           success: false,
           error: userSafeError,
@@ -1543,13 +1723,55 @@ serve(async (req: Request) => {
 
       // Record email in database
       const now = new Date().toISOString();
-      const emailPayload = {
+      const emailId = crypto.randomUUID();
+
+      // 1. Canonical emails record
+      const canonicalEmail = {
+        id: emailId,
+        user_id: user.id,
+        gmail_connection_id: connection.id || null,
+        recipient_email: recipient,
+        cc: cc ? (Array.isArray(cc) ? cc : [cc]) : [],
+        bcc: bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : [],
+        subject,
+        body: emailBody,
+        email_type: (category || situation || "other").toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+        tone: (tone || "professional").toLowerCase(),
+        importance: (priority || "normal").toLowerCase(),
+        status: "sent",
+        direction: "sent",
+        spam_status: "clean",
+        gmail_message_id: sendData.id,
+        thread_id: sendData.threadId || null,
+        sent_at: now,
+        created_at: now,
+        updated_at: now,
+      };
+      await supabase.from("emails").upsert(canonicalEmail, { onConflict: "id" }).catch((e: any) => console.warn("Canonical emails insert notice:", e));
+
+      // 2. Canonical email_events record
+      await supabase.from("email_events").insert({
         id: crypto.randomUUID(),
+        user_id: user.id,
+        email_id: emailId,
+        event_type: "sent",
+        metadata: {
+          recipient,
+          subject,
+          gmail_message_id: sendData.id,
+          sender: connectedEmail,
+        },
+        created_at: now,
+      }).catch((e: any) => console.warn("email_events insert notice:", e));
+
+      // 3. Legacy Email record
+      const emailPayload = {
+        id: emailId,
         userId: user.id,
-        gmailAccount: account.gmailEmail,
+        gmailAccount: connectedEmail,
         recipient,
-        cc: cc || null,
-        bcc: bcc || null,
+        cc: typeof cc === "string" ? cc : (cc || []).join(", "),
+        bcc: typeof bcc === "string" ? bcc : (bcc || []).join(", "),
         subject,
         body: emailBody,
         category: category || "Official/Professional",
@@ -1560,9 +1782,9 @@ serve(async (req: Request) => {
         isSent: true,
         isReceived: false,
         isSpam: false,
-        sentAt: now,
-        gmailMessageId: sendData.id || null,
+        gmailMessageId: sendData.id,
         gmailThreadId: sendData.threadId || null,
+        sentAt: now,
         createdAt: now,
       };
 
@@ -2029,11 +2251,19 @@ RULES:
       // 1. Try calling PostgreSQL get_dashboard_analytics RPC function
       try {
         const { data: rpcStats, error: rpcErr } = await supabase.rpc("get_dashboard_analytics", { p_user_id: user.id });
+        const { data: recentEvents } = await supabase
+          .from("email_events")
+          .select("id, email_id, event_type, metadata, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+
         if (!rpcErr && rpcStats && typeof rpcStats.sent === 'number') {
           return jsonResponse({
             success: true,
             ...rpcStats,
             totalEmails: rpcStats.sent,
+            recentActivity: recentEvents || [],
           });
         }
       } catch (rpcEx) {

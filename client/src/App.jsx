@@ -30,7 +30,7 @@ import { PublicLandingPage } from './components/PublicLandingPage';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { TermsOfService } from './components/TermsOfService';
 import { apiFetch } from './utils/api';
-import { subscribeToNotificationChanges } from './utils/supabaseClient';
+import { supabase, subscribeToNotificationChanges, signOutUser } from './utils/supabaseClient';
 
 export default function App() {
   const [currentUserEmail, setCurrentUserEmail] = useState(() => localStorage.getItem('userEmail') || '');
@@ -97,18 +97,92 @@ export default function App() {
 
   const [toastMessage, setToastMessage] = useState('');
 
+  // Listen to Supabase Auth State & Session
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const supaUser = session.user;
+        const email = supaUser.email || '';
+        const name = supaUser.user_metadata?.full_name || supaUser.user_metadata?.name || email.split('@')[0];
+        setCurrentUserEmail(email);
+        setCurrentUserName(name);
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userName', name);
+        localStorage.setItem('userId', supaUser.id);
+        if (session.access_token) localStorage.setItem('authToken', session.access_token);
+
+        if (session.provider_token) {
+          apiFetch('/api/auth/google/save-session-tokens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              providerToken: session.provider_token,
+              providerRefreshToken: session.provider_refresh_token,
+              email: email,
+            }),
+          }).catch((e) => console.warn('Sync session tokens notice:', e));
+        }
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const supaUser = session.user;
+        const email = supaUser.email || '';
+        const name = supaUser.user_metadata?.full_name || supaUser.user_metadata?.name || email.split('@')[0];
+        setCurrentUserEmail(email);
+        setCurrentUserName(name);
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userName', name);
+        localStorage.setItem('userId', supaUser.id);
+        if (session.access_token) localStorage.setItem('authToken', session.access_token);
+
+        if (session.provider_token) {
+          apiFetch('/api/auth/google/save-session-tokens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              providerToken: session.provider_token,
+              providerRefreshToken: session.provider_refresh_token,
+              email: email,
+            }),
+          }).catch((e) => console.warn('Sync session tokens notice:', e));
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUserEmail('');
+        setCurrentUserName('');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('gmail') === 'connected' || params.get('auth') === 'success') {
       const emailParam = params.get('email');
+      const userIdParam = params.get('user_id');
+      const authLinkParam = params.get('auth_link');
+
       if (emailParam) {
         localStorage.setItem('userEmail', emailParam.toLowerCase().trim());
         setCurrentUserEmail(emailParam.toLowerCase().trim());
       }
+      if (userIdParam) {
+        localStorage.setItem('userId', userIdParam);
+      }
+      if (authLinkParam) {
+        window.location.href = authLinkParam;
+        return;
+      }
+
       setActiveTab('dashboard');
       setToastMessage('✓ Gmail Connected Successfully!');
       window.history.replaceState({}, '', window.location.pathname);
       setTimeout(() => setToastMessage(''), 5000);
+      checkGmailConnection();
     } else if (params.get('gmail') === 'missing_scopes') {
       setActiveTab('settings');
       setToastMessage('⚠️ Gmail sending permission was not granted. Please click "Connect with Google" and check the "Send email on your behalf" box.');
@@ -189,14 +263,16 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      await signOutUser();
+    } catch (_) {}
+    try {
       await apiFetch('/api/auth/logout', { method: 'POST' });
     } catch (e) {}
-    localStorage.removeItem('userEmail');
-    localStorage.removeItem('userName');
-    localStorage.removeItem('authToken');
+    localStorage.clear();
     setCurrentUserEmail('');
     setCurrentUserName('');
     setUnreadNotifCount(0);
+    setIsGmailConnected(false);
     navigateTo('/');
   };
 

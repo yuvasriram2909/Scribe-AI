@@ -5,6 +5,7 @@ import {
   Calendar, FileText, Briefcase, HelpCircle, Users, ExternalLink, Heart, Mail, Clock
 } from 'lucide-react';
 import { apiFetch, safeParseResponse } from '../utils/api';
+import { signInWithGoogle } from '../utils/supabaseClient';
 import { 
   EMAIL_CATEGORIES, 
   classifyEmailIntent, 
@@ -412,6 +413,12 @@ export function ComposeWorkflow({
             <button
               onClick={async () => {
                 try {
+                  try {
+                    await signInWithGoogle();
+                    return;
+                  } catch (supaErr) {
+                    console.warn('Supabase Auth signInWithGoogle notice:', supaErr?.message);
+                  }
                   const res = await apiFetch('/api/auth/google/start');
                   const data = await safeParseResponse(res);
                   if (data && data.url) {

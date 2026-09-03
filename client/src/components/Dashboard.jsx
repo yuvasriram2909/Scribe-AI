@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
-import { subscribeToEmailChanges } from '../utils/supabaseClient';
+import { subscribeToEmailChanges, subscribeToEmailEvents, signInWithGoogle } from '../utils/supabaseClient';
 
 const CATEGORIES_LIST = [
   { id: 'All', label: 'All Situations' },
@@ -141,8 +141,12 @@ export function Dashboard({
     checkConnectionStatus();
     checkPushNotificationSupport();
 
-    // Instant update via Supabase Realtime channel on Email changes
-    const unsubscribeEmail = subscribeToEmailChanges(localStorage.getItem('userEmail') || '', () => {
+    // Instant update via Supabase Realtime channel on Email & Email Events changes
+    const targetUser = localStorage.getItem('userId') || localStorage.getItem('userEmail') || '';
+    const unsubscribeEmail = subscribeToEmailChanges(targetUser, () => {
+      fetchDashboardData();
+    });
+    const unsubscribeEvents = subscribeToEmailEvents(targetUser, () => {
       fetchDashboardData();
     });
 
@@ -154,6 +158,7 @@ export function Dashboard({
 
     return () => {
       if (typeof unsubscribeEmail === 'function') unsubscribeEmail();
+      if (typeof unsubscribeEvents === 'function') unsubscribeEvents();
       clearInterval(interval);
     };
   }, [selectedCategory, selectedStatus, searchQuery]);
@@ -207,6 +212,13 @@ export function Dashboard({
 
   const handleConnectGmail = async () => {
     try {
+      try {
+        await signInWithGoogle();
+        return;
+      } catch (supaErr) {
+        console.warn('Supabase Auth signInWithGoogle notice, using Edge Function OAuth fallback:', supaErr?.message);
+      }
+
       const res = await apiFetch('/api/auth/google/start');
       const data = await res.json();
       if (data && data.url) {

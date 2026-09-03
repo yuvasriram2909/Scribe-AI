@@ -288,20 +288,68 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ============================================================================
--- 16. CANONICAL SUPABASE DATA LAYER TABLES
+-- 16. CANONICAL SUPABASE AUTH & DATA LAYER TABLES
 -- ============================================================================
 
--- 1. Profiles Table
+-- 1. Profiles Table (Referencing auth.users)
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    email TEXT,
+    email TEXT NOT NULL,
     full_name TEXT,
     avatar_url TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS profiles_email_idx ON public.profiles(email);
 
--- 2. Connected Accounts Table (Encrypted Google OAuth / Gmail)
+-- Automatic Profile Creation Trigger on auth.users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, avatar_url, created_at, updated_at)
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    new.raw_user_meta_data->>'avatar_url',
+    now(),
+    now()
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET
+    email = EXCLUDED.email,
+    full_name = COALESCE(EXCLUDED.full_name, public.profiles.full_name),
+    avatar_url = COALESCE(EXCLUDED.avatar_url, public.profiles.avatar_url),
+    updated_at = now();
+  RETURN new;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT OR UPDATE ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 2. Gmail Connections Table (Server-side Encrypted Google OAuth Credentials)
+CREATE TABLE IF NOT EXISTS public.gmail_connections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    gmail_email TEXT NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'google',
+    access_token_encrypted TEXT,
+    refresh_token_encrypted TEXT,
+    token_expires_at TIMESTAMPTZ,
+    scopes TEXT[],
+    connected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT gmail_connections_user_email_unique UNIQUE(user_id, gmail_email)
+);
+CREATE INDEX IF NOT EXISTS gmail_connections_user_id_idx ON public.gmail_connections(user_id);
+
+-- Backward compatibility alias: connected_accounts
 CREATE TABLE IF NOT EXISTS public.connected_accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -312,40 +360,54 @@ CREATE TABLE IF NOT EXISTS public.connected_accounts (
     refresh_token_encrypted TEXT,
     token_expires_at TIMESTAMPTZ,
     scopes TEXT[],
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS connected_accounts_user_id_idx ON public.connected_accounts(user_id);
 
 -- 3. Emails Table
 CREATE TABLE IF NOT EXISTS public.emails (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    gmail_message_id TEXT,
-    thread_id TEXT,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    gmail_connection_id UUID REFERENCES public.gmail_connections(id) ON DELETE SET NULL,
     recipient_email TEXT NOT NULL,
-    cc TEXT,
-    bcc TEXT,
+    cc TEXT[],
+    bcc TEXT[],
     subject TEXT NOT NULL,
     body TEXT NOT NULL,
-    email_type TEXT NOT NULL DEFAULT 'Professional / Official',
-    tone TEXT NOT NULL DEFAULT 'Professional',
-    importance TEXT NOT NULL DEFAULT 'Normal',
-    status TEXT NOT NULL DEFAULT 'sent',
+    email_type TEXT NOT NULL DEFAULT 'other',
+    tone TEXT NOT NULL DEFAULT 'professional',
+    importance TEXT NOT NULL DEFAULT 'normal',
+    status TEXT NOT NULL DEFAULT 'draft',
     direction TEXT NOT NULL DEFAULT 'sent',
     spam_status TEXT NOT NULL DEFAULT 'clean',
+    gmail_message_id TEXT,
+    thread_id TEXT,
     sent_at TIMESTAMPTZ,
     received_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS emails_user_id_idx ON public.emails(user_id);
 CREATE INDEX IF NOT EXISTS emails_user_id_created_at_idx ON public.emails(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS emails_user_id_status_idx ON public.emails(user_id, status);
 CREATE INDEX IF NOT EXISTS emails_user_id_direction_idx ON public.emails(user_id, direction);
-CREATE INDEX IF NOT EXISTS emails_user_id_category_idx ON public.emails(user_id, email_type);
+CREATE INDEX IF NOT EXISTS emails_user_id_email_type_idx ON public.emails(user_id, email_type);
 CREATE UNIQUE INDEX IF NOT EXISTS emails_user_id_gmail_message_id_idx ON public.emails(user_id, gmail_message_id) WHERE gmail_message_id IS NOT NULL;
 
--- 4. Email Analytics Table
+-- 4. Email Events Table (Audit & Real-time Analytics Logging)
+CREATE TABLE IF NOT EXISTS public.email_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    email_id UUID REFERENCES public.emails(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS email_events_user_id_idx ON public.email_events(user_id);
+CREATE INDEX IF NOT EXISTS email_events_user_id_created_at_idx ON public.email_events(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS email_events_email_id_idx ON public.email_events(email_id);
+
+-- Backward compatibility: email_analytics
 CREATE TABLE IF NOT EXISTS public.email_analytics (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -356,13 +418,10 @@ CREATE TABLE IF NOT EXISTS public.email_analytics (
     status TEXT NOT NULL DEFAULT 'sent',
     is_spam BOOLEAN NOT NULL DEFAULT false,
     direction TEXT NOT NULL DEFAULT 'sent',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS email_analytics_user_id_idx ON public.email_analytics(user_id);
-CREATE INDEX IF NOT EXISTS email_analytics_user_id_created_at_idx ON public.email_analytics(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS email_analytics_email_id_idx ON public.email_analytics(email_id);
 
--- 5. Drafts Table
+-- Backward compatibility: drafts
 CREATE TABLE IF NOT EXISTS public.drafts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -371,35 +430,41 @@ CREATE TABLE IF NOT EXISTS public.drafts (
     body TEXT,
     category TEXT DEFAULT 'Professional / Official',
     tone TEXT DEFAULT 'Professional',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS drafts_user_id_idx ON public.drafts(user_id);
 
--- 6. Contacts Table
+-- 5. Contacts Table
 CREATE TABLE IF NOT EXISTS public.contacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     email TEXT NOT NULL,
     company TEXT,
+    phone TEXT,
     notes TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS contacts_user_id_idx ON public.contacts(user_id);
 
--- Enable RLS on Canonical Tables
+-- Enable Strict Row Level Security (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.gmail_connections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.connected_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.emails ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_analytics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.drafts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
 
--- Service Role Full Access
+-- Service Role Full Access Policies (For Edge Functions)
 DO $$ BEGIN
   CREATE POLICY "Service role full access profiles" ON public.profiles FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access gmail_connections" ON public.gmail_connections FOR ALL TO service_role USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -408,6 +473,10 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Service role full access emails" ON public.emails FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access email_events" ON public.email_events FOR ALL TO service_role USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -422,47 +491,61 @@ DO $$ BEGIN
   CREATE POLICY "Service role full access contacts" ON public.contacts FOR ALL TO service_role USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- Authenticated Users Policies (Scoped to auth.uid())
+-- Strict User Isolation Policies (Strictly auth.uid() = user_id or auth.uid() = id)
 DO $$ BEGIN
-  CREATE POLICY "Users can manage their own profile" ON public.profiles
-    FOR ALL TO authenticated, anon
-    USING (auth.uid() = id OR id IS NOT NULL)
-    WITH CHECK (auth.uid() = id OR id IS NOT NULL);
+  CREATE POLICY "Users can only access their own profile" ON public.profiles
+    FOR ALL TO authenticated
+    USING (auth.uid() = id)
+    WITH CHECK (auth.uid() = id);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE POLICY "Users can manage their connected_accounts" ON public.connected_accounts
-    FOR ALL TO authenticated, anon
-    USING (auth.uid() = user_id OR user_id IS NOT NULL)
-    WITH CHECK (auth.uid() = user_id OR user_id IS NOT NULL);
+  CREATE POLICY "Users can only access their own gmail connections" ON public.gmail_connections
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE POLICY "Users can manage their own emails canonical" ON public.emails
-    FOR ALL TO authenticated, anon
-    USING (auth.uid() = user_id OR user_id IS NOT NULL)
-    WITH CHECK (auth.uid() = user_id OR user_id IS NOT NULL);
+  CREATE POLICY "Users can only access their own connected accounts" ON public.connected_accounts
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE POLICY "Users can manage their email analytics canonical" ON public.email_analytics
-    FOR ALL TO authenticated, anon
-    USING (auth.uid() = user_id OR user_id IS NOT NULL)
-    WITH CHECK (auth.uid() = user_id OR user_id IS NOT NULL);
+  CREATE POLICY "Users can only access their own emails" ON public.emails
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE POLICY "Users can manage their drafts canonical" ON public.drafts
-    FOR ALL TO authenticated, anon
-    USING (auth.uid() = user_id OR user_id IS NOT NULL)
-    WITH CHECK (auth.uid() = user_id OR user_id IS NOT NULL);
+  CREATE POLICY "Users can only access their own email events" ON public.email_events
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE POLICY "Users can manage their contacts canonical" ON public.contacts
-    FOR ALL TO authenticated, anon
-    USING (auth.uid() = user_id OR user_id IS NOT NULL)
-    WITH CHECK (auth.uid() = user_id OR user_id IS NOT NULL);
+  CREATE POLICY "Users can only access their own email analytics" ON public.email_analytics
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Users can only access their own drafts" ON public.drafts
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Users can only access their own contacts" ON public.contacts
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Enable Realtime for Canonical Tables
@@ -471,14 +554,18 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER PUBLICATION supabase_realtime ADD TABLE public.drafts;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.email_events;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.gmail_connections;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.contacts;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- 17. SQL Analytics Function: get_dashboard_analytics
+-- 17. SQL Analytics Function: get_dashboard_analytics (Strictly Authenticated)
 CREATE OR REPLACE FUNCTION public.get_dashboard_analytics(p_user_id TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -488,13 +575,14 @@ DECLARE
   v_result JSONB;
 BEGIN
   SELECT jsonb_build_object(
-    'sent', COUNT(*) FILTER (WHERE direction = 'sent' AND status = 'sent'),
+    'sent', COUNT(*) FILTER (WHERE (direction = 'sent' OR status = 'sent') AND status != 'failed'),
     'received', COUNT(*) FILTER (WHERE direction = 'received' AND (spam_status IS NULL OR spam_status != 'spam')),
-    'drafts', (SELECT COUNT(*) FROM public.drafts WHERE user_id::text = p_user_id) + COUNT(*) FILTER (WHERE status = 'draft'),
+    'drafts', COUNT(*) FILTER (WHERE status = 'draft'),
     'scheduled', COUNT(*) FILTER (WHERE status = 'scheduled'),
-    'emergency', COUNT(*) FILTER (WHERE email_type ILIKE '%emergency%' OR importance IN ('High', 'Critical') OR tone = 'Urgent'),
-    'spam', COUNT(*) FILTER (WHERE spam_status = 'spam'),
-    'pendingReview', COUNT(*) FILTER (WHERE status IN ('pending', 'pending_review')),
+    'emergency', COUNT(*) FILTER (WHERE importance IN ('urgent', 'high', 'critical') OR email_type ILIKE '%emergency%'),
+    'spam', COUNT(*) FILTER (WHERE spam_status = 'spam' OR status = 'spam'),
+    'pendingReview', COUNT(*) FILTER (WHERE status IN ('pending', 'pending_review', 'generated')),
+    'failed', COUNT(*) FILTER (WHERE status = 'failed'),
     'total', COUNT(*),
     'categories', jsonb_build_object(
       'leave', COUNT(*) FILTER (WHERE email_type ILIKE '%leave%' OR email_type ILIKE '%sick%'),
@@ -531,7 +619,7 @@ BEGIN
       'low', COUNT(*) FILTER (WHERE importance ILIKE '%low%'),
       'normal', COUNT(*) FILTER (WHERE importance ILIKE '%normal%' OR importance ILIKE '%medium%'),
       'high', COUNT(*) FILTER (WHERE importance ILIKE '%high%'),
-      'critical', COUNT(*) FILTER (WHERE importance ILIKE '%critical%')
+      'urgent', COUNT(*) FILTER (WHERE importance ILIKE '%urgent%' OR importance ILIKE '%critical%')
     )
   ) INTO v_result
   FROM public.emails

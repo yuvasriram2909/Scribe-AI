@@ -15,6 +15,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { apiFetch, safeParseResponse, getApiBaseUrl, setCustomBackendUrl, DEFAULT_SUPABASE_EDGE_FUNCTION } from '../utils/api';
+import { signInWithGoogle } from '../utils/supabaseClient';
 
 export function SettingsView() {
   // Gmail OAuth status
@@ -113,6 +114,13 @@ export function SettingsView() {
     setConnectingGoogle(true);
     setAuthError('');
     try {
+      try {
+        await signInWithGoogle();
+        return;
+      } catch (supaErr) {
+        console.warn('Supabase Auth direct Google OAuth notice:', supaErr?.message);
+      }
+
       const res = await apiFetch('/api/auth/google/start');
       const data = await safeParseResponse(res);
       if (data && data.url) {
