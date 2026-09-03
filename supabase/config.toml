@@ -1,6 +1,6 @@
 # Supabase Project Configuration for Scribe AI Edge Functions
 
-project_id = "bjxjorlxjjssrqjosed"
+project_id = "bjxjorlxjijssrqjosed"
 
 [functions.api]
 verify_jwt = false
