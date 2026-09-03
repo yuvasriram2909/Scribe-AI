@@ -324,7 +324,11 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       created_at: payload.createdAt || now,
     };
 
-    await supabase.from("emails").upsert(canonicalPayload, { onConflict: "id" }).catch((e: any) => console.warn("Canonical emails upsert notice:", e?.message));
+    try {
+      await supabase.from("emails").upsert(canonicalPayload, { onConflict: "id" });
+    } catch (e: any) {
+      console.warn("Canonical emails upsert notice:", e?.message);
+    }
 
     // 2. Insert into Canonical "email_analytics" table
     const analyticsPayload = {
@@ -340,7 +344,11 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       created_at: now,
     };
 
-    await supabase.from("email_analytics").insert(analyticsPayload).catch((e: any) => console.warn("Canonical email_analytics insert notice:", e?.message));
+    try {
+      await supabase.from("email_analytics").insert(analyticsPayload);
+    } catch (e: any) {
+      console.warn("Canonical email_analytics insert notice:", e?.message);
+    }
   } catch (canonicalErr: any) {
     console.warn("Canonical emails write notice:", canonicalErr?.message);
   }
@@ -1358,12 +1366,14 @@ serve(async (req: Request) => {
       const effectiveUserId = authUserId || crypto.randomUUID();
 
       // 2. Ensure profile exists in public.profiles
-      await supabase.from("profiles").upsert({
-        id: effectiveUserId,
-        email: authorizedEmail.toLowerCase(),
-        full_name: googleName,
-        updated_at: now,
-      }, { onConflict: "id" }).catch(() => {});
+      try {
+        await supabase.from("profiles").upsert({
+          id: effectiveUserId,
+          email: authorizedEmail.toLowerCase(),
+          full_name: googleName,
+          updated_at: now,
+        }, { onConflict: "id" });
+      } catch (_) {}
 
       // 3. Dual-save to legacy User table
       let { data: user } = await supabase
@@ -1387,15 +1397,17 @@ serve(async (req: Request) => {
         user = newUser;
 
         // Auto signature
-        await supabase.from("UserSignature").insert({
-          id: crypto.randomUUID(),
-          userId: effectiveUserId,
-          name: googleName,
-          preferredTone: "Professional",
-          enabled: true,
-          createdAt: now,
-          updatedAt: now,
-        }).catch(() => {});
+        try {
+          await supabase.from("UserSignature").insert({
+            id: crypto.randomUUID(),
+            userId: effectiveUserId,
+            name: googleName,
+            preferredTone: "Professional",
+            enabled: true,
+            createdAt: now,
+            updatedAt: now,
+          });
+        } catch (_) {}
       }
 
       // Preserve existing refresh token if Google didn't return one during incremental re-auth
@@ -1426,15 +1438,19 @@ serve(async (req: Request) => {
       const hasGmailSend = grantedScope.includes("gmail.send") || grantedScope.includes("mail.google.com");
 
       // Save into canonical gmail_connections table
-      await supabase.from("gmail_connections").upsert({
-        user_id: effectiveUserId,
-        gmail_email: authorizedEmail.toLowerCase(),
-        provider: "google",
-        access_token_encrypted: tokenData.access_token || "",
-        refresh_token_encrypted: encryptedRefreshToken,
-        scopes: grantedScope.split(" "),
-        updated_at: now,
-      }, { onConflict: "user_id,gmail_email" }).catch((e: any) => console.warn("gmail_connections upsert:", e));
+      try {
+        await supabase.from("gmail_connections").upsert({
+          user_id: effectiveUserId,
+          gmail_email: authorizedEmail.toLowerCase(),
+          provider: "google",
+          access_token_encrypted: tokenData.access_token || "",
+          refresh_token_encrypted: encryptedRefreshToken,
+          scopes: grantedScope.split(" "),
+          updated_at: now,
+        }, { onConflict: "user_id,gmail_email" });
+      } catch (e: any) {
+        console.warn("gmail_connections upsert notice:", e);
+      }
 
       // Remove existing account record for this user and insert updated (legacy compatibility)
       await supabase.from("GmailAccount").delete().eq("userId", user?.id || effectiveUserId);
@@ -1491,26 +1507,35 @@ serve(async (req: Request) => {
         encRefresh = await encryptToken(providerRefreshToken);
       }
 
-      await supabase.from("gmail_connections").upsert({
-        user_id: user.id,
-        gmail_email: userEmail,
-        provider: "google",
-        access_token_encrypted: encAccess,
-        refresh_token_encrypted: encRefresh || undefined,
-        updated_at: now,
-      }, { onConflict: "user_id,gmail_email" }).catch((e: any) => console.warn("save-session-tokens error:", e));
+      try {
+        await supabase.from("gmail_connections").upsert({
+          user_id: user.id,
+          gmail_email: userEmail,
+          provider: "google",
+          access_token_encrypted: encAccess,
+          refresh_token_encrypted: encRefresh || undefined,
+          updated_at: now,
+        }, { onConflict: "user_id,gmail_email" });
+      } catch (e: any) {
+        console.warn("save-session-tokens error:", e);
+      }
 
-      await supabase.from("GmailAccount").delete().eq("userId", user.id).catch(() => {});
-      await supabase.from("GmailAccount").insert({
-        id: crypto.randomUUID(),
-        userId: user.id,
-        gmailEmail: userEmail,
-        encryptedAccessToken: encAccess,
-        encryptedRefreshToken: encRefresh,
-        status: "CONNECTED",
-        createdAt: now,
-        updatedAt: now,
-      }).catch(() => {});
+      try {
+        await supabase.from("GmailAccount").delete().eq("userId", user.id);
+      } catch (_) {}
+
+      try {
+        await supabase.from("GmailAccount").insert({
+          id: crypto.randomUUID(),
+          userId: user.id,
+          gmailEmail: userEmail,
+          encryptedAccessToken: encAccess,
+          encryptedRefreshToken: encRefresh,
+          status: "CONNECTED",
+          createdAt: now,
+          updatedAt: now,
+        });
+      } catch (_) {}
 
       return jsonResponse({ success: true, message: "Tokens encrypted and saved into gmail_connections." });
     }
@@ -1519,8 +1544,12 @@ serve(async (req: Request) => {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
 
-      await supabase.from("gmail_connections").delete().eq("user_id", user.id).catch(() => {});
-      await supabase.from("GmailAccount").delete().eq("userId", user.id).catch(() => {});
+      try {
+        await supabase.from("gmail_connections").delete().eq("user_id", user.id);
+      } catch (_) {}
+      try {
+        await supabase.from("GmailAccount").delete().eq("userId", user.id);
+      } catch (_) {}
       return jsonResponse({ success: true, message: "Gmail account disconnected successfully." });
     }
 
@@ -1637,16 +1666,18 @@ serve(async (req: Request) => {
           if (refreshData.access_token) {
             accessToken = refreshData.access_token;
             if (connection.id) {
-              await supabase
-                .from("gmail_connections")
-                .update({ access_token_encrypted: accessToken, updated_at: new Date().toISOString() })
-                .eq("id", connection.id)
-                .catch(() => {});
-              await supabase
-                .from("GmailAccount")
-                .update({ encryptedAccessToken: accessToken, updatedAt: new Date().toISOString() })
-                .eq("id", connection.id)
-                .catch(() => {});
+              try {
+                await supabase
+                  .from("gmail_connections")
+                  .update({ access_token_encrypted: accessToken, updated_at: new Date().toISOString() })
+                  .eq("id", connection.id);
+              } catch (_) {}
+              try {
+                await supabase
+                  .from("GmailAccount")
+                  .update({ encryptedAccessToken: accessToken, updatedAt: new Date().toISOString() })
+                  .eq("id", connection.id);
+              } catch (_) {}
             }
           }
         }
@@ -1693,26 +1724,30 @@ serve(async (req: Request) => {
         const now = new Date().toISOString();
         const failedId = crypto.randomUUID();
         // Log failure to emails and email_events
-        await supabase.from("emails").insert({
-          id: failedId,
-          user_id: user.id,
-          recipient_email: recipient,
-          subject,
-          body: emailBody,
-          status: "failed",
-          direction: "sent",
-          created_at: now,
-          updated_at: now,
-        }).catch(() => {});
+        try {
+          await supabase.from("emails").insert({
+            id: failedId,
+            user_id: user.id,
+            recipient_email: recipient,
+            subject,
+            body: emailBody,
+            status: "failed",
+            direction: "sent",
+            created_at: now,
+            updated_at: now,
+          });
+        } catch (_) {}
 
-        await supabase.from("email_events").insert({
-          id: crypto.randomUUID(),
-          user_id: user.id,
-          email_id: failedId,
-          event_type: "failed",
-          metadata: { recipient, subject, error: userSafeError },
-          created_at: now,
-        }).catch(() => {});
+        try {
+          await supabase.from("email_events").insert({
+            id: crypto.randomUUID(),
+            user_id: user.id,
+            email_id: failedId,
+            event_type: "failed",
+            metadata: { recipient, subject, error: userSafeError },
+            created_at: now,
+          });
+        } catch (_) {}
 
         return jsonResponse({
           success: false,
@@ -1747,22 +1782,30 @@ serve(async (req: Request) => {
         created_at: now,
         updated_at: now,
       };
-      await supabase.from("emails").upsert(canonicalEmail, { onConflict: "id" }).catch((e: any) => console.warn("Canonical emails insert notice:", e));
+      try {
+        await supabase.from("emails").upsert(canonicalEmail, { onConflict: "id" });
+      } catch (e: any) {
+        console.warn("Canonical emails insert notice:", e);
+      }
 
       // 2. Canonical email_events record
-      await supabase.from("email_events").insert({
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        email_id: emailId,
-        event_type: "sent",
-        metadata: {
-          recipient,
-          subject,
-          gmail_message_id: sendData.id,
-          sender: connectedEmail,
-        },
-        created_at: now,
-      }).catch((e: any) => console.warn("email_events insert notice:", e));
+      try {
+        await supabase.from("email_events").insert({
+          id: crypto.randomUUID(),
+          user_id: user.id,
+          email_id: emailId,
+          event_type: "sent",
+          metadata: {
+            recipient,
+            subject,
+            gmail_message_id: sendData.id,
+            sender: connectedEmail,
+          },
+          created_at: now,
+        });
+      } catch (e: any) {
+        console.warn("email_events insert notice:", e);
+      }
 
       // 3. Legacy Email record
       const emailPayload = {
@@ -2504,13 +2547,17 @@ RULES:
       const { subscription } = body;
       if (user && subscription?.endpoint) {
         const { endpoint, keys } = subscription;
-        await supabase.from("PushSubscription").upsert({
-          userId: user.id,
-          endpoint,
-          p256dh: keys?.p256dh || "",
-          auth: keys?.auth || "",
-          updatedAt: new Date().toISOString()
-        }, { onConflict: "endpoint" }).catch((e: any) => console.warn("Push subscription upsert:", e));
+        try {
+          await supabase.from("PushSubscription").upsert({
+            userId: user.id,
+            endpoint,
+            p256dh: keys?.p256dh || "",
+            auth: keys?.auth || "",
+            updatedAt: new Date().toISOString()
+          }, { onConflict: "endpoint" });
+        } catch (e: any) {
+          console.warn("Push subscription upsert:", e);
+        }
       }
       return jsonResponse({ success: true, message: "Subscribed to push notifications." });
     }
@@ -2520,7 +2567,9 @@ RULES:
       const body = await req.json().catch(() => ({}));
       const { endpoint } = body;
       if (user && endpoint) {
-        await supabase.from("PushSubscription").delete().eq("endpoint", endpoint).eq("userId", user.id).catch(() => {});
+        try {
+          await supabase.from("PushSubscription").delete().eq("endpoint", endpoint).eq("userId", user.id);
+        } catch (_) {}
       }
       return jsonResponse({ success: true, message: "Unsubscribed from push notifications." });
     }
