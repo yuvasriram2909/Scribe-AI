@@ -47,6 +47,18 @@ export function subscribeToEmailChanges(userId, onEmailEvent) {
           onEmailEvent(payload);
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'emails',
+          ...(userId ? { filter: `user_id=eq.${userId}` } : {}),
+        },
+        (payload) => {
+          onEmailEvent(payload);
+        }
+      )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           console.log(`[Supabase Realtime] Subscribed to Email changes for user: ${userId || 'all'}`);
@@ -58,6 +70,38 @@ export function subscribeToEmailChanges(userId, onEmailEvent) {
     };
   } catch (err) {
     console.warn('[Supabase Realtime] Failed to initialize Email channel:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Subscribe to real-time changes on the Drafts table
+ */
+export function subscribeToDraftChanges(userId, onDraftEvent) {
+  if (!supabase || !onDraftEvent) return () => {};
+
+  try {
+    const channel = supabase
+      .channel(`realtime:drafts:${userId || 'global'}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'drafts',
+          ...(userId ? { filter: `user_id=eq.${userId}` } : {}),
+        },
+        (payload) => {
+          onDraftEvent(payload);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (err) {
+    console.warn('[Supabase Realtime] Failed to initialize Drafts channel:', err);
     return () => {};
   }
 }

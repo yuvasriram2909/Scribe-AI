@@ -874,6 +874,39 @@ export function Dashboard({
             );
           })}
         </div>
+
+        {/* Tone & Priority Analytics Row */}
+        <div className="pt-4 border-t border-slate-800/80">
+          <div className="text-[11px] font-bold text-slate-400 mb-2 flex items-center gap-1.5">
+            <span>🎭 Tone & Priority Distribution (Live Supabase Data):</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Professional</span>
+              <span className="text-xs font-bold text-purple-300 bg-purple-950/60 px-2 py-0.5 rounded-full">{stats.tones?.professional || 0}</span>
+            </div>
+            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Formal</span>
+              <span className="text-xs font-bold text-indigo-300 bg-indigo-950/60 px-2 py-0.5 rounded-full">{stats.tones?.formal || 0}</span>
+            </div>
+            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Friendly</span>
+              <span className="text-xs font-bold text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-full">{stats.tones?.friendly || 0}</span>
+            </div>
+            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Urgent</span>
+              <span className="text-xs font-bold text-rose-300 bg-rose-950/60 px-2 py-0.5 rounded-full">{stats.tones?.urgent || 0}</span>
+            </div>
+            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Concise</span>
+              <span className="text-xs font-bold text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded-full">{stats.tones?.concise || 0}</span>
+            </div>
+            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">High / Critical</span>
+              <span className="text-xs font-bold text-pink-300 bg-pink-950/60 px-2 py-0.5 rounded-full">{(stats.importance?.high || 0) + (stats.importance?.critical || 0)}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 4. Recent Activity & AI Suggestions Row */}

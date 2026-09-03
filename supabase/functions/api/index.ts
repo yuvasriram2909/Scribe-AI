@@ -273,6 +273,59 @@ async function getValidAccessToken(account: any, supabase: any) {
 // ----------------------------------------------------
 
 async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
+  const emailId = payload.id || crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  // 1. Dual Write to Canonical "emails" table
+  try {
+    const isReceived = !!payload.isReceived;
+    const isSpam = !!payload.isSpam;
+    const direction = isReceived ? 'received' : 'sent';
+    const status = (payload.status || 'sent').toLowerCase();
+
+    const canonicalPayload = {
+      id: emailId,
+      user_id: payload.userId,
+      gmail_message_id: payload.gmailMessageId || null,
+      thread_id: payload.gmailThreadId || null,
+      recipient_email: payload.recipient || payload.recipient_email || '',
+      cc: payload.cc || null,
+      bcc: payload.bcc || null,
+      subject: payload.subject || '(No Subject)',
+      body: payload.body || '',
+      email_type: payload.category || payload.email_type || payload.situation || 'Professional / Official',
+      tone: payload.tone || 'Professional',
+      importance: payload.priority || payload.importance || 'Normal',
+      status: status,
+      direction: direction,
+      spam_status: isSpam ? 'spam' : 'clean',
+      sent_at: payload.sentAt || (direction === 'sent' ? now : null),
+      received_at: payload.receivedAt || (direction === 'received' ? now : null),
+      created_at: payload.createdAt || now,
+    };
+
+    await supabase.from("emails").upsert(canonicalPayload, { onConflict: "id" }).catch((e: any) => console.warn("Canonical emails upsert notice:", e?.message));
+
+    // 2. Insert into Canonical "email_analytics" table
+    const analyticsPayload = {
+      id: crypto.randomUUID(),
+      user_id: payload.userId,
+      email_id: emailId,
+      category: canonicalPayload.email_type,
+      tone: canonicalPayload.tone,
+      importance: canonicalPayload.importance,
+      status: canonicalPayload.status,
+      is_spam: isSpam,
+      direction: direction,
+      created_at: now,
+    };
+
+    await supabase.from("email_analytics").insert(analyticsPayload).catch((e: any) => console.warn("Canonical email_analytics insert notice:", e?.message));
+  } catch (canonicalErr: any) {
+    console.warn("Canonical emails write notice:", canonicalErr?.message);
+  }
+
+  // 3. Write to legacy "Email" table for dual-table compatibility
   const { data, error } = await supabase.from("Email").insert(payload).select().maybeSingle();
   if (!error) return { data, error: null };
 
@@ -337,7 +390,14 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
           .eq("gmailMessageId", m.id)
           .maybeSingle();
 
-        if (existing) continue;
+        const { data: existingCanonical } = await supabase
+          .from("emails")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("gmail_message_id", m.id)
+          .maybeSingle();
+
+        if (existing || existingCanonical) continue;
 
         const metaRes = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
@@ -1468,14 +1528,17 @@ serve(async (req: Request) => {
       const sendData = await sendRes.json();
       if (!sendRes.ok || sendData.error) {
         const errorMsg = sendData.error?.message || "Failed to send email through Gmail API";
+        let userSafeError = "Email was generated, but Gmail could not send it.";
         if (sendRes.status === 403 && (errorMsg.includes("insufficient") || errorMsg.includes("scope") || errorMsg.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT"))) {
-          return jsonResponse({
-            success: false,
-            error: "Gmail sending permission (gmail.send) is missing. Please click 'Connect Google Gmail' to authorize Gmail sending.",
-            needsReauth: true,
-          }, 403);
+          userSafeError = "Gmail authorization is missing the required send permission.";
+        } else if (sendRes.status === 401 || errorMsg.includes("invalid_grant") || errorMsg.includes("Token has been expired")) {
+          userSafeError = "Your Gmail connection has expired. Please reconnect Gmail.";
         }
-        throw new Error(errorMsg);
+        return jsonResponse({
+          success: false,
+          error: userSafeError,
+          needsReauth: sendRes.status === 401 || sendRes.status === 403,
+        }, sendRes.status || 400);
       }
 
       // Record email in database
@@ -1694,6 +1757,10 @@ RULES:
       const statusQuery = url.searchParams.get("status");
       const categoryQuery = url.searchParams.get("category");
       const searchQuery = url.searchParams.get("q");
+      const directionQuery = url.searchParams.get("direction");
+      const toneQuery = url.searchParams.get("tone");
+      const importanceQuery = url.searchParams.get("importance");
+      const dateRangeQuery = url.searchParams.get("dateRange");
 
       let query = supabase.from("Email").select("*, attachments:Attachment(*)").eq("userId", user.id);
       if (statusQuery && statusQuery !== "All") query = query.eq("status", statusQuery);
@@ -1701,6 +1768,41 @@ RULES:
 
       const { data: emails } = await query.order("createdAt", { ascending: false });
       let result = emails || [];
+
+      // Direction Filter
+      if (directionQuery && directionQuery !== "All") {
+        if (directionQuery.toLowerCase() === "sent") {
+          result = result.filter((e: any) => e.isSent || e.status === "Sent" || e.status === "Delivered");
+        } else if (directionQuery.toLowerCase() === "received") {
+          result = result.filter((e: any) => e.isReceived || e.status === "Received");
+        }
+      }
+
+      // Tone Filter
+      if (toneQuery && toneQuery !== "All") {
+        result = result.filter((e: any) => (e.tone || "").toLowerCase().includes(toneQuery.toLowerCase()));
+      }
+
+      // Importance Filter
+      if (importanceQuery && importanceQuery !== "All") {
+        result = result.filter((e: any) => (e.priority || e.importance || "").toLowerCase() === importanceQuery.toLowerCase());
+      }
+
+      // Date Range Filter
+      if (dateRangeQuery && dateRangeQuery !== "All") {
+        const now = new Date();
+        let cutoff = new Date(0);
+        if (dateRangeQuery === "today") {
+          cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        } else if (dateRangeQuery === "week") {
+          cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        } else if (dateRangeQuery === "month") {
+          cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        }
+        result = result.filter((e: any) => new Date(e.sentAt || e.receivedAt || e.createdAt) >= cutoff);
+      }
+
+      // Text Search Filter
       if (searchQuery && searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         result = result.filter((e: any) => 
@@ -1924,6 +2026,21 @@ RULES:
         syncUserGmail(user, account, supabase).catch((e) => console.warn("Background sync error:", e));
       }
 
+      // 1. Try calling PostgreSQL get_dashboard_analytics RPC function
+      try {
+        const { data: rpcStats, error: rpcErr } = await supabase.rpc("get_dashboard_analytics", { p_user_id: user.id });
+        if (!rpcErr && rpcStats && typeof rpcStats.sent === 'number') {
+          return jsonResponse({
+            success: true,
+            ...rpcStats,
+            totalEmails: rpcStats.sent,
+          });
+        }
+      } catch (rpcEx) {
+        console.warn("RPC get_dashboard_analytics notice, calculating from database records:", rpcEx);
+      }
+
+      // 2. Direct database query fallback
       const { data: emails } = await supabase
         .from("Email")
         .select("*")
@@ -1994,6 +2111,23 @@ RULES:
         other: 0,
       };
 
+      const tones: Record<string, number> = {
+        professional: 0,
+        formal: 0,
+        friendly: 0,
+        urgent: 0,
+        polite: 0,
+        apologetic: 0,
+        concise: 0,
+      };
+
+      const importance: Record<string, number> = {
+        low: 0,
+        normal: 0,
+        high: 0,
+        critical: 0,
+      };
+
       for (const e of list) {
         const cat = (e.category || "").toLowerCase();
         const sit = (e.situation || "").toLowerCase();
@@ -2036,6 +2170,21 @@ RULES:
         } else {
           categories.other++;
         }
+
+        const t = (e.tone || "").toLowerCase();
+        if (t.includes("professional")) tones.professional++;
+        else if (t.includes("formal")) tones.formal++;
+        else if (t.includes("friendly")) tones.friendly++;
+        else if (t.includes("urgent")) tones.urgent++;
+        else if (t.includes("polite")) tones.polite++;
+        else if (t.includes("apologetic")) tones.apologetic++;
+        else if (t.includes("concise")) tones.concise++;
+
+        const imp = (e.priority || "").toLowerCase();
+        if (imp.includes("low")) importance.low++;
+        else if (imp.includes("high")) importance.high++;
+        else if (imp.includes("critical")) importance.critical++;
+        else importance.normal++;
       }
 
       return jsonResponse({
@@ -2052,6 +2201,8 @@ RULES:
         failed,
         total,
         categories,
+        tones,
+        importance,
         totalEmails: sent,
         leave: categories.leave,
         resume: categories.jobApplication,
