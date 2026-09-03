@@ -413,12 +413,6 @@ export function ComposeWorkflow({
             <button
               onClick={async () => {
                 try {
-                  try {
-                    await signInWithGoogle();
-                    return;
-                  } catch (supaErr) {
-                    console.warn('Supabase Auth signInWithGoogle notice:', supaErr?.message);
-                  }
                   const res = await apiFetch('/api/auth/google/start');
                   const data = await safeParseResponse(res);
                   if (data && data.url) {

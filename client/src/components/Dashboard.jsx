@@ -212,13 +212,6 @@ export function Dashboard({
 
   const handleConnectGmail = async () => {
     try {
-      try {
-        await signInWithGoogle();
-        return;
-      } catch (supaErr) {
-        console.warn('Supabase Auth signInWithGoogle notice, using Edge Function OAuth fallback:', supaErr?.message);
-      }
-
       const res = await apiFetch('/api/auth/google/start');
       const data = await res.json();
       if (data && data.url) {

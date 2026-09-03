@@ -29,15 +29,7 @@ export function LoginPage({ onLoginSuccess }) {
       setGoogleLoading(true);
       setError('');
 
-      // 1. Try official Supabase Auth Google Sign-In
-      try {
-        await signInWithGoogle();
-        return; // Redirecting to Google OAuth
-      } catch (supaErr) {
-        console.warn('Supabase Auth direct Google OAuth notice, using Edge Function OAuth fallback:', supaErr?.message);
-      }
-
-      // 2. Fallback to Edge Function Google OAuth flow (which auto-provisions user in auth.users)
+      // Use Edge Function Google OAuth which auto-provisions user in auth.users and matches Google Console Redirect URI
       const res = await apiFetch('/api/auth/google/start');
       const data = await safeParseResponse(res);
       if (data && data.url) {

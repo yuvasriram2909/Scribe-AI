@@ -1229,18 +1229,28 @@ serve(async (req: Request) => {
         });
       }
 
-      const { data: accounts } = await supabase
-        .from("GmailAccount")
+      // Check canonical gmail_connections first, then legacy GmailAccount
+      let { data: connections } = await supabase
+        .from("gmail_connections")
         .select("*")
-        .eq("userId", user.id);
+        .eq("user_id", user.id);
 
-      const account = accounts?.[0];
-      const isConnected = !!account && account.status !== "DISCONNECTED";
+      let connection = connections?.[0];
+      if (!connection) {
+        const { data: accounts } = await supabase
+          .from("GmailAccount")
+          .select("*")
+          .eq("userId", user.id);
+        connection = accounts?.[0];
+      }
+
+      const isConnected = !!connection && connection.status !== "DISCONNECTED";
+      const connectedEmail = connection?.gmail_email || connection?.gmailEmail || null;
 
       return jsonResponse({
         isConnected,
-        status: account ? (account.status || "CONNECTED") : "DISCONNECTED",
-        connectedEmail: account?.gmailEmail || null,
+        status: connection ? (connection.status || "CONNECTED") : "DISCONNECTED",
+        connectedEmail,
         isGoogleConfigured: true,
         mode: isConnected ? "Google OAuth Active" : "Not Connected",
       });
@@ -1248,7 +1258,7 @@ serve(async (req: Request) => {
 
     if ((path === "/auth/google" || path === "/auth/google/url" || path === "/auth/google/start") && method === "GET") {
       const { clientId } = await getGoogleCredentials(supabase);
-      const redirectUri = Deno.env.get("GOOGLE_REDIRECT_URI") || `${url.origin}/functions/v1/api/auth/google/callback`;
+      const redirectUri = Deno.env.get("GOOGLE_REDIRECT_URI") || "https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api/auth/google/callback";
 
       if (!clientId) {
         return errorResponse("Google Client ID is not configured in Supabase Edge Function Secrets.", 400);
@@ -1263,10 +1273,19 @@ serve(async (req: Request) => {
         "https://www.googleapis.com/auth/gmail.readonly",
       ].join(" ");
 
-      const userEmail = req.headers.get("x-user-email") || "";
-      const state = btoa(`${userEmail}:${Date.now()}`);
+      const user = await getAuthUser(req, supabase);
+      const userEmail = user?.email || req.headers.get("x-user-email") || "";
+      const userId = user?.id || "";
 
-      // prompt=select_account lets the user pick their account and connects directly without repeated re-consent prompts
+      // Encode user identity in state so the callback links this connection to the right user
+      const stateObj = {
+        userId: userId,
+        userEmail: userEmail,
+        ts: Date.now()
+      };
+      const state = btoa(JSON.stringify(stateObj));
+
+      // prompt=select_account lets the user pick any Google account and connects directly
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
         clientId
       )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(
@@ -1289,16 +1308,23 @@ serve(async (req: Request) => {
       if (!code) return errorResponse("Authorization code missing.", 400);
 
       let targetEmail = "";
+      let targetUserId = "";
       if (state) {
         try {
           const decoded = atob(state);
-          targetEmail = decoded.split(":")[0];
+          if (decoded.startsWith("{")) {
+            const parsed = JSON.parse(decoded);
+            targetUserId = parsed.userId || "";
+            targetEmail = parsed.userEmail || "";
+          } else {
+            targetEmail = decoded.split(":")[0];
+          }
         } catch (_) {}
       }
 
       // Resolve Google Client ID and Secret
       const { clientId, clientSecret } = await getGoogleCredentials(supabase);
-      const redirectUri = Deno.env.get("GOOGLE_REDIRECT_URI") || `${url.origin}/functions/v1/api/auth/google/callback`;
+      const redirectUri = Deno.env.get("GOOGLE_REDIRECT_URI") || "https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api/auth/google/callback";
 
       if (!clientId || !clientSecret) {
         return Response.redirect(`${frontendUrl}?error=oauth_credentials_missing`, 302);
@@ -1338,29 +1364,31 @@ serve(async (req: Request) => {
       const now = new Date().toISOString();
 
       // 1. Primary: Ensure user exists in Supabase Auth (auth.users)
-      let authUserId: string | null = null;
-      try {
-        const { data: userList } = await supabase.auth.admin.listUsers({ perPage: 100 });
-        const existingAuthUser = userList?.users?.find(
-          (u: any) => u.email?.toLowerCase() === authorizedEmail.toLowerCase()
-        );
+      let authUserId: string | null = targetUserId || null;
+      if (!authUserId) {
+        try {
+          const { data: userList } = await supabase.auth.admin.listUsers({ perPage: 100 });
+          const existingAuthUser = userList?.users?.find(
+            (u: any) => u.email?.toLowerCase() === authorizedEmail.toLowerCase()
+          );
 
-        if (existingAuthUser) {
-          authUserId = existingAuthUser.id;
-        } else {
-          const { data: createdUser, error: createAuthErr } = await supabase.auth.admin.createUser({
-            email: authorizedEmail.toLowerCase(),
-            email_confirm: true,
-            user_metadata: { full_name: googleName, name: googleName },
-          });
-          if (createdUser?.user) {
-            authUserId = createdUser.user.id;
+          if (existingAuthUser) {
+            authUserId = existingAuthUser.id;
           } else {
-            console.warn("auth.admin.createUser notice:", createAuthErr?.message);
+            const { data: createdUser, error: createAuthErr } = await supabase.auth.admin.createUser({
+              email: authorizedEmail.toLowerCase(),
+              email_confirm: true,
+              user_metadata: { full_name: googleName, name: googleName },
+            });
+            if (createdUser?.user) {
+              authUserId = createdUser.user.id;
+            } else {
+              console.warn("auth.admin.createUser notice:", createAuthErr?.message);
+            }
           }
+        } catch (authAdminEx: any) {
+          console.warn("auth.admin error:", authAdminEx?.message);
         }
-      } catch (authAdminEx: any) {
-        console.warn("auth.admin error:", authAdminEx?.message);
       }
 
       const effectiveUserId = authUserId || crypto.randomUUID();
@@ -1471,9 +1499,9 @@ serve(async (req: Request) => {
         return Response.redirect(`${frontendUrl}?gmail=missing_scopes`, 302);
       }
 
-      // Generate Supabase Auth session / magic link for instant client-side session login
+      // Generate Supabase Auth session / magic link for instant client-side session login (if not already logged in)
       let authLink = "";
-      if (authUserId) {
+      if (authUserId && !targetUserId) {
         try {
           const { data: linkData } = await supabase.auth.admin.generateLink({
             type: "magiclink",
