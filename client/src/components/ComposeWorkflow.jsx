@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, Send, Check, AlertCircle, RefreshCw, Paperclip, X, 
   ArrowLeft, ArrowRight, UserPlus, Eye, Edit3, ShieldCheck, ShieldAlert,
-  Calendar, FileText, Briefcase, HelpCircle, Users, ExternalLink, Heart
+  Calendar, FileText, Briefcase, HelpCircle, Users, ExternalLink, Heart, Mail
 } from 'lucide-react';
 import { apiFetch, safeParseResponse } from '../utils/api';
 
