@@ -43,6 +43,57 @@ export default function App() {
   const [isGmailConnected, setIsGmailConnected] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
+  // Single Source of Truth for Compose Form State
+  const [composeState, setComposeState] = useState({
+    instruction: '',
+    recipient: '',
+    cc: '',
+    bcc: '',
+    subject: '',
+    body: '',
+    selectedFile: null,
+    step: 1, // 1: Form, 2: Loading, 3: Preview, 4: Modal, 5: Sending, 6: Sent
+    emailType: 'Professional / Official',
+    detectedCategory: 'Professional / Official',
+    situation: '💼 Official / Professional',
+    situationSource: 'auto',
+    tone: 'Professional',
+    priority: 'MEDIUM',
+    importance: 'MEDIUM',
+    urgency: 'Normal response',
+    errorMessage: '',
+    sentResult: null,
+    autoGenerate: false
+  });
+
+  const handleUpdateComposeState = (updates) => {
+    setComposeState(prev => ({ ...prev, ...updates }));
+  };
+
+  const handleResetCompose = () => {
+    setComposeState({
+      instruction: '',
+      recipient: '',
+      cc: '',
+      bcc: '',
+      subject: '',
+      body: '',
+      selectedFile: null,
+      step: 1,
+      emailType: 'Professional / Official',
+      detectedCategory: 'Professional / Official',
+      situation: '💼 Official / Professional',
+      situationSource: 'auto',
+      tone: 'Professional',
+      priority: 'MEDIUM',
+      importance: 'MEDIUM',
+      urgency: 'Normal response',
+      errorMessage: '',
+      sentResult: null,
+      autoGenerate: false
+    });
+  };
+
   const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
@@ -135,6 +186,17 @@ export default function App() {
   };
 
   const handleStartCompose = (data = {}) => {
+    setComposeState(prev => ({
+      ...prev,
+      instruction: data.instruction !== undefined ? data.instruction : prev.instruction,
+      recipient: data.recipient !== undefined ? data.recipient : prev.recipient,
+      subject: data.subject !== undefined ? data.subject : prev.subject,
+      body: data.body !== undefined ? data.body : prev.body,
+      selectedFile: data.selectedFile !== undefined ? data.selectedFile : prev.selectedFile,
+      autoGenerate: !!data.autoGenerate,
+      step: data.autoGenerate ? 2 : (data.step || prev.step || 1),
+      errorMessage: ''
+    }));
     setComposeInitialData(data);
     setActiveTab('compose');
     setMobileMenuOpen(false);
@@ -515,14 +577,22 @@ export default function App() {
               onViewHistory={() => setActiveTab('history')}
               onViewNotifications={() => setActiveTab('notifications')}
               onNavigateToSettings={() => setActiveTab('settings')}
+              composeState={composeState}
+              onUpdateComposeState={handleUpdateComposeState}
             />
           )}
 
           {activeTab === 'compose' && (
             <ComposeWorkflow
+              composeState={composeState}
+              onUpdateComposeState={handleUpdateComposeState}
+              onResetCompose={handleResetCompose}
               initialData={composeInitialData}
               onComplete={() => setActiveTab('dashboard')}
-              onCancel={() => setActiveTab('dashboard')}
+              onCancel={() => {
+                handleResetCompose();
+                setActiveTab('dashboard');
+              }}
               onNavigateToSettings={() => setActiveTab('settings')}
             />
           )}
@@ -538,8 +608,7 @@ export default function App() {
           {activeTab === 'contacts' && (
             <ContactsManager
               onQuickCompose={(contact) => {
-                setComposeInitialData({ recipient: contact.email });
-                setActiveTab('compose');
+                handleStartCompose({ recipient: contact.email });
               }}
             />
           )}
@@ -547,8 +616,7 @@ export default function App() {
           {activeTab === 'templates' && (
             <TemplatesLibrary
               onSelectTemplate={(instruction) => {
-                setComposeInitialData({ instruction });
-                setActiveTab('compose');
+                handleStartCompose({ instruction });
               }}
             />
           )}

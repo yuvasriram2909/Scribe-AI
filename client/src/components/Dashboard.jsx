@@ -47,7 +47,14 @@ export function getTimeBasedGreeting(date = new Date()) {
   return { title: 'Good night!', icon: '🌙' };
 }
 
-export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings, onViewNotifications }) {
+export function Dashboard({ 
+  onStartCompose, 
+  onViewHistory, 
+  onNavigateToSettings, 
+  onViewNotifications,
+  composeState = {},
+  onUpdateComposeState
+}) {
   const [greetingObj, setGreetingObj] = useState(() => getTimeBasedGreeting());
 
   useEffect(() => {
@@ -90,9 +97,19 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings,
   // Email Detail Modal
   const [detailModalEmail, setDetailModalEmail] = useState(null);
 
-  // Quick compose state
-  const [quickInstruction, setQuickInstruction] = useState('');
-  const [quickRecipient, setQuickRecipient] = useState('');
+  // Quick compose state - single source of truth initialized with composeState
+  const [quickInstruction, setQuickInstruction] = useState(composeState.instruction || '');
+  const [quickRecipient, setQuickRecipient] = useState(composeState.recipient || '');
+  const [quickError, setQuickError] = useState('');
+
+  useEffect(() => {
+    if (composeState.instruction && !quickInstruction) {
+      setQuickInstruction(composeState.instruction);
+    }
+    if (composeState.recipient && !quickRecipient) {
+      setQuickRecipient(composeState.recipient);
+    }
+  }, [composeState.instruction, composeState.recipient]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -208,16 +225,41 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings,
   };
 
   const handleQuickSubmit = (e) => {
-    e.preventDefault();
-    if (!quickInstruction.trim()) return;
+    if (e) e.preventDefault();
+    setQuickError('');
+
+    const cleanInstruction = quickInstruction.trim();
+    const cleanRecipient = quickRecipient.trim();
+
+    if (!cleanInstruction) {
+      setQuickError('Please describe what you want to send in the problem details.');
+      return;
+    }
+
+    if (!cleanRecipient) {
+      setQuickError('Please enter a recipient email address.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanRecipient)) {
+      setQuickError('Please enter a valid email address (e.g. manager@example.com).');
+      return;
+    }
+
     onStartCompose({
-      instruction: quickInstruction,
-      recipient: quickRecipient
+      instruction: cleanInstruction,
+      recipient: cleanRecipient,
+      autoGenerate: true
     });
   };
 
-  const handleQuickChip = (instruction) => {
-    onStartCompose({ instruction });
+  const handleQuickChip = (instructionText) => {
+    setQuickInstruction(instructionText);
+    setQuickError('');
+    if (onUpdateComposeState) {
+      onUpdateComposeState({ instruction: instructionText });
+    }
   };
 
   const handleDeleteEmail = async (id, e) => {
@@ -397,64 +439,93 @@ export function Dashboard({ onStartCompose, onViewHistory, onNavigateToSettings,
               </p>
             </div>
 
-            {/* Quick Compose Input Row */}
+            {/* Quick Compose Input Form */}
             <form onSubmit={handleQuickSubmit} className="space-y-3 pt-2">
-              <div className="flex flex-col sm:flex-row gap-2.5">
-                <div className="flex-1 relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-purple-400">
-                    <Sparkles className="w-4 h-4" />
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* 1. Instruction Input */}
+                <div className="flex-1 space-y-1">
+                  <label className="text-[11px] font-bold text-slate-300 block flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    What do you want to send?
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder='e.g., "I need sick leave for 3 days due to high fever."'
+                      value={quickInstruction}
+                      onChange={(e) => {
+                        setQuickInstruction(e.target.value);
+                        setQuickError('');
+                        if (onUpdateComposeState) onUpdateComposeState({ instruction: e.target.value });
+                      }}
+                      className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    placeholder='e.g., "Inform manager I need emergency leave this week"'
-                    value={quickInstruction}
-                    onChange={(e) => setQuickInstruction(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
-                  />
                 </div>
-                <div className="w-full sm:w-64 relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Users className="w-4 h-4" />
+
+                {/* 2. Recipient Input */}
+                <div className="w-full sm:w-72 space-y-1">
+                  <label className="text-[11px] font-bold text-slate-300 block flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-purple-400" />
+                    Recipient Email
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      placeholder="manager@example.com"
+                      value={quickRecipient}
+                      onChange={(e) => {
+                        setQuickRecipient(e.target.value);
+                        setQuickError('');
+                        if (onUpdateComposeState) onUpdateComposeState({ recipient: e.target.value });
+                      }}
+                      className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
+                    />
                   </div>
-                  <input
-                    type="email"
-                    placeholder="Recipient (e.g. manager@example.com)"
-                    value={quickRecipient}
-                    onChange={(e) => setQuickRecipient(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
-                  />
                 </div>
-                <button
-                  type="submit"
-                  className="px-6 py-3 rounded-2xl gradient-btn text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-600/40 hover:scale-105 transition-all cursor-pointer shrink-0"
-                >
-                  <Wand2 className="w-4 h-4 text-pink-200" />
-                  <span>Generate Email</span>
-                </button>
+
+                {/* 3. Generate Email Submit Button */}
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    className="w-full sm:w-auto px-6 py-3 rounded-2xl gradient-btn text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-600/40 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shrink-0"
+                  >
+                    <Wand2 className="w-4 h-4 text-pink-200" />
+                    <span>Generate Email</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Inline Validation Error */}
+              {quickError && (
+                <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2 animate-fadeIn font-semibold">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{quickError}</span>
+                </div>
+              )}
             </form>
 
-            {/* Try Chips */}
-            <div className="flex items-center gap-2 flex-wrap pt-1 text-xs">
+            {/* Try Quick-Action Chips (Populate instruction ONLY, never touches recipient or submits) */}
+            <div className="flex items-center gap-2 flex-wrap pt-2 text-xs">
               <span className="text-slate-400 font-semibold text-[11px]">Try:</span>
               <button
                 type="button"
-                onClick={() => handleQuickChip('Sick leave for 3 days due to high fever and illness')}
-                className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+                onClick={() => handleQuickChip('I need sick leave for 3 days due to illness.')}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer hover:border-purple-500/40"
               >
                 <span>🩺</span> Sick leave 3 days
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickChip('Emergency leave today afternoon for doctor appointment')}
-                className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+                onClick={() => handleQuickChip('Emergency leave today: My father had an accident and I need to leave immediately.')}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer hover:border-purple-500/40"
               >
                 <span>🚨</span> Emergency leave today
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickChip('Resume and cover letter job application for Software Engineer position')}
-                className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+                onClick={() => handleQuickChip('Please send my resume to the HR manager for the software developer position.')}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer hover:border-purple-500/40"
               >
                 <span>📄</span> Send Resume
               </button>

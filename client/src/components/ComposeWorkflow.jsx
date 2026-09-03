@@ -26,124 +26,149 @@ const AVAILABLE_TONES = [
   'Concise'
 ];
 
-export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavigateToSettings }) {
-  const [step, setStep] = useState(1);
-  const [instruction, setInstruction] = useState(initialData.instruction || '');
-  const [recipient, setRecipient] = useState(initialData.recipient || '');
-  const [cc, setCc] = useState('');
-  const [bcc, setBcc] = useState('');
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
-  
-  // Upgraded 5-Facet AI Analysis State
-  const [emailType, setEmailType] = useState('Professional / Official');
-  const [detectedCategory, setDetectedCategory] = useState('Professional / Official');
-  const [situation, setSituation] = useState('💼 Official / Professional');
-  const [situationSource, setSituationSource] = useState('auto');
-  const [tone, setTone] = useState('Professional');
-  const [priority, setPriority] = useState('MEDIUM');
-  const [importance, setImportance] = useState('MEDIUM');
-  const [urgency, setUrgency] = useState('Normal response');
+export function ComposeWorkflow({ 
+  composeState = {}, 
+  onUpdateComposeState, 
+  onResetCompose, 
+  initialData = {}, 
+  onComplete, 
+  onCancel, 
+  onNavigateToSettings 
+}) {
+  // Helper to sync state directly with the authoritative composeState
+  const updateState = (updates) => {
+    if (onUpdateComposeState) {
+      onUpdateComposeState(updates);
+    }
+  };
+
+  // Authoritative form state values (with initialData fallback for backwards compatibility)
+  const instruction = composeState.instruction !== undefined ? composeState.instruction : (initialData.instruction || '');
+  const recipient = composeState.recipient !== undefined ? composeState.recipient : (initialData.recipient || '');
+  const cc = composeState.cc || '';
+  const bcc = composeState.bcc || '';
+  const subject = composeState.subject || '';
+  const body = composeState.body || '';
+  const selectedFile = composeState.selectedFile || null;
+  const step = composeState.step || 1;
+  const emailType = composeState.emailType || 'Professional / Official';
+  const detectedCategory = composeState.detectedCategory || 'Professional / Official';
+  const situation = composeState.situation || '💼 Official / Professional';
+  const situationSource = composeState.situationSource || 'auto';
+  const tone = composeState.tone || 'Professional';
+  const priority = composeState.priority || 'MEDIUM';
+  const importance = composeState.importance || 'MEDIUM';
+  const urgency = composeState.urgency || 'Normal response';
+  const errorMessage = composeState.errorMessage || '';
+  const sentResult = composeState.sentResult || null;
 
   const [aiLoading, setAiLoading] = useState(false);
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [sentResult, setSentResult] = useState(null);
-  const [errorMessage, setErrorMessage] = useState('');
 
+  // Automatic AI Generation Trigger (when autoGenerate === true from Dashboard)
   useEffect(() => {
-    if (initialData.instruction) setInstruction(initialData.instruction);
-    if (initialData.recipient) setRecipient(initialData.recipient);
-  }, [initialData]);
-
-  // STEP 1 -> STEP 2 -> STEP 3: Automatic AI Intent Classification & Fact-Grounded Generation
-  const handleGenerateEmail = async (e) => {
-    if (e) e.preventDefault();
-    if (!instruction.trim() && !subject.trim()) {
-      setErrorMessage('Please describe what you want to send in the problem details.');
-      return;
+    if (composeState.autoGenerate && recipient && (instruction || subject)) {
+      updateState({ autoGenerate: false });
+      executeAIGeneration(instruction || subject, recipient);
     }
-    if (!recipient.trim()) {
-      setErrorMessage('Please enter a recipient email address.');
-      return;
-    }
+  }, [composeState.autoGenerate]);
 
-    setErrorMessage('');
+  // Core AI Intent Classification & Email Generation Function
+  const executeAIGeneration = async (instrText, recipText) => {
+    updateState({ errorMessage: '', step: 2 });
     setAiLoading(true);
-    setStep(2); // Show AI loading animation
 
     try {
       // 1. High-precision local classification & factual generation
       const localResult = generateIntelligentEmail({
-        instruction: instruction || subject,
+        instruction: instrText,
         userSubject: subject,
-        recipient,
+        recipient: recipText,
         hasAttachment: !!selectedFile,
         senderName: localStorage.getItem('userName') || ''
       });
 
-      setEmailType(localResult.category);
-      setDetectedCategory(localResult.category);
-      setSituation(localResult.situation);
-      setTone(localResult.tone);
-      setPriority(localResult.priority);
-      setImportance(localResult.priority);
-      setUrgency(localResult.urgency);
-      setSituationSource('auto');
+      updateState({
+        emailType: localResult.category,
+        detectedCategory: localResult.category,
+        situation: localResult.situation,
+        tone: localResult.tone,
+        priority: localResult.priority,
+        importance: localResult.priority,
+        urgency: localResult.urgency,
+        situationSource: 'auto',
+        subject: localResult.subject,
+        body: localResult.body,
+        step: 3, // Directly show Email Preview screen!
+        errorMessage: ''
+      });
 
-      if (localResult.subject) setSubject(localResult.subject);
-      if (localResult.body) setBody(localResult.body);
-
-      // 2. Attempt backend pass-through for Gemini enhancement if available
+      // 2. Background pass-through to Gemini API if configured
       try {
         const genRes = await apiFetch('/api/ai/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            instruction,
+            instruction: instrText,
             subject: localResult.subject,
             situation: localResult.situation,
             category: localResult.category,
             tone: localResult.tone,
             priority: localResult.priority,
             urgency: localResult.urgency,
-            recipient
+            recipient: recipText
           })
         });
         const genData = await safeParseResponse(genRes);
         if (genData && genData.body && !genData.error) {
-          if (genData.subject) setSubject(genData.subject);
-          setBody(genData.body || genData.email_body);
+          updateState({
+            subject: genData.subject || localResult.subject,
+            body: genData.body || genData.email_body || localResult.body
+          });
         }
       } catch (apiErr) {
         console.warn('Backend generation note (using local intelligence):', apiErr);
       }
-
-      setStep(3); // Show preview screen
     } catch (err) {
       console.error('AI Generation Error:', err);
-      setErrorMessage(err.message || 'Unable to generate email. Please try again.');
-      setStep(1);
+      updateState({
+        errorMessage: err.message || 'Unable to generate email. Please try again.',
+        step: 1
+      });
     } finally {
       setAiLoading(false);
     }
   };
 
-  // Regeneration when user selects a different category from dropdown
+  // STEP 1 Form Submission (when user is composing directly on Step 1)
+  const handleGenerateEmail = (e) => {
+    if (e) e.preventDefault();
+    const cleanInstr = instruction.trim();
+    const cleanRecip = recipient.trim();
+
+    if (!cleanInstr && !subject.trim()) {
+      updateState({ errorMessage: 'Please describe what you want to send in the problem details.' });
+      return;
+    }
+    if (!cleanRecip) {
+      updateState({ errorMessage: 'Please enter a recipient email address.' });
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanRecip)) {
+      updateState({ errorMessage: 'Please enter a valid email address (e.g. manager@example.com).' });
+      return;
+    }
+
+    executeAIGeneration(cleanInstr || subject.trim(), cleanRecip);
+  };
+
+  // User override for Category (regenerates email with new category while keeping recipient & facts)
   const handleManualSituationChange = (newCatId) => {
     const catObj = EMAIL_CATEGORIES.find(c => c.id === newCatId || c.name === newCatId);
     if (!catObj) return;
-
-    setSituationSource('manual');
-    setEmailType(catObj.name);
-    setDetectedCategory(catObj.name);
-    setSituation(`${catObj.icon} ${catObj.name}`);
-    setTone(catObj.defaultTone);
-    setPriority(catObj.importance);
-    setImportance(catObj.importance);
-    setUrgency(catObj.urgency);
 
     const reGen = generateIntelligentEmail({
       instruction: instruction || subject,
@@ -156,15 +181,22 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
       senderName: localStorage.getItem('userName') || ''
     });
 
-    if (reGen.subject) setSubject(reGen.subject);
-    if (reGen.body) setBody(reGen.body);
+    updateState({
+      situationSource: 'manual',
+      emailType: catObj.name,
+      detectedCategory: catObj.name,
+      situation: `${catObj.icon} ${catObj.name}`,
+      tone: catObj.defaultTone,
+      priority: catObj.importance,
+      importance: catObj.importance,
+      urgency: catObj.urgency,
+      subject: reGen.subject || subject,
+      body: reGen.body || body
+    });
   };
 
-  // Regeneration when user selects a different tone
+  // User override for Tone (regenerates email body with new tone while keeping recipient & facts)
   const handleManualToneChange = (newTone) => {
-    setTone(newTone);
-    setSituationSource('manual');
-
     const reGen = generateIntelligentEmail({
       instruction: instruction || subject,
       userSubject: subject,
@@ -176,38 +208,49 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
       senderName: localStorage.getItem('userName') || ''
     });
 
-    if (reGen.body) setBody(reGen.body);
+    updateState({
+      situationSource: 'manual',
+      tone: newTone,
+      body: reGen.body || body
+    });
   };
 
-  // Update priority without breaking structure
+  // User override for Priority
   const handleManualPriorityChange = (newPriority) => {
-    setPriority(newPriority);
-    setImportance(newPriority);
-    setSituationSource('manual');
+    updateState({
+      situationSource: 'manual',
+      priority: newPriority,
+      importance: newPriority
+    });
   };
 
   // STEP 3 -> STEP 4: Trigger Security Confirmation Modal
   const handleStartSending = () => {
     if (!recipient.trim()) {
-      setErrorMessage('Recipient email is required.');
+      updateState({ errorMessage: 'Recipient email is required.' });
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipient.trim())) {
+      updateState({ errorMessage: 'Please enter a valid recipient email address.' });
       return;
     }
     if (!subject.trim()) {
-      setErrorMessage('Email subject is required.');
+      updateState({ errorMessage: 'Email subject is required.' });
       return;
     }
     if (!body.trim()) {
-      setErrorMessage('Email body cannot be empty.');
+      updateState({ errorMessage: 'Email body cannot be empty.' });
       return;
     }
-    setErrorMessage('');
+    updateState({ errorMessage: '' });
     setShowConfirmModal(true);
   };
 
-  // STEP 4 -> STEP 5 & 6: Final Confirmed Dispatch
+  // STEP 4 -> STEP 5 & 6: Final Confirmed Dispatch via Gmail API
   const handleFinalConfirmedSend = async () => {
     setShowConfirmModal(false);
-    setStep(5); // Sending progress animation
+    updateState({ step: 5 }); // Sending progress animation
 
     try {
       const formData = new FormData();
@@ -235,12 +278,16 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
       const data = await safeParseResponse(res);
       if (!res.ok || data.error) throw new Error(data.error || 'Failed to send email.');
 
-      setSentResult(data);
-      setStep(6); // Success screen animation
+      updateState({
+        sentResult: data,
+        step: 6 // Success screen animation
+      });
     } catch (err) {
       console.error('Send Error:', err);
-      setErrorMessage(err.message);
-      setStep(3);
+      updateState({
+        errorMessage: err.message || 'Failed to send email. Please check your Gmail connection.',
+        step: 3
+      });
     }
   };
 
@@ -310,7 +357,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
               AI Intelligent Email Compose
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Enter what you want to communicate. Scribe AI will classify the intent, determine tone & importance, and generate a professional, fact-grounded email.
+              Enter your communication request. Scribe AI will automatically classify intent, set tone and urgency, and compose a fact-grounded email.
             </p>
           </div>
 
@@ -336,10 +383,10 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
               <input
                 type="email"
                 required
-                placeholder="client@example.com, manager@company.com, hr@firm.com"
+                placeholder="manager@example.com, client@example.com, hr@company.com"
                 value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white"
+                onChange={(e) => updateState({ recipient: e.target.value, errorMessage: '' })}
+                className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
               />
 
               {showCcBcc && (
@@ -352,8 +399,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                       type="button"
                       onClick={() => {
                         setShowCcBcc(false);
-                        setCc('');
-                        setBcc('');
+                        updateState({ cc: '', bcc: '' });
                       }}
                       className="text-[10px] text-slate-400 hover:text-rose-400 cursor-pointer"
                     >
@@ -370,7 +416,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                         type="text"
                         placeholder="lead@company.com, team@firm.com"
                         value={cc}
-                        onChange={(e) => setCc(e.target.value)}
+                        onChange={(e) => updateState({ cc: e.target.value })}
                         className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
                       />
                     </div>
@@ -383,7 +429,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                         type="text"
                         placeholder="archive@company.com, audit@firm.com"
                         value={bcc}
-                        onChange={(e) => setBcc(e.target.value)}
+                        onChange={(e) => updateState({ bcc: e.target.value })}
                         className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
                       />
                     </div>
@@ -395,15 +441,15 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-bold text-slate-300 block">
-                  Subject / Topic <span className="text-[11px] font-normal text-slate-500">(Optional — AI generates automatically based on intent)</span>
+                  Subject / Topic <span className="text-[11px] font-normal text-slate-500">(Optional — AI automatically generates based on intent)</span>
                 </label>
               </div>
               <input
                 type="text"
-                placeholder="e.g. Leave Request for 3 Days Due to Illness, or Complaint about delayed delivery"
+                placeholder="e.g. Leave Request for 3 Days Due to Illness, or Complaint regarding delayed delivery"
                 value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-2xl glass-input text-xs text-white"
+                onChange={(e) => updateState({ subject: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
               />
             </div>
 
@@ -413,10 +459,10 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
               </label>
               <textarea
                 rows={4}
-                placeholder="Example: I am sick and need leave for 3 days, or My father had an accident and I need to leave immediately."
+                placeholder='Example: "I need sick leave for 3 days due to illness" or "My father had an accident and I need to leave immediately."'
                 value={instruction}
-                onChange={(e) => setInstruction(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white leading-relaxed"
+                onChange={(e) => updateState({ instruction: e.target.value, errorMessage: '' })}
+                className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white leading-relaxed placeholder-slate-500"
               />
             </div>
 
@@ -427,7 +473,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
               </label>
               <input
                 type="file"
-                onChange={(e) => setSelectedFile(e.target.files[0])}
+                onChange={(e) => updateState({ selectedFile: e.target.files[0] || null })}
                 className="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-800 file:text-purple-300 hover:file:bg-slate-700 file:cursor-pointer"
               />
             </div>
@@ -466,7 +512,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
           <div className="space-y-2">
             <h3 className="text-xl font-extrabold text-white">Scribe AI Engine Analyzing Request...</h3>
             <div className="text-slate-400 text-xs max-w-md mx-auto space-y-1">
-              <p>• Classifying email intent (20 categories)...</p>
+              <p>• Classifying email intent across 20 categories...</p>
               <p>• Determining optimal tone & recipient relationship...</p>
               <p>• Detecting importance & urgency level...</p>
               <p>• Formatting structure & generating clear subject...</p>
@@ -631,7 +677,17 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
               <div className="space-y-2 pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500 font-bold w-12 shrink-0">To:</span>
-                  <span className="text-cyan-300 font-mono font-bold">{recipient}</span>
+                  {isEditing ? (
+                    <input
+                      type="email"
+                      value={recipient}
+                      onChange={(e) => updateState({ recipient: e.target.value })}
+                      placeholder="recipient@example.com"
+                      className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-cyan-300 font-mono font-bold"
+                    />
+                  ) : (
+                    <span className="text-cyan-300 font-mono font-bold">{recipient}</span>
+                  )}
                 </div>
                 {cc && (
                   <div className="flex items-center gap-2">
@@ -656,7 +712,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                   <input
                     type="text"
                     value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
+                    onChange={(e) => updateState({ subject: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg glass-input text-xs text-white font-bold"
                   />
                 ) : (
@@ -675,7 +731,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                   <textarea
                     rows={12}
                     value={body}
-                    onChange={(e) => setBody(e.target.value)}
+                    onChange={(e) => updateState({ body: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg glass-input text-xs text-white leading-relaxed font-sans"
                   />
                 ) : (
@@ -692,7 +748,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
                     <Paperclip className="w-4 h-4 text-purple-400" />
                     <span>Attached: <strong>{selectedFile.name}</strong> ({(selectedFile.size / 1024).toFixed(1)} KB)</span>
                   </div>
-                  <button onClick={() => setSelectedFile(null)} className="text-slate-400 hover:text-rose-400">
+                  <button onClick={() => updateState({ selectedFile: null })} className="text-slate-400 hover:text-rose-400">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -703,7 +759,7 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
           {/* ACTION BUTTONS */}
           <div className="flex items-center justify-between gap-4 pt-2">
             <button
-              onClick={() => setStep(1)}
+              onClick={() => updateState({ step: 1 })}
               className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -841,15 +897,21 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
           <div className="flex items-center justify-center gap-4 pt-4">
             <button
               onClick={() => {
-                setStep(1);
-                setInstruction('');
-                setRecipient('');
-                setCc('');
-                setBcc('');
-                setSubject('');
-                setBody('');
-                setSelectedFile(null);
-                setSentResult(null);
+                if (onResetCompose) {
+                  onResetCompose();
+                } else {
+                  updateState({
+                    step: 1,
+                    instruction: '',
+                    recipient: '',
+                    cc: '',
+                    bcc: '',
+                    subject: '',
+                    body: '',
+                    selectedFile: null,
+                    sentResult: null
+                  });
+                }
               }}
               className="px-6 py-3 rounded-xl gradient-btn text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-[1.02] cursor-pointer"
             >
@@ -859,7 +921,10 @@ export function ComposeWorkflow({ initialData = {}, onComplete, onCancel, onNavi
 
             {onComplete && (
               <button
-                onClick={onComplete}
+                onClick={() => {
+                  if (onResetCompose) onResetCompose();
+                  onComplete();
+                }}
                 className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-bold text-xs cursor-pointer"
               >
                 Go to Dashboard
