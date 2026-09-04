@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
-import { subscribeToEmailChanges, subscribeToEmailEvents, signInWithGoogle } from '../utils/supabaseClient';
+import { supabase, subscribeToEmailChanges, subscribeToEmailEvents, signInWithGoogle } from '../utils/supabaseClient';
 
 const CATEGORIES_LIST = [
   { id: 'All', label: 'All Situations' },
