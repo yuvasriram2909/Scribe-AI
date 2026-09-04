@@ -30,6 +30,7 @@ const DATE_RANGES = [
 export function EmailHistory({ onReuseEmail }) {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [selectedDirection, setSelectedDirection] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedTone, setSelectedTone] = useState('All');
@@ -43,8 +44,18 @@ export function EmailHistory({ onReuseEmail }) {
   useEffect(() => {
     fetchEmails();
 
+    // Auto-sync Gmail in background on mount
+    apiFetch('/api/gmail/sync', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d?.newReceived > 0 || d?.newSent > 0 || d?.newSpam > 0) {
+          fetchEmails();
+        }
+      })
+      .catch(() => {});
+
     // Supabase Realtime Listener
-    const unsubscribe = subscribeToEmailChanges(localStorage.getItem('userEmail') || '', () => {
+    const unsubscribe = subscribeToEmailChanges(localStorage.getItem('userId') || localStorage.getItem('userEmail') || '', () => {
       fetchEmails();
     });
 
@@ -54,6 +65,23 @@ export function EmailHistory({ onReuseEmail }) {
       clearInterval(interval);
     };
   }, [selectedDirection, selectedCategory, selectedTone, selectedImportance, selectedStatus, selectedDateRange, searchQuery]);
+
+  const handleManualSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const res = await apiFetch('/api/gmail/sync', { method: 'POST' });
+      const data = await res.json();
+      await fetchEmails();
+      if (data?.newReceived > 0 || data?.newSent > 0) {
+        alert(`Synced ${data.newReceived || 0} received and ${data.newSent || 0} sent emails from Gmail!`);
+      }
+    } catch (e) {
+      console.warn('Manual sync notice:', e);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const fetchEmails = async () => {
     setLoading(true);
@@ -262,9 +290,19 @@ export function EmailHistory({ onReuseEmail }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-transparent text-xs text-white focus:outline-none placeholder-slate-500"
-          >
-          </input>
+          />
         </div>
+
+        {/* Manual Gmail Sync Button */}
+        <button
+          onClick={handleManualSync}
+          disabled={syncing}
+          className="px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/40 text-purple-200 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 disabled:opacity-50 shadow-sm"
+          title="Synchronize incoming and outgoing emails from connected Gmail"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-purple-300 ${syncing ? 'animate-spin' : ''}`} />
+          <span>{syncing ? 'Syncing...' : 'Sync Gmail'}</span>
+        </button>
       </div>
 
       {/* Cards List */}
@@ -315,7 +353,7 @@ export function EmailHistory({ onReuseEmail }) {
                   </h3>
                   <p className="text-xs text-slate-400 line-clamp-1">
                     {isReceived ? (
-                      <>From: <span className="font-semibold text-purple-300 font-mono">{email.sender || 'Unknown Sender'}</span></>
+                      <>From: <span className="font-semibold text-purple-300 font-mono">{email.sender || email.sender_email || email.gmailAccount || 'External Sender'}</span></>
                     ) : (
                       <>To: <span className="font-semibold text-cyan-300 font-mono">{email.recipient || email.recipient_email}</span></>
                     )}
@@ -400,7 +438,11 @@ export function EmailHistory({ onReuseEmail }) {
 
             <div className="space-y-2 text-xs text-slate-300 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 font-mono">
               <p><strong className="text-purple-400">Direction:</strong> {selectedEmail.direction || (selectedEmail.isReceived ? 'Received' : 'Sent')}</p>
-              {selectedEmail.sender && <p><strong className="text-purple-400">From:</strong> {selectedEmail.sender}</p>}
+              {(selectedEmail.sender || selectedEmail.sender_email) ? (
+                <p><strong className="text-purple-400">From:</strong> {selectedEmail.sender || selectedEmail.sender_email}</p>
+              ) : selectedEmail.isReceived ? (
+                <p><strong className="text-purple-400">From:</strong> External Sender</p>
+              ) : null}
               <p><strong className="text-purple-400">To:</strong> {selectedEmail.recipient || selectedEmail.recipient_email}</p>
               {selectedEmail.cc && <p><strong className="text-purple-400">Cc:</strong> {selectedEmail.cc}</p>}
               {selectedEmail.bcc && <p><strong className="text-purple-400">Bcc:</strong> {selectedEmail.bcc}</p>}

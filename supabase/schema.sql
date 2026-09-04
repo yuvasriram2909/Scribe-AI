@@ -369,6 +369,8 @@ CREATE TABLE IF NOT EXISTS public.emails (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     gmail_connection_id UUID REFERENCES public.gmail_connections(id) ON DELETE SET NULL,
+    sender_email TEXT,
+    sender TEXT,
     recipient_email TEXT NOT NULL,
     cc TEXT[],
     bcc TEXT[],
@@ -387,6 +389,10 @@ CREATE TABLE IF NOT EXISTS public.emails (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS sender_email TEXT;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS sender TEXT;
+
 CREATE INDEX IF NOT EXISTS emails_user_id_idx ON public.emails(user_id);
 CREATE INDEX IF NOT EXISTS emails_user_id_created_at_idx ON public.emails(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS emails_user_id_status_idx ON public.emails(user_id, status);

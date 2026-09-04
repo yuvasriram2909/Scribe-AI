@@ -254,8 +254,9 @@ async function getAuthUser(req: Request, supabase: any) {
 // ----------------------------------------------------
 
 async function getValidAccessToken(account: any, supabase: any) {
-  let accessToken = account.encryptedAccessToken;
-  const refreshToken = await decryptToken(account.encryptedRefreshToken);
+  let accessToken = account.access_token_encrypted || account.encryptedAccessToken;
+  const rawRefresh = account.refresh_token_encrypted || account.encryptedRefreshToken;
+  const refreshToken = await decryptToken(rawRefresh);
 
   if (refreshToken) {
     const { clientId, clientSecret } = await getGoogleCredentials(supabase);
@@ -274,10 +275,21 @@ async function getValidAccessToken(account: any, supabase: any) {
         const refreshData = await refreshRes.json();
         if (refreshData.access_token) {
           accessToken = refreshData.access_token;
-          await supabase
-            .from("GmailAccount")
-            .update({ encryptedAccessToken: accessToken, updatedAt: new Date().toISOString() })
-            .eq("id", account.id);
+          const nowIso = new Date().toISOString();
+          if (account.id) {
+            try {
+              await supabase
+                .from("gmail_connections")
+                .update({ access_token_encrypted: accessToken, updated_at: nowIso })
+                .eq("id", account.id);
+            } catch (_) {}
+            try {
+              await supabase
+                .from("GmailAccount")
+                .update({ encryptedAccessToken: accessToken, updatedAt: nowIso })
+                .eq("id", account.id);
+            } catch (_) {}
+          }
         }
       } catch (e) {
         console.warn("Token refresh attempt notice:", e);
@@ -301,16 +313,20 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
     const isReceived = !!payload.isReceived;
     const isSpam = !!payload.isSpam;
     const direction = isReceived ? 'received' : 'sent';
-    const status = (payload.status || 'sent').toLowerCase();
+    const status = (payload.status || (isReceived ? 'received' : 'sent')).toLowerCase();
+    const senderVal = payload.sender || payload.sender_email || payload.from || payload.gmailAccount || '';
+    const senderEmailVal = payload.sender_email || payload.sender || payload.from || '';
 
     const canonicalPayload = {
       id: emailId,
       user_id: payload.userId,
       gmail_message_id: payload.gmailMessageId || null,
       thread_id: payload.gmailThreadId || null,
+      sender_email: senderEmailVal,
+      sender: senderVal,
       recipient_email: payload.recipient || payload.recipient_email || '',
-      cc: payload.cc || null,
-      bcc: payload.bcc || null,
+      cc: payload.cc ? (Array.isArray(payload.cc) ? payload.cc : [payload.cc]) : null,
+      bcc: payload.bcc ? (Array.isArray(payload.bcc) ? payload.bcc : [payload.bcc]) : null,
       subject: payload.subject || '(No Subject)',
       body: payload.body || '',
       email_type: payload.category || payload.email_type || payload.situation || 'Professional / Official',
@@ -325,7 +341,11 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
     };
 
     try {
-      await supabase.from("emails").upsert(canonicalPayload, { onConflict: "id" });
+      const { error: upErr } = await supabase.from("emails").upsert(canonicalPayload, { onConflict: "id" });
+      if (upErr && (upErr.message?.includes("column") || upErr.message?.includes("does not exist"))) {
+        const { sender_email, sender, ...safeCanonical } = canonicalPayload;
+        await supabase.from("emails").upsert(safeCanonical, { onConflict: "id" });
+      }
     } catch (e: any) {
       console.warn("Canonical emails upsert notice:", e?.message);
     }
@@ -360,10 +380,11 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
   console.warn("Full Email insert notice, falling back to core columns:", error?.message);
 
   const coreColumns = [
-    "id", "userId", "recipient", "cc", "bcc", "subject", "body",
+    "id", "userId", "sender", "recipient", "cc", "bcc", "subject", "body",
     "instruction", "originalSituation", "category", "situation",
     "situationSource", "priority", "tone", "status", "errorMessage",
-    "gmailMessageId", "createdAt", "sentAt"
+    "gmailMessageId", "gmailThreadId", "gmailAccount", "isSent", "isReceived", "isSpam", "isRead",
+    "createdAt", "sentAt", "receivedAt", "labels", "snippet"
   ];
   const fallbackPayload: Record<string, any> = {};
   for (const c of coreColumns) {
@@ -395,6 +416,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
   const accessToken = await getValidAccessToken(account, supabase);
   if (!accessToken) return { error: "No valid access token" };
 
+  const accountEmail = account.gmail_email || account.gmailEmail || "";
   let newReceived = 0;
   let newSpam = 0;
   let newSent = 0;
@@ -403,7 +425,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
   try {
     // 1. Fetch Inbox Messages
     const inboxRes = await fetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=label:INBOX",
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=label:INBOX",
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     if (inboxRes.ok) {
@@ -435,9 +457,17 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
           const meta = await metaRes.json();
           const headers = meta.payload?.headers || [];
           const fromHeader = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "";
-          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || account.gmailEmail;
+          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || accountEmail;
           const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(No Subject)";
           const dateHeader = headers.find((h: any) => h.name.toLowerCase() === "date")?.value || "";
+
+          let parsedSender = fromHeader;
+          let parsedSenderEmail = fromHeader;
+          const fromMatch = fromHeader.match(/^(.*?)\s*<([^>]+)>/);
+          if (fromMatch) {
+            parsedSender = fromMatch[1].replace(/^["']|["']$/g, '').trim() || fromMatch[2].trim();
+            parsedSenderEmail = fromMatch[2].trim();
+          }
 
           const isSpam = (meta.labelIds || []).includes("SPAM");
           const isSent = (meta.labelIds || []).includes("SENT");
@@ -449,10 +479,11 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
           await safeInsertEmail(supabase, {
             id: crypto.randomUUID(),
             userId: user.id,
-            gmailAccount: account.gmailEmail,
+            gmailAccount: accountEmail,
             gmailMessageId: m.id,
             gmailThreadId: m.threadId || null,
-            sender: fromHeader,
+            sender: parsedSender,
+            sender_email: parsedSenderEmail,
             recipient: toHeader,
             subject: subjectHeader,
             body: meta.snippet || "",
@@ -496,7 +527,14 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
           .eq("gmailMessageId", m.id)
           .maybeSingle();
 
-        if (existing) continue;
+        const { data: existingCanonical } = await supabase
+          .from("emails")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("gmail_message_id", m.id)
+          .maybeSingle();
+
+        if (existing || existingCanonical) continue;
 
         const metaRes = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
@@ -506,9 +544,17 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
           const meta = await metaRes.json();
           const headers = meta.payload?.headers || [];
           const fromHeader = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "";
-          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || account.gmailEmail;
+          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || accountEmail;
           const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(Spam Message)";
           const dateHeader = headers.find((h: any) => h.name.toLowerCase() === "date")?.value || "";
+
+          let parsedSender = fromHeader;
+          let parsedSenderEmail = fromHeader;
+          const fromMatch = fromHeader.match(/^(.*?)\s*<([^>]+)>/);
+          if (fromMatch) {
+            parsedSender = fromMatch[1].replace(/^["']|["']$/g, '').trim() || fromMatch[2].trim();
+            parsedSenderEmail = fromMatch[2].trim();
+          }
 
           const detectedCat = detectSituationEngine(`${subjectHeader} ${meta.snippet || ""}`);
           const dateIso = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
@@ -516,10 +562,11 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
           await safeInsertEmail(supabase, {
             id: crypto.randomUUID(),
             userId: user.id,
-            gmailAccount: account.gmailEmail,
+            gmailAccount: accountEmail,
             gmailMessageId: m.id,
             gmailThreadId: m.threadId || null,
-            sender: fromHeader,
+            sender: parsedSender,
+            sender_email: parsedSenderEmail,
             recipient: toHeader,
             subject: subjectHeader,
             body: meta.snippet || "",
@@ -1793,6 +1840,8 @@ serve(async (req: Request) => {
         id: emailId,
         user_id: user.id,
         gmail_connection_id: connection.id || null,
+        sender_email: connectedEmail,
+        sender: user.name || connectedEmail,
         recipient_email: recipient,
         cc: cc ? (Array.isArray(cc) ? cc : [cc]) : [],
         bcc: bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : [],
@@ -1840,6 +1889,7 @@ serve(async (req: Request) => {
         id: emailId,
         userId: user.id,
         gmailAccount: connectedEmail,
+        sender: user.name || connectedEmail,
         recipient,
         cc: typeof cc === "string" ? cc : (cc || []).join(", "),
         bcc: typeof bcc === "string" ? bcc : (bcc || []).join(", "),
@@ -1861,7 +1911,125 @@ serve(async (req: Request) => {
 
       const { data: emailRecord } = await safeInsertEmail(supabase, emailPayload);
 
-      // Create notification
+      // 4. In-App Cross-User Received Delivery:
+      // If recipient is also a registered user in Scribe AI, immediately deliver it to their Received history!
+      const cleanRecipient = recipient.toLowerCase().trim();
+      let recipientUserId: string | null = null;
+      try {
+        const { data: recProfiles } = await supabase
+          .from("profiles")
+          .select("id, email")
+          .ilike("email", cleanRecipient)
+          .maybeSingle();
+
+        if (recProfiles?.id) {
+          recipientUserId = recProfiles.id;
+        } else {
+          const { data: recConn } = await supabase
+            .from("gmail_connections")
+            .select("user_id")
+            .ilike("gmail_email", cleanRecipient)
+            .maybeSingle();
+          if (recConn?.user_id) {
+            recipientUserId = recConn.user_id;
+          } else {
+            const { data: recAcc } = await supabase
+              .from("GmailAccount")
+              .select("userId")
+              .ilike("gmailEmail", cleanRecipient)
+              .maybeSingle();
+            if (recAcc?.userId) recipientUserId = recAcc.userId;
+          }
+        }
+      } catch (recErr) {
+        console.warn("Recipient user lookup notice:", recErr);
+      }
+
+      if (recipientUserId && recipientUserId !== user.id) {
+        const receivedEmailId = crypto.randomUUID();
+        const receivedCanonical = {
+          id: receivedEmailId,
+          user_id: recipientUserId,
+          sender_email: connectedEmail,
+          sender: user.name || connectedEmail,
+          recipient_email: cleanRecipient,
+          subject,
+          body: emailBody,
+          email_type: (category || situation || "other").toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+          tone: (tone || "professional").toLowerCase(),
+          importance: (priority || "normal").toLowerCase(),
+          status: "received",
+          direction: "received",
+          spam_status: "clean",
+          gmail_message_id: sendData.id,
+          thread_id: sendData.threadId || null,
+          received_at: now,
+          created_at: now,
+          updated_at: now,
+        };
+
+        try {
+          const { error: rUpErr } = await supabase.from("emails").upsert(receivedCanonical, { onConflict: "id" });
+          if (rUpErr && (rUpErr.message?.includes("column") || rUpErr.message?.includes("does not exist"))) {
+            const { sender_email, sender, ...safeCanonical } = receivedCanonical;
+            await supabase.from("emails").upsert(safeCanonical, { onConflict: "id" });
+          }
+        } catch (_) {}
+
+        try {
+          await supabase.from("email_events").insert({
+            id: crypto.randomUUID(),
+            user_id: recipientUserId,
+            email_id: receivedEmailId,
+            event_type: "received",
+            metadata: {
+              sender: user.name || connectedEmail,
+              sender_email: connectedEmail,
+              recipient: cleanRecipient,
+              subject,
+              gmail_message_id: sendData.id,
+            },
+            created_at: now,
+          });
+        } catch (_) {}
+
+        try {
+          await supabase.from("Email").insert({
+            id: receivedEmailId,
+            userId: recipientUserId,
+            sender: user.name || connectedEmail,
+            recipient: cleanRecipient,
+            subject,
+            body: emailBody,
+            category: category || "Official/Professional",
+            situation: situation || "💼 Official / Professional",
+            priority: priority || "Normal",
+            tone: tone || "Professional",
+            status: "Received",
+            isSent: false,
+            isReceived: true,
+            isSpam: false,
+            isRead: false,
+            gmailMessageId: sendData.id,
+            gmailThreadId: sendData.threadId || null,
+            receivedAt: now,
+            createdAt: now,
+          });
+        } catch (_) {}
+
+        await safeInsertNotification(supabase, {
+          id: crypto.randomUUID(),
+          userId: recipientUserId,
+          emailId: receivedEmailId,
+          notificationType: category || "General",
+          message: `New email from ${user.name || connectedEmail}: "${subject}"`,
+          read: false,
+          isTrashed: false,
+          createdAt: now,
+        });
+      }
+
+      // Create notification for Sender
       await safeInsertNotification(supabase, {
         id: crypto.randomUUID(),
         userId: user.id,
@@ -2055,19 +2223,101 @@ RULES:
       const importanceQuery = url.searchParams.get("importance");
       const dateRangeQuery = url.searchParams.get("dateRange");
 
-      let query = supabase.from("Email").select("*, attachments:Attachment(*)").eq("userId", user.id);
-      if (statusQuery && statusQuery !== "All") query = query.eq("status", statusQuery);
-      if (categoryQuery && categoryQuery !== "All") query = query.eq("category", categoryQuery);
+      // Query both canonical emails and legacy Email
+      const { data: canonicalEmails } = await supabase
+        .from("emails")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
-      const { data: emails } = await query.order("createdAt", { ascending: false });
-      let result = emails || [];
+      const { data: legacyEmails } = await supabase
+        .from("Email")
+        .select("*, attachments:Attachment(*)")
+        .eq("userId", user.id)
+        .order("createdAt", { ascending: false });
+
+      // Merge and deduplicate by id and gmail_message_id
+      const seenIds = new Set<string>();
+      const seenGmailIds = new Set<string>();
+      const combined: any[] = [];
+
+      // 1. Add canonical emails (normalized)
+      for (const ce of (canonicalEmails || [])) {
+        if (ce.id) seenIds.add(ce.id);
+        if (ce.gmail_message_id) seenGmailIds.add(ce.gmail_message_id);
+
+        const isReceived = ce.direction === "received" || ce.status === "received";
+        const isSent = ce.direction === "sent" || ce.status === "sent" || ce.status === "delivered";
+
+        combined.push({
+          id: ce.id,
+          userId: ce.user_id,
+          sender: ce.sender || ce.sender_email || "",
+          sender_email: ce.sender_email || ce.sender || "",
+          recipient: ce.recipient_email || "",
+          recipient_email: ce.recipient_email || "",
+          cc: ce.cc,
+          bcc: ce.bcc,
+          subject: ce.subject || "(No Subject)",
+          body: ce.body || "",
+          category: ce.email_type || "Professional / Official",
+          situation: ce.email_type || "Professional / Official",
+          tone: ce.tone || "Professional",
+          priority: ce.importance || "Normal",
+          importance: ce.importance || "Normal",
+          status: ce.status ? (ce.status.charAt(0).toUpperCase() + ce.status.slice(1)) : "Sent",
+          direction: ce.direction || (isReceived ? "received" : "sent"),
+          isSent: isSent,
+          isReceived: isReceived,
+          isSpam: ce.spam_status === "spam",
+          gmailMessageId: ce.gmail_message_id,
+          gmailThreadId: ce.thread_id,
+          sentAt: ce.sent_at,
+          receivedAt: ce.received_at,
+          createdAt: ce.created_at,
+        });
+      }
+
+      // 2. Add legacy emails if not already present
+      for (const le of (legacyEmails || [])) {
+        if (seenIds.has(le.id)) continue;
+        if (le.gmailMessageId && seenGmailIds.has(le.gmailMessageId)) continue;
+        seenIds.add(le.id);
+        if (le.gmailMessageId) seenGmailIds.add(le.gmailMessageId);
+
+        const isReceived = le.isReceived || le.status === "Received" || le.direction === "received";
+        const isSent = le.isSent || le.status === "Sent" || le.status === "Delivered" || le.direction === "sent";
+
+        combined.push({
+          ...le,
+          sender: le.sender || le.sender_email || "",
+          sender_email: le.sender_email || le.sender || "",
+          recipient: le.recipient || le.recipient_email || "",
+          recipient_email: le.recipient || le.recipient_email || "",
+          isSent,
+          isReceived,
+          direction: isReceived ? "received" : "sent",
+        });
+      }
+
+      let result = combined;
+
+      // Status Filter
+      if (statusQuery && statusQuery !== "All") {
+        result = result.filter((e: any) => (e.status || "").toLowerCase() === statusQuery.toLowerCase());
+      }
+
+      // Category Filter
+      if (categoryQuery && categoryQuery !== "All") {
+        result = result.filter((e: any) => (e.category || "").toLowerCase() === categoryQuery.toLowerCase());
+      }
 
       // Direction Filter
       if (directionQuery && directionQuery !== "All") {
         if (directionQuery.toLowerCase() === "sent") {
-          result = result.filter((e: any) => e.isSent || e.status === "Sent" || e.status === "Delivered");
+          result = result.filter((e: any) => e.isSent || (e.direction || "").toLowerCase() === "sent" || (e.status || "").toLowerCase() === "sent");
         } else if (directionQuery.toLowerCase() === "received") {
-          result = result.filter((e: any) => e.isReceived || e.status === "Received");
+          result = result.filter((e: any) => e.isReceived || (e.direction || "").toLowerCase() === "received" || (e.status || "").toLowerCase() === "received");
         }
       }
 
@@ -2102,9 +2352,14 @@ RULES:
           (e.subject || "").toLowerCase().includes(q) ||
           (e.recipient || "").toLowerCase().includes(q) ||
           (e.sender || "").toLowerCase().includes(q) ||
+          (e.sender_email || "").toLowerCase().includes(q) ||
           (e.body || "").toLowerCase().includes(q)
         );
       }
+
+      // Sort by date descending
+      result.sort((a, b) => new Date(b.receivedAt || b.sentAt || b.createdAt).getTime() - new Date(a.receivedAt || a.sentAt || a.createdAt).getTime());
+
       return jsonResponse(result);
     }
 
@@ -2200,8 +2455,19 @@ RULES:
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
 
-      const { data: accounts } = await supabase.from("GmailAccount").select("*").eq("userId", user.id);
-      const account = accounts?.[0];
+      // Check gmail_connections first, then GmailAccount
+      let account: any = null;
+      const { data: connections } = await supabase
+        .from("gmail_connections")
+        .select("*")
+        .eq("user_id", user.id);
+      if (connections && connections.length > 0) {
+        account = connections[0];
+      } else {
+        const { data: accounts } = await supabase.from("GmailAccount").select("*").eq("userId", user.id);
+        account = accounts?.[0];
+      }
+
       if (!account) return errorResponse("No Gmail account connected", 400);
 
       const syncResult = await syncUserGmail(user, account, supabase);
@@ -2313,10 +2579,16 @@ RULES:
       if (!user) return errorResponse("Unauthorized", 401);
 
       // Attempt background Gmail sync if connected
-      const { data: accounts } = await supabase.from("GmailAccount").select("*").eq("userId", user.id);
-      const account = accounts?.[0];
-      if (account?.encryptedAccessToken) {
-        syncUserGmail(user, account, supabase).catch((e) => console.warn("Background sync error:", e));
+      let syncAccount: any = null;
+      const { data: conns } = await supabase.from("gmail_connections").select("*").eq("user_id", user.id);
+      if (conns && conns.length > 0) {
+        syncAccount = conns[0];
+      } else {
+        const { data: accounts } = await supabase.from("GmailAccount").select("*").eq("userId", user.id);
+        syncAccount = accounts?.[0];
+      }
+      if (syncAccount && (syncAccount.access_token_encrypted || syncAccount.encryptedAccessToken || syncAccount.refresh_token_encrypted || syncAccount.encryptedRefreshToken)) {
+        syncUserGmail(user, syncAccount, supabase).catch((e) => console.warn("Background sync error:", e));
       }
 
       // 1. Try calling PostgreSQL get_dashboard_analytics RPC function
