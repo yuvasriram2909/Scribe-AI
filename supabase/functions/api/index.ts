@@ -609,7 +609,14 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
           .eq("gmailMessageId", msgId)
           .maybeSingle();
 
-        if (existing) continue;
+        const { data: existingCanonical } = await supabase
+          .from("emails")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("gmail_message_id", msgId)
+          .maybeSingle();
+
+        if (existing || existingCanonical) continue;
 
         const dRes = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${d.id}?format=metadata&metadataHeaders=To&metadataHeaders=Subject`,
@@ -643,6 +650,86 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
           });
 
           newDrafts++;
+        }
+      }
+    }
+
+    // 4. Fetch Sent Messages from Gmail
+    const sentRes = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=label:SENT",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (sentRes.ok) {
+      const sentData = await sentRes.json();
+      const messages = sentData.messages || [];
+
+      for (const m of messages) {
+        const { data: existing } = await supabase
+          .from("Email")
+          .select("id")
+          .eq("userId", user.id)
+          .eq("gmailMessageId", m.id)
+          .maybeSingle();
+
+        const { data: existingCanonical } = await supabase
+          .from("emails")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("gmail_message_id", m.id)
+          .maybeSingle();
+
+        if (existing || existingCanonical) continue;
+
+        const metaRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          const headers = meta.payload?.headers || [];
+          const fromHeader = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || accountEmail;
+          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || "";
+          const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(No Subject)";
+          const dateHeader = headers.find((h: any) => h.name.toLowerCase() === "date")?.value || "";
+
+          let parsedSender = fromHeader;
+          let parsedSenderEmail = fromHeader;
+          const fromMatch = fromHeader.match(/^(.*?)\s*<([^>]+)>/);
+          if (fromMatch) {
+            parsedSender = fromMatch[1].replace(/^["']|["']$/g, '').trim() || fromMatch[2].trim();
+            parsedSenderEmail = fromMatch[2].trim();
+          }
+
+          const detectedCat = detectSituationEngine(`${subjectHeader} ${meta.snippet || ""}`);
+          const dateIso = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
+
+          await safeInsertEmail(supabase, {
+            id: crypto.randomUUID(),
+            userId: user.id,
+            gmailAccount: accountEmail,
+            gmailMessageId: m.id,
+            gmailThreadId: m.threadId || null,
+            sender: parsedSender,
+            sender_email: parsedSenderEmail,
+            recipient: toHeader,
+            subject: subjectHeader,
+            body: meta.snippet || "",
+            snippet: meta.snippet || "",
+            category: detectedCat.category,
+            situation: detectedCat.name,
+            priority: detectedCat.priority,
+            tone: detectedCat.tone,
+            status: "Sent",
+            isReceived: false,
+            isSent: true,
+            isSpam: false,
+            isRead: true,
+            labels: "SENT",
+            createdAt: dateIso,
+            sentAt: dateIso,
+          });
+
+          newSent++;
         }
       }
     }
@@ -2626,75 +2713,106 @@ RULES:
         syncUserGmail(user, syncAccount, supabase).catch((e) => console.warn("Background sync error:", e));
       }
 
-      // 1. Try calling PostgreSQL get_dashboard_analytics RPC function
-      try {
-        const { data: rpcStats, error: rpcErr } = await supabase.rpc("get_dashboard_analytics", { p_user_id: user.id });
-        const { data: recentEvents } = await supabase
-          .from("email_events")
-          .select("id, email_id, event_type, metadata, created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(10);
+      // Fetch emails from BOTH canonical emails and legacy Email tables
+      const { data: canonicalEmails } = await supabase
+        .from("emails")
+        .select("*")
+        .eq("user_id", user.id);
 
-        if (!rpcErr && rpcStats && typeof rpcStats.sent === 'number') {
-          return jsonResponse({
-            success: true,
-            ...rpcStats,
-            totalEmails: rpcStats.sent,
-            recentActivity: recentEvents || [],
-          });
-        }
-      } catch (rpcEx) {
-        console.warn("RPC get_dashboard_analytics notice, calculating from database records:", rpcEx);
-      }
-
-      // 2. Direct database query fallback
-      const { data: emails } = await supabase
+      const { data: legacyEmails } = await supabase
         .from("Email")
         .select("*")
         .eq("userId", user.id);
 
-      const list = emails || [];
+      // Merge and deduplicate by id and gmail_message_id
+      const seenIds = new Set<string>();
+      const seenGmailIds = new Set<string>();
+      const unifiedList: any[] = [];
+
+      for (const ce of (canonicalEmails || [])) {
+        if (ce.id) seenIds.add(ce.id);
+        if (ce.gmail_message_id) seenGmailIds.add(ce.gmail_message_id);
+        const isReceived = ce.direction === "received" || (ce.status || "").toLowerCase() === "received";
+        const isSent = ce.direction === "sent" || (ce.status || "").toLowerCase() === "sent" || (ce.status || "").toLowerCase() === "delivered";
+        unifiedList.push({
+          ...ce,
+          status: ce.status || (isReceived ? "received" : "sent"),
+          isSent,
+          isReceived,
+          isSpam: ce.spam_status === "spam" || (ce.status || "").toLowerCase() === "spam",
+          category: ce.email_type,
+          situation: ce.email_type,
+          priority: ce.importance,
+        });
+      }
+
+      for (const le of (legacyEmails || [])) {
+        if (seenIds.has(le.id)) continue;
+        if (le.gmailMessageId && seenGmailIds.has(le.gmailMessageId)) continue;
+        seenIds.add(le.id);
+        if (le.gmailMessageId) seenGmailIds.add(le.gmailMessageId);
+
+        const isReceived = le.isReceived || (le.status || "").toLowerCase() === "received" || le.direction === "received";
+        const isSent = le.isSent || (le.status || "").toLowerCase() === "sent" || (le.status || "").toLowerCase() === "delivered" || le.direction === "sent";
+
+        unifiedList.push({
+          ...le,
+          status: le.status || (isReceived ? "Received" : "Sent"),
+          isSent,
+          isReceived,
+          direction: isReceived ? "received" : "sent",
+        });
+      }
+
+      const list = unifiedList;
       const total = list.length;
 
-      const sent = list.filter((e: any) => 
-        (e.status === "Sent" || e.status === "Delivered" || e.isSent === true) && !e.isSpam && !e.isReceived
-      ).length;
+      const sent = list.filter((e: any) => {
+        const st = (e.status || "").toLowerCase();
+        return (st === "sent" || st === "delivered" || e.isSent === true || e.direction === "sent") &&
+          st !== "draft" && !e.isSpam && !e.isReceived && st !== "failed";
+      }).length;
 
-      const received = list.filter((e: any) => 
-        (e.status === "Received" || e.isReceived === true) && !e.isSpam && !e.isSent
-      ).length;
+      const received = list.filter((e: any) => {
+        const st = (e.status || "").toLowerCase();
+        return (st === "received" || e.isReceived === true || e.direction === "received") &&
+          st !== "draft" && !e.isSpam && !e.isSent;
+      }).length;
 
       const drafts = list.filter((e: any) => 
-        e.status === "Draft" || e.status === "draft"
+        (e.status || "").toLowerCase() === "draft"
       ).length;
 
-      const scheduled = list.filter((e: any) => 
-        e.status === "Scheduled" || e.status === "scheduled" || e.status === "Sending"
-      ).length;
+      const scheduled = list.filter((e: any) => {
+        const st = (e.status || "").toLowerCase();
+        return st === "scheduled" || st === "sending";
+      }).length;
 
       const emergency = list.filter((e: any) => {
         const cat = (e.category || "").toLowerCase();
         const sit = (e.situation || "").toLowerCase();
-        const pri = (e.priority || "").toLowerCase();
-        return cat.includes("emergency") || sit.includes("emergency") || pri === "high" || pri === "critical";
+        const pri = (e.priority || e.importance || "").toLowerCase();
+        return cat.includes("emergency") || sit.includes("emergency") || pri === "high" || pri === "critical" || pri === "urgent";
       }).length;
 
-      const spam = list.filter((e: any) => 
-        e.status === "Spam" || e.status === "spam" || e.isSpam === true
-      ).length;
+      const spam = list.filter((e: any) => {
+        const st = (e.status || "").toLowerCase();
+        return st === "spam" || e.isSpam === true || (e.spam_status || "").toLowerCase() === "spam";
+      }).length;
 
-      const pendingReview = list.filter((e: any) => 
-        e.status === "Pending" || e.status === "pending" || e.status === "pending_review"
-      ).length;
+      const pendingReview = list.filter((e: any) => {
+        const st = (e.status || "").toLowerCase();
+        return st === "pending" || st === "pending_review" || st === "generated";
+      }).length;
 
-      const failed = list.filter((e: any) => e.status === "Failed").length;
+      const failed = list.filter((e: any) => (e.status || "").toLowerCase() === "failed").length;
 
       const todayMidnight = new Date();
       todayMidnight.setHours(0, 0, 0, 0);
       const sentToday = list.filter((e: any) => {
-        if (e.status !== "Sent" && e.status !== "Delivered" && !e.isSent) return false;
-        return new Date(e.sentAt || e.createdAt) >= todayMidnight;
+        const st = (e.status || "").toLowerCase();
+        if (st !== "sent" && st !== "delivered" && !e.isSent) return false;
+        return new Date(e.sentAt || e.sent_at || e.createdAt || e.created_at) >= todayMidnight;
       }).length;
 
       // 18 Standard Categories Distribution
@@ -2737,7 +2855,7 @@ RULES:
       };
 
       for (const e of list) {
-        const cat = (e.category || "").toLowerCase();
+        const cat = (e.category || e.email_type || "").toLowerCase();
         const sit = (e.situation || "").toLowerCase();
         const full = `${cat} ${sit}`;
 
@@ -2753,7 +2871,7 @@ RULES:
           categories.personal++;
         } else if (full.includes("complaint") || full.includes("delayed") || full.includes("refund")) {
           categories.complaint++;
-        } else if (full.includes("payment") || full.includes("invoice") || full.includes("due")) {
+        } else if (full.includes("payment") || full.includes("invoice") || full.includes("due") || full.includes("fee") || full.includes("receipt")) {
           categories.payment++;
         } else if (full.includes("meeting") || full.includes("appointment") || full.includes("reschedule")) {
           categories.meeting++;
@@ -2780,51 +2898,104 @@ RULES:
         }
 
         const t = (e.tone || "").toLowerCase();
-        if (t.includes("professional")) tones.professional++;
-        else if (t.includes("formal")) tones.formal++;
+        if (t.includes("formal")) tones.formal++;
         else if (t.includes("friendly")) tones.friendly++;
         else if (t.includes("urgent")) tones.urgent++;
         else if (t.includes("polite")) tones.polite++;
         else if (t.includes("apologetic")) tones.apologetic++;
         else if (t.includes("concise")) tones.concise++;
+        else tones.professional++;
 
-        const imp = (e.priority || "").toLowerCase();
-        if (imp.includes("low")) importance.low++;
+        const imp = (e.priority || e.importance || "").toLowerCase();
+        if (imp.includes("crit") || imp.includes("urg")) importance.critical++;
         else if (imp.includes("high")) importance.high++;
-        else if (imp.includes("critical")) importance.critical++;
+        else if (imp.includes("low")) importance.low++;
         else importance.normal++;
       }
 
+      // Fetch recent events for real-time activity stream
+      const { data: recentEvents } = await supabase
+        .from("email_events")
+        .select("id, email_id, event_type, metadata, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      // If email_events has items, use them; otherwise fallback to formatting the top 5 recent emails as activity
+      const activityStream = (recentEvents && recentEvents.length > 0)
+        ? recentEvents
+        : list.slice(0, 5).map((e: any) => ({
+            id: e.id,
+            email_id: e.id,
+            event_type: (e.status || "").toLowerCase(),
+            metadata: {
+              subject: e.subject || "(No Subject)",
+              recipient: e.recipient || e.recipient_email || "",
+              sender: e.sender || e.sender_email || "",
+            },
+            created_at: e.createdAt || e.created_at || new Date().toISOString(),
+          }));
+
+      // Check RPC analytics as an optional booster if available
+      let finalSent = sent;
+      let finalReceived = received;
+      let finalDrafts = drafts;
+      let finalScheduled = scheduled;
+      let finalEmergency = emergency;
+      let finalSpam = spam;
+      let finalPending = pendingReview;
+      let finalTotal = total;
+
+      try {
+        const { data: rpcStats, error: rpcErr } = await supabase.rpc("get_dashboard_analytics", { p_user_id: user.id });
+        if (!rpcErr && rpcStats) {
+          finalSent = Math.max(finalSent, rpcStats.sent || 0);
+          finalReceived = Math.max(finalReceived, rpcStats.received || 0);
+          finalDrafts = Math.max(finalDrafts, rpcStats.drafts || 0);
+          finalScheduled = Math.max(finalScheduled, rpcStats.scheduled || 0);
+          finalEmergency = Math.max(finalEmergency, rpcStats.emergency || 0);
+          finalSpam = Math.max(finalSpam, rpcStats.spam || 0);
+          finalPending = Math.max(finalPending, rpcStats.pendingReview || 0);
+          finalTotal = Math.max(finalTotal, rpcStats.total || 0);
+          if (rpcStats.categories && typeof rpcStats.categories === 'object') {
+            for (const [k, v] of Object.entries(rpcStats.categories)) {
+              categories[k] = Math.max(categories[k] || 0, Number(v) || 0);
+            }
+          }
+        }
+      } catch (_) {}
+
       return jsonResponse({
         success: true,
-        sent,
-        received,
-        drafts,
-        scheduled,
-        emergency,
-        spam,
-        pendingReview,
-        pending: pendingReview,
+        sent: finalSent,
+        received: finalReceived,
+        drafts: finalDrafts,
+        scheduled: finalScheduled,
+        emergency: finalEmergency,
+        spam: finalSpam,
+        pendingReview: finalPending,
+        pending: finalPending,
         sentToday,
         failed,
-        total,
+        total: finalTotal,
         categories,
         tones,
         importance,
-        totalEmails: sent,
+        totalEmails: finalSent,
         leave: categories.leave,
         resume: categories.jobApplication,
         official: categories.official,
+        recentActivity: activityStream,
         stats: {
-          total,
-          sent,
-          received,
-          drafts,
-          scheduled,
-          emergency,
-          spam,
-          pending: pendingReview,
-          pendingReview,
+          total: finalTotal,
+          sent: finalSent,
+          received: finalReceived,
+          drafts: finalDrafts,
+          scheduled: finalScheduled,
+          emergency: finalEmergency,
+          spam: finalSpam,
+          pending: finalPending,
+          pendingReview: finalPending,
           sentToday,
           categories,
         }

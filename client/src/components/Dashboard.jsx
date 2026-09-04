@@ -141,7 +141,7 @@ export function Dashboard({
     checkConnectionStatus();
     checkPushNotificationSupport();
 
-    // Automatically trigger Gmail sync on Dashboard load for the active user
+    // Trigger immediate background Gmail sync on mount
     apiFetch('/api/gmail/sync', { method: 'POST' })
       .then(r => r.json())
       .then(d => {
@@ -151,8 +151,21 @@ export function Dashboard({
       })
       .catch(() => {});
 
-    // Instant update via Supabase Realtime channel on Email & Email Events changes
-    const targetUser = localStorage.getItem('userId') || localStorage.getItem('userEmail') || '';
+    // Resolve accurate user target (UUID preferred for Postgres RLS/Realtime)
+    const storedId = localStorage.getItem('userId');
+    const isUuid = Boolean(storedId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedId));
+    let targetUser = isUuid ? storedId : (localStorage.getItem('userEmail') || '');
+
+    // Background verify Supabase Auth UUID if not yet in localStorage
+    if (!isUuid) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user?.id) {
+          localStorage.setItem('userId', session.user.id);
+        }
+      }).catch(() => {});
+    }
+
+    // Instant real-time updates via Supabase Realtime
     const unsubscribeEmail = subscribeToEmailChanges(targetUser, () => {
       fetchDashboardData();
     });
@@ -160,15 +173,43 @@ export function Dashboard({
       fetchDashboardData();
     });
 
-    // Fallback sync polling every 10 seconds
+    // Real-time tab visibility & focus listener (triggers sync when switching tabs)
+    const handleFocusSync = () => {
+      if (document.visibilityState === 'visible') {
+        apiFetch('/api/gmail/sync', { method: 'POST' })
+          .then(r => r.json())
+          .then(d => {
+            if (d?.newReceived > 0 || d?.newSent > 0 || d?.synced > 0) fetchDashboardData();
+          })
+          .catch(() => {});
+        fetchDashboardData();
+      }
+    };
+    window.addEventListener('focus', handleFocusSync);
+    document.addEventListener('visibilitychange', handleFocusSync);
+
+    // Regular background sync and data polling every 10 seconds
+    let syncCounter = 0;
     const interval = setInterval(() => {
       fetchDashboardData();
       checkConnectionStatus();
+      syncCounter++;
+      // Sync Gmail in background every 3rd cycle (30s)
+      if (syncCounter % 3 === 0) {
+        apiFetch('/api/gmail/sync', { method: 'POST' })
+          .then(r => r.json())
+          .then(d => {
+            if (d?.newReceived > 0 || d?.newSent > 0 || d?.synced > 0) fetchDashboardData();
+          })
+          .catch(() => {});
+      }
     }, 10000);
 
     return () => {
       if (typeof unsubscribeEmail === 'function') unsubscribeEmail();
       if (typeof unsubscribeEvents === 'function') unsubscribeEvents();
+      window.removeEventListener('focus', handleFocusSync);
+      document.removeEventListener('visibilitychange', handleFocusSync);
       clearInterval(interval);
     };
   }, [selectedCategory, selectedStatus, searchQuery]);
@@ -272,47 +313,96 @@ export function Dashboard({
         apiFetch(url)
       ]);
 
-      if (statsRes.ok) {
-        const sData = await statsRes.json();
-        if (sData) {
-          setStats({
-            sent: sData.sent ?? sData.totalEmails ?? 0,
-            received: sData.received ?? 0,
-            drafts: sData.drafts ?? 0,
-            scheduled: sData.scheduled ?? 0,
-            emergency: sData.emergency ?? 0,
-            spam: sData.spam ?? 0,
-            pendingReview: sData.pendingReview ?? sData.pending ?? 0,
-            sentToday: sData.sentToday ?? 0,
-            total: sData.total ?? 0,
-            categories: sData.categories || {
-              leave: sData.leave ?? 0,
-              jobApplication: sData.resume ?? 0,
-              official: sData.official ?? 0,
-              business: 0,
-              emergency: sData.emergency ?? 0,
-              personal: 0,
-              complaint: 0,
-              payment: 0,
-              meeting: 0,
-              followUp: 0,
-              thankYou: 0,
-              apology: 0,
-              announcement: 0,
-              academic: 0,
-              inquiry: 0,
-              congratulations: 0,
-              security: 0,
-              other: 0,
-            }
-          });
-        }
-      }
-
+      let emailList = [];
       if (emailsRes.ok) {
         const emails = await emailsRes.json();
-        setRecentEmails(Array.isArray(emails) ? emails : []);
+        emailList = Array.isArray(emails) ? emails : [];
+        setRecentEmails(emailList);
       }
+
+      // Compute local metric fallbacks directly from loaded emails
+      const listDrafts = emailList.filter(e => (e.status || '').toLowerCase() === 'draft').length;
+      const listSent = emailList.filter(e => {
+        const st = (e.status || '').toLowerCase();
+        return (st === 'sent' || st === 'delivered' || e.isSent === true || e.direction === 'sent') && st !== 'draft' && !e.isReceived && !e.isSpam;
+      }).length;
+      const listReceived = emailList.filter(e => {
+        const st = (e.status || '').toLowerCase();
+        return (st === 'received' || e.isReceived === true || e.direction === 'received') && st !== 'draft' && !e.isSpam && !e.isSent;
+      }).length;
+      const listScheduled = emailList.filter(e => ['scheduled', 'sending'].includes((e.status || '').toLowerCase())).length;
+      const listEmergency = emailList.filter(e => {
+        const cat = (e.category || '').toLowerCase();
+        const sit = (e.situation || '').toLowerCase();
+        const pri = (e.priority || e.importance || '').toLowerCase();
+        return cat.includes('emergency') || sit.includes('emergency') || pri === 'high' || pri === 'critical' || pri === 'urgent';
+      }).length;
+      const listSpam = emailList.filter(e => (e.status || '').toLowerCase() === 'spam' || e.isSpam || (e.spam_status || '').toLowerCase() === 'spam').length;
+      const listPending = emailList.filter(e => ['pending', 'pending_review', 'generated'].includes((e.status || '').toLowerCase())).length;
+
+      // Compute local categories distribution fallback
+      const emailListCategories = {
+        leave: 0,
+        jobApplication: 0,
+        official: 0,
+        business: 0,
+        emergency: 0,
+        personal: 0,
+        complaint: 0,
+        payment: 0,
+        meeting: 0,
+        followUp: 0,
+        thankYou: 0,
+        apology: 0,
+        announcement: 0,
+        academic: 0,
+        inquiry: 0,
+        congratulations: 0,
+        security: 0,
+        other: 0,
+      };
+
+      for (const item of emailList) {
+        const catStr = `${item.category || ''} ${item.situation || ''} ${item.email_type || ''} ${item.subject || ''}`.toLowerCase();
+        if (catStr.includes('leave') || catStr.includes('sick') || catStr.includes('vacation')) emailListCategories.leave++;
+        else if (catStr.includes('job') || catStr.includes('resume') || catStr.includes('application')) emailListCategories.jobApplication++;
+        else if (catStr.includes('business') || catStr.includes('proposal')) emailListCategories.business++;
+        else if (catStr.includes('emergency') || catStr.includes('urgent')) emailListCategories.emergency++;
+        else if (catStr.includes('personal') || catStr.includes('casual')) emailListCategories.personal++;
+        else if (catStr.includes('complaint') || catStr.includes('refund')) emailListCategories.complaint++;
+        else if (catStr.includes('payment') || catStr.includes('fee') || catStr.includes('receipt') || catStr.includes('invoice')) emailListCategories.payment++;
+        else if (catStr.includes('meeting') || catStr.includes('appointment')) emailListCategories.meeting++;
+        else if (catStr.includes('follow') || catStr.includes('reminder')) emailListCategories.followUp++;
+        else if (catStr.includes('thank') || catStr.includes('appreciation')) emailListCategories.thankYou++;
+        else if (catStr.includes('apology') || catStr.includes('sorry')) emailListCategories.apology++;
+        else if (catStr.includes('academic') || catStr.includes('student') || catStr.includes('exam')) emailListCategories.academic++;
+        else if (catStr.includes('inquiry') || catStr.includes('info')) emailListCategories.inquiry++;
+        else if (catStr.includes('official') || catStr.includes('professional')) emailListCategories.official++;
+        else emailListCategories.other++;
+      }
+
+      let sData = null;
+      if (statsRes.ok) {
+        sData = await statsRes.json();
+      }
+
+      const resolvedCategories = {};
+      for (const k of Object.keys(emailListCategories)) {
+        resolvedCategories[k] = Math.max(sData?.categories?.[k] || 0, emailListCategories[k] || 0);
+      }
+
+      setStats({
+        sent: Math.max(sData?.sent ?? sData?.totalEmails ?? 0, listSent),
+        received: Math.max(sData?.received ?? 0, listReceived),
+        drafts: Math.max(sData?.drafts ?? 0, listDrafts),
+        scheduled: Math.max(sData?.scheduled ?? 0, listScheduled),
+        emergency: Math.max(sData?.emergency ?? 0, listEmergency),
+        spam: Math.max(sData?.spam ?? 0, listSpam),
+        pendingReview: Math.max(sData?.pendingReview ?? sData?.pending ?? 0, listPending),
+        sentToday: sData?.sentToday ?? 0,
+        total: Math.max(sData?.total ?? 0, emailList.length),
+        categories: resolvedCategories
+      });
     } catch (err) {
       console.error('Dashboard data fetch error:', err);
     } finally {

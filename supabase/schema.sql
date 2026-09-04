@@ -580,11 +580,39 @@ AS $$
 DECLARE
   v_result JSONB;
 BEGIN
+  WITH combined_emails AS (
+    SELECT 
+      id::text as id,
+      user_id::text as user_id,
+      LOWER(status) as status,
+      LOWER(direction) as direction,
+      LOWER(COALESCE(spam_status, 'clean')) as spam_status,
+      LOWER(COALESCE(email_type, 'other')) as email_type,
+      LOWER(COALESCE(tone, 'professional')) as tone,
+      LOWER(COALESCE(importance, 'normal')) as importance
+    FROM public.emails
+    WHERE user_id::text = p_user_id
+    UNION ALL
+    SELECT 
+      id::text as id,
+      "userId"::text as user_id,
+      LOWER("status") as status,
+      CASE WHEN "isReceived" = true THEN 'received' ELSE 'sent' END as direction,
+      CASE WHEN "isSpam" = true THEN 'spam' ELSE 'clean' END as spam_status,
+      LOWER(COALESCE("category", "situation", 'other')) as email_type,
+      LOWER(COALESCE("tone", 'professional')) as tone,
+      LOWER(COALESCE("priority", 'normal')) as importance
+    FROM public."Email"
+    WHERE "userId"::text = p_user_id
+      AND NOT EXISTS (
+        SELECT 1 FROM public.emails e WHERE e.id::text = public."Email".id::text
+      )
+  )
   SELECT jsonb_build_object(
-    'sent', COUNT(*) FILTER (WHERE (direction = 'sent' OR status = 'sent') AND status != 'failed'),
-    'received', COUNT(*) FILTER (WHERE direction = 'received' AND (spam_status IS NULL OR spam_status != 'spam')),
+    'sent', COUNT(*) FILTER (WHERE (direction = 'sent' OR status = 'sent') AND status != 'draft' AND status != 'failed' AND spam_status != 'spam'),
+    'received', COUNT(*) FILTER (WHERE (direction = 'received' OR status = 'received') AND status != 'draft' AND spam_status != 'spam'),
     'drafts', COUNT(*) FILTER (WHERE status = 'draft'),
-    'scheduled', COUNT(*) FILTER (WHERE status = 'scheduled'),
+    'scheduled', COUNT(*) FILTER (WHERE status IN ('scheduled', 'sending')),
     'emergency', COUNT(*) FILTER (WHERE importance IN ('urgent', 'high', 'critical') OR email_type ILIKE '%emergency%'),
     'spam', COUNT(*) FILTER (WHERE spam_status = 'spam' OR status = 'spam'),
     'pendingReview', COUNT(*) FILTER (WHERE status IN ('pending', 'pending_review', 'generated')),
@@ -595,6 +623,7 @@ BEGIN
       'jobApplication', COUNT(*) FILTER (WHERE email_type ILIKE '%job%' OR email_type ILIKE '%resume%' OR email_type ILIKE '%application%'),
       'followUp', COUNT(*) FILTER (WHERE email_type ILIKE '%follow%' OR email_type ILIKE '%reminder%'),
       'complaint', COUNT(*) FILTER (WHERE email_type ILIKE '%complaint%'),
+      'payment', COUNT(*) FILTER (WHERE email_type ILIKE '%payment%' OR email_type ILIKE '%fee%' OR email_type ILIKE '%receipt%' OR email_type ILIKE '%invoice%'),
       'request', COUNT(*) FILTER (WHERE email_type ILIKE '%request%' OR email_type ILIKE '%inquiry%'),
       'business', COUNT(*) FILTER (WHERE email_type ILIKE '%business%' OR email_type ILIKE '%proposal%'),
       'personal', COUNT(*) FILTER (WHERE email_type ILIKE '%personal%' OR email_type ILIKE '%casual%'),
@@ -606,6 +635,8 @@ BEGIN
         email_type NOT ILIKE '%leave%' AND email_type NOT ILIKE '%sick%' AND 
         email_type NOT ILIKE '%job%' AND email_type NOT ILIKE '%resume%' AND 
         email_type NOT ILIKE '%follow%' AND email_type NOT ILIKE '%complaint%' AND 
+        email_type NOT ILIKE '%payment%' AND email_type NOT ILIKE '%fee%' AND
+        email_type NOT ILIKE '%receipt%' AND email_type NOT ILIKE '%invoice%' AND
         email_type NOT ILIKE '%request%' AND email_type NOT ILIKE '%business%' AND 
         email_type NOT ILIKE '%personal%' AND email_type NOT ILIKE '%meeting%' AND
         email_type NOT ILIKE '%official%' AND email_type NOT ILIKE '%thank%' AND
@@ -628,8 +659,7 @@ BEGIN
       'urgent', COUNT(*) FILTER (WHERE importance ILIKE '%urgent%' OR importance ILIKE '%critical%')
     )
   ) INTO v_result
-  FROM public.emails
-  WHERE user_id::text = p_user_id;
+  FROM combined_emails;
 
   RETURN COALESCE(v_result, '{}'::jsonb);
 END;

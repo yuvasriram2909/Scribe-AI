@@ -92,13 +92,21 @@ export async function signOutUser() {
 }
 
 /**
+ * Helper to test if a string is a valid UUID
+ */
+function isValidUuid(id) {
+  return Boolean(id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+}
+
+/**
  * Subscribe to real-time changes on the Email table for a specific user
  */
 export function subscribeToEmailChanges(userId, onEmailEvent) {
   if (!supabase || !onEmailEvent) return () => {};
 
   try {
-    const channelName = `realtime:emails:${userId || 'global'}`;
+    const isUuid = isValidUuid(userId);
+    const channelName = `rt_emails_${userId || 'all'}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
       .channel(channelName)
       .on(
@@ -119,7 +127,7 @@ export function subscribeToEmailChanges(userId, onEmailEvent) {
           event: '*',
           schema: 'public',
           table: 'emails',
-          ...(userId ? { filter: `user_id=eq.${userId}` } : {}),
+          ...(isUuid ? { filter: `user_id=eq.${userId}` } : {}),
         },
         (payload) => {
           onEmailEvent(payload);
@@ -147,15 +155,17 @@ export function subscribeToDraftChanges(userId, onDraftEvent) {
   if (!supabase || !onDraftEvent) return () => {};
 
   try {
+    const isUuid = isValidUuid(userId);
+    const channelName = `rt_drafts_${userId || 'all'}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`realtime:drafts:${userId || 'global'}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'drafts',
-          ...(userId ? { filter: `user_id=eq.${userId}` } : {}),
+          ...(isUuid ? { filter: `user_id=eq.${userId}` } : {}),
         },
         (payload) => {
           onDraftEvent(payload);
@@ -179,7 +189,7 @@ export function subscribeToNotificationChanges(userId, onNotificationEvent) {
   if (!supabase || !onNotificationEvent) return () => {};
 
   try {
-    const channelName = `realtime:notifications:${userId || 'global'}`;
+    const channelName = `rt_notifs_${userId || 'all'}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
       .channel(channelName)
       .on(
@@ -228,15 +238,17 @@ export function subscribeToEmailEvents(userId, onEvent) {
   if (!supabase || !onEvent) return () => {};
 
   try {
+    const isUuid = isValidUuid(userId);
+    const channelName = `rt_events_${userId || 'all'}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`realtime:email_events:${userId || 'global'}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'email_events',
-          ...(userId ? { filter: `user_id=eq.${userId}` } : {}),
+          ...(isUuid ? { filter: `user_id=eq.${userId}` } : {}),
         },
         (payload) => {
           onEvent(payload);
@@ -248,7 +260,7 @@ export function subscribeToEmailEvents(userId, onEvent) {
       supabase.removeChannel(channel);
     };
   } catch (err) {
-    console.warn('[Supabase Realtime] Failed to initialize email_events channel:', err);
+    console.warn('[Supabase Realtime] Failed to initialize Email events channel:', err);
     return () => {};
   }
 }

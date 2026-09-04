@@ -150,6 +150,7 @@ export function LoginPage({ onLoginSuccess }) {
           loggedInUser = data.user || { email: email.trim(), name: email.split('@')[0] };
         }
 
+        if (loggedInUser.id) localStorage.setItem('userId', loggedInUser.id);
         if (loggedInUser.email) localStorage.setItem('userEmail', loggedInUser.email);
         if (loggedInUser.name) localStorage.setItem('userName', loggedInUser.name);
 
