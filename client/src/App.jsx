@@ -122,6 +122,9 @@ export default function App() {
             }),
           }).catch((e) => console.warn('Sync session tokens notice:', e));
         }
+
+        // Trigger automatic Gmail sync on session restore
+        apiFetch('/api/gmail/sync', { method: 'POST' }).catch(() => {});
       }
     });
 
@@ -147,6 +150,11 @@ export default function App() {
               email: email,
             }),
           }).catch((e) => console.warn('Sync session tokens notice:', e));
+        }
+
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          // Trigger automatic Gmail sync on user login
+          apiFetch('/api/gmail/sync', { method: 'POST' }).catch(() => {});
         }
       } else if (event === 'SIGNED_OUT') {
         setCurrentUserEmail('');
@@ -183,6 +191,8 @@ export default function App() {
       window.history.replaceState({}, '', window.location.pathname);
       setTimeout(() => setToastMessage(''), 5000);
       checkGmailConnection();
+      // Auto-trigger sync immediately upon connecting Gmail
+      apiFetch('/api/gmail/sync', { method: 'POST' }).catch(() => {});
     } else if (params.get('gmail') === 'missing_scopes') {
       setActiveTab('settings');
       setToastMessage('⚠️ Gmail sending permission was not granted. Please click "Connect with Google" and check the "Send email on your behalf" box.');
@@ -213,6 +223,16 @@ export default function App() {
     if (currentUserEmail) {
       fetchUnreadNotifs();
       checkGmailConnection();
+
+      // Trigger automatic background Gmail synchronization whenever any user logs in or switches
+      apiFetch('/api/gmail/sync', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          if (d?.newReceived > 0 || d?.newSent > 0) {
+            fetchUnreadNotifs();
+          }
+        })
+        .catch(() => {});
 
       // Instant updates via Supabase Realtime channel
       const unsubscribe = subscribeToNotificationChanges(currentUserEmail, () => {

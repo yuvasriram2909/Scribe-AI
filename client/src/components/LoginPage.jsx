@@ -153,6 +153,9 @@ export function LoginPage({ onLoginSuccess }) {
         if (loggedInUser.email) localStorage.setItem('userEmail', loggedInUser.email);
         if (loggedInUser.name) localStorage.setItem('userName', loggedInUser.name);
 
+        // Auto-trigger Gmail sync immediately upon user login
+        apiFetch('/api/gmail/sync', { method: 'POST' }).catch(() => {});
+
         onLoginSuccess(loggedInUser);
       }
     } catch (err) {

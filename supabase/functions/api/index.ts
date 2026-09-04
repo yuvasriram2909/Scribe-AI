@@ -1179,6 +1179,20 @@ serve(async (req: Request) => {
         .update({ lastLoginAt: new Date().toISOString() })
         .eq("id", user.id);
 
+      // Automatically trigger background Gmail sync for this user upon login
+      try {
+        let loginSyncAccount: any = null;
+        const { data: conns } = await supabase.from("gmail_connections").select("*").eq("user_id", user.id);
+        if (conns && conns.length > 0) {
+          loginSyncAccount = conns[0];
+        } else if (accounts && accounts.length > 0) {
+          loginSyncAccount = accounts[0];
+        }
+        if (loginSyncAccount) {
+          syncUserGmail(user, loginSyncAccount, supabase).catch((e: any) => console.warn("Login auto-sync notice:", e));
+        }
+      } catch (_) {}
+
       return jsonResponse({
         success: true,
         token,
@@ -1293,6 +1307,11 @@ serve(async (req: Request) => {
 
       const isConnected = !!connection && connection.status !== "DISCONNECTED";
       const connectedEmail = connection?.gmail_email || connection?.gmailEmail || null;
+
+      // If connected, ensure latest emails are synced in background
+      if (isConnected && connection) {
+        syncUserGmail(user, connection, supabase).catch((e: any) => console.warn("Status auto-sync notice:", e));
+      }
 
       return jsonResponse({
         isConnected,
@@ -1545,6 +1564,22 @@ serve(async (req: Request) => {
       if (!hasGmailSend) {
         return Response.redirect(`${frontendUrl}?gmail=missing_scopes`, 302);
       }
+
+      // Automatically trigger initial background Gmail sync for this user upon connecting
+      try {
+        const syncAccount = {
+          id: effectiveUserId,
+          userId: effectiveUserId,
+          gmailEmail: authorizedEmail,
+          gmail_email: authorizedEmail,
+          access_token_encrypted: tokenData.access_token || "",
+          encryptedAccessToken: tokenData.access_token || "",
+          refresh_token_encrypted: encryptedRefreshToken,
+          encryptedRefreshToken,
+        };
+        syncUserGmail({ id: effectiveUserId, email: authorizedEmail }, syncAccount, supabase)
+          .catch((err: any) => console.warn("Post-OAuth initial sync notice:", err));
+      } catch (_) {}
 
       // Generate Supabase Auth session / magic link for instant client-side session login (if not already logged in)
       let authLink = "";

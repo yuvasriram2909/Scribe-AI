@@ -141,6 +141,16 @@ export function Dashboard({
     checkConnectionStatus();
     checkPushNotificationSupport();
 
+    // Automatically trigger Gmail sync on Dashboard load for the active user
+    apiFetch('/api/gmail/sync', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d?.newReceived > 0 || d?.newSent > 0 || d?.synced > 0) {
+          fetchDashboardData();
+        }
+      })
+      .catch(() => {});
+
     // Instant update via Supabase Realtime channel on Email & Email Events changes
     const targetUser = localStorage.getItem('userId') || localStorage.getItem('userEmail') || '';
     const unsubscribeEmail = subscribeToEmailChanges(targetUser, () => {
