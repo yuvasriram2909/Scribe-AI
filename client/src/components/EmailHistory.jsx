@@ -10,6 +10,7 @@ const CATEGORIES_FILTER = [
   'Job Application',
   'Official',
   'Meeting',
+  'Payment',
   'Follow-up',
   'Complaint',
   'Request',
@@ -18,7 +19,7 @@ const CATEGORIES_FILTER = [
 
 const TONES_FILTER = ['All', 'Professional', 'Formal', 'Friendly', 'Urgent', 'Polite', 'Apologetic', 'Concise'];
 const IMPORTANCE_FILTER = ['All', 'Low', 'Normal', 'High', 'Critical'];
-const DIRECTION_FILTER = ['All', 'Sent', 'Received'];
+const DIRECTION_FILTER = ['All', 'Sent', 'Received', 'Drafts'];
 const STATUS_FILTER = ['All', 'Sent', 'Received', 'Draft', 'Scheduled', 'Failed', 'Spam'];
 const DATE_RANGES = [
   { id: 'All', label: 'All Time' },
@@ -40,6 +41,18 @@ export function EmailHistory({ onReuseEmail }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [retryingId, setRetryingId] = useState(null);
+
+  const hasActiveFilters = selectedDirection !== 'All' || selectedCategory !== 'All' || selectedTone !== 'All' || selectedImportance !== 'All' || selectedStatus !== 'All' || selectedDateRange !== 'All' || searchQuery.trim() !== '';
+
+  const handleResetFilters = () => {
+    setSelectedDirection('All');
+    setSelectedCategory('All');
+    setSelectedTone('All');
+    setSelectedImportance('All');
+    setSelectedStatus('All');
+    setSelectedDateRange('All');
+    setSearchQuery('');
+  };
 
   useEffect(() => {
     fetchEmails();
@@ -144,43 +157,62 @@ export function EmailHistory({ onReuseEmail }) {
     }
   };
 
-  const renderStatusBadge = (status, isSpam, errorMessage) => {
-    if (isSpam || status === 'Spam' || status === 'spam') {
+  const renderEmailBadge = (email) => {
+    const isSpam = email.isSpam || email.spam_status === 'spam' || (email.status || '').toLowerCase() === 'spam';
+    if (isSpam) {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 rounded-full">
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-sm">
           <ShieldAlert className="w-3 h-3 text-amber-400" />
           Spam
         </span>
       );
     }
-    if (status === 'Sent' || status === 'Delivered') {
+    const isDraft = email.isDraft || email.direction === 'draft' || (email.status || '').toLowerCase() === 'draft';
+    if (isDraft) {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 rounded-full">
-          <CheckCircle className="w-3 h-3 text-emerald-400" />
-          Sent
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-300 bg-purple-950/80 border border-purple-500/40 px-2.5 py-0.5 rounded-full shadow-sm">
+          <Clock className="w-3 h-3 text-purple-400" />
+          Draft
         </span>
       );
     }
-    if (status === 'Received') {
+    const isReceived = email.isReceived || email.direction === 'received' || (email.status || '').toLowerCase() === 'received';
+    if (isReceived) {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-300 bg-blue-950/80 border border-blue-500/40 px-2 py-0.5 rounded-full">
-          <Inbox className="w-3 h-3 text-blue-400" />
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-300 bg-blue-950/80 border border-blue-500/40 px-2.5 py-0.5 rounded-full shadow-sm">
+          <ArrowDownLeft className="w-3 h-3 text-blue-400" />
           Received
         </span>
       );
     }
-    if (status === 'Failed') {
+    const isSent = email.isSent || email.direction === 'sent' || (email.status || '').toLowerCase() === 'sent' || (email.status || '').toLowerCase() === 'delivered';
+    if (isSent) {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-300 bg-rose-950/80 border border-rose-500/40 px-2 py-0.5 rounded-full" title={errorMessage || 'Sending failed'}>
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-0.5 rounded-full shadow-sm">
+          <ArrowUpRight className="w-3 h-3 text-emerald-400" />
+          Sent
+        </span>
+      );
+    }
+    if ((email.status || '').toLowerCase() === 'failed') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-300 bg-rose-950/80 border border-rose-500/40 px-2.5 py-0.5 rounded-full shadow-sm" title={email.errorMessage || 'Sending failed'}>
           <AlertCircle className="w-3 h-3 text-rose-400 shrink-0" />
           Failed
         </span>
       );
     }
+    if ((email.status || '').toLowerCase() === 'scheduled') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-sm">
+          <Clock className="w-3 h-3 text-amber-400" />
+          Scheduled
+        </span>
+      );
+    }
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full">
-        <Clock className="w-3 h-3 text-slate-400" />
-        {status || 'Draft'}
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-300 bg-slate-800 border border-slate-700 px-2.5 py-0.5 rounded-full">
+        {email.status || 'Email'}
       </span>
     );
   };
@@ -213,6 +245,7 @@ export function EmailHistory({ onReuseEmail }) {
             >
               {dir === 'Sent' && <ArrowUpRight className="w-3 h-3 text-emerald-400" />}
               {dir === 'Received' && <ArrowDownLeft className="w-3 h-3 text-blue-400" />}
+              {dir === 'Drafts' && <Clock className="w-3 h-3 text-purple-400" />}
               {dir}
             </button>
           ))}
@@ -293,6 +326,17 @@ export function EmailHistory({ onReuseEmail }) {
           />
         </div>
 
+        {hasActiveFilters && (
+          <button
+            onClick={handleResetFilters}
+            className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 border border-slate-700 cursor-pointer transition-colors"
+            title="Reset all active filters"
+          >
+            <X className="w-3 h-3 text-rose-400" />
+            <span>Clear</span>
+          </button>
+        )}
+
         {/* Manual Gmail Sync Button */}
         <button
           onClick={handleManualSync}
@@ -314,14 +358,22 @@ export function EmailHistory({ onReuseEmail }) {
       ) : emails.length === 0 ? (
         <div className="glass-panel p-12 text-center text-xs text-slate-400 rounded-3xl space-y-3 border border-slate-800 shadow-xl">
           <Mail className="w-8 h-8 text-purple-400 mx-auto opacity-50" />
-          <p className="font-bold text-white">No email history found</p>
-          <p className="text-slate-400">No emails matching your selected filters in Supabase.</p>
+          <p className="font-bold text-white text-sm">No email records found</p>
+          <p className="text-slate-400">No emails matched your selected filters.</p>
+          {hasActiveFilters && (
+            <button
+              onClick={handleResetFilters}
+              className="mt-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all cursor-pointer shadow-lg"
+            >
+              Reset All Filters
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {emails.map(email => {
-            const isReceived = email.isReceived || email.direction === 'received' || email.status === 'Received';
-            const isSpam = email.isSpam || email.spam_status === 'spam';
+            const isDraft = email.isDraft || email.direction === 'draft' || (email.status || '').toLowerCase() === 'draft';
+            const isReceived = !isDraft && (email.isReceived || email.direction === 'received' || email.status === 'Received');
             const cat = email.category || email.email_type || 'General';
             const tone = email.tone || 'Professional';
             const priority = email.priority || email.importance || 'Normal';
@@ -338,14 +390,7 @@ export function EmailHistory({ onReuseEmail }) {
                     <span className="text-[10px] font-bold text-purple-300 bg-purple-950/60 px-2 py-0.5 rounded-full border border-purple-500/30">
                       {cat}
                     </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        isReceived ? 'bg-blue-950/60 text-blue-300 border-blue-500/30' : 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30'
-                      }`}>
-                        {isReceived ? '↙ Received' : '↗ Sent'}
-                      </span>
-                      {renderStatusBadge(email.status, isSpam, email.errorMessage)}
-                    </div>
+                    {renderEmailBadge(email)}
                   </div>
 
                   <h3 className="text-sm font-bold text-white line-clamp-1">
@@ -354,6 +399,8 @@ export function EmailHistory({ onReuseEmail }) {
                   <p className="text-xs text-slate-400 line-clamp-1">
                     {isReceived ? (
                       <>From: <span className="font-semibold text-purple-300 font-mono">{email.sender || email.sender_email || email.gmailAccount || 'External Sender'}</span></>
+                    ) : isDraft ? (
+                      <>Draft To: <span className="font-semibold text-cyan-300 font-mono">{email.recipient || email.recipient_email || '(Unspecified)'}</span></>
                     ) : (
                       <>To: <span className="font-semibold text-cyan-300 font-mono">{email.recipient || email.recipient_email}</span></>
                     )}
@@ -437,13 +484,13 @@ export function EmailHistory({ onReuseEmail }) {
             </div>
 
             <div className="space-y-2 text-xs text-slate-300 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 font-mono">
-              <p><strong className="text-purple-400">Direction:</strong> {selectedEmail.direction || (selectedEmail.isReceived ? 'Received' : 'Sent')}</p>
+              <p><strong className="text-purple-400">Direction:</strong> {(selectedEmail.isDraft || (selectedEmail.status || '').toLowerCase() === 'draft') ? 'Draft (Unsent)' : (selectedEmail.direction || (selectedEmail.isReceived ? 'Received' : 'Sent'))}</p>
               {(selectedEmail.sender || selectedEmail.sender_email) ? (
                 <p><strong className="text-purple-400">From:</strong> {selectedEmail.sender || selectedEmail.sender_email}</p>
               ) : selectedEmail.isReceived ? (
                 <p><strong className="text-purple-400">From:</strong> External Sender</p>
               ) : null}
-              <p><strong className="text-purple-400">To:</strong> {selectedEmail.recipient || selectedEmail.recipient_email}</p>
+              <p><strong className="text-purple-400">To:</strong> {selectedEmail.recipient || selectedEmail.recipient_email || '(Unspecified)'}</p>
               {selectedEmail.cc && <p><strong className="text-purple-400">Cc:</strong> {selectedEmail.cc}</p>}
               {selectedEmail.bcc && <p><strong className="text-purple-400">Bcc:</strong> {selectedEmail.bcc}</p>}
               <p><strong className="text-purple-400">Status:</strong> {selectedEmail.status}</p>

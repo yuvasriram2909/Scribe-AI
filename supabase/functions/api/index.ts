@@ -2368,8 +2368,13 @@ RULES:
         if (ce.id) seenIds.add(ce.id);
         if (ce.gmail_message_id) seenGmailIds.add(ce.gmail_message_id);
 
-        const isReceived = ce.direction === "received" || ce.status === "received";
-        const isSent = ce.direction === "sent" || ce.status === "sent" || ce.status === "delivered";
+        const rawStatus = (ce.status || "").toLowerCase();
+        const rawDir = (ce.direction || "").toLowerCase();
+        const isDraft = rawStatus === "draft" || rawDir === "draft";
+        const isReceived = !isDraft && (rawDir === "received" || rawStatus === "received");
+        const isSent = !isDraft && (rawDir === "sent" || rawStatus === "sent" || rawStatus === "delivered");
+        const direction = isDraft ? "draft" : isReceived ? "received" : isSent ? "sent" : "other";
+        const status = isDraft ? "Draft" : ce.status ? (ce.status.charAt(0).toUpperCase() + ce.status.slice(1).toLowerCase()) : (isReceived ? "Received" : "Sent");
 
         combined.push({
           id: ce.id,
@@ -2382,16 +2387,17 @@ RULES:
           bcc: ce.bcc,
           subject: ce.subject || "(No Subject)",
           body: ce.body || "",
-          category: ce.email_type || "Professional / Official",
-          situation: ce.email_type || "Professional / Official",
+          category: ce.email_type || "Official / Professional",
+          situation: ce.email_type || "Official / Professional",
           tone: ce.tone || "Professional",
           priority: ce.importance || "Normal",
           importance: ce.importance || "Normal",
-          status: ce.status ? (ce.status.charAt(0).toUpperCase() + ce.status.slice(1)) : "Sent",
-          direction: ce.direction || (isReceived ? "received" : "sent"),
-          isSent: isSent,
-          isReceived: isReceived,
-          isSpam: ce.spam_status === "spam",
+          status,
+          direction,
+          isSent,
+          isReceived,
+          isDraft,
+          isSpam: ce.spam_status === "spam" || rawStatus === "spam",
           gmailMessageId: ce.gmail_message_id,
           gmailThreadId: ce.thread_id,
           sentAt: ce.sent_at,
@@ -2407,8 +2413,13 @@ RULES:
         seenIds.add(le.id);
         if (le.gmailMessageId) seenGmailIds.add(le.gmailMessageId);
 
-        const isReceived = le.isReceived || le.status === "Received" || le.direction === "received";
-        const isSent = le.isSent || le.status === "Sent" || le.status === "Delivered" || le.direction === "sent";
+        const rawStatus = (le.status || "").toLowerCase();
+        const rawDir = (le.direction || "").toLowerCase();
+        const isDraft = rawStatus === "draft" || rawDir === "draft";
+        const isReceived = !isDraft && (le.isReceived === true || rawDir === "received" || rawStatus === "received");
+        const isSent = !isDraft && (le.isSent === true || rawDir === "sent" || rawStatus === "sent" || rawStatus === "delivered");
+        const direction = isDraft ? "draft" : isReceived ? "received" : isSent ? "sent" : "other";
+        const status = isDraft ? "Draft" : le.status ? (le.status.charAt(0).toUpperCase() + le.status.slice(1).toLowerCase()) : (isReceived ? "Received" : "Sent");
 
         combined.push({
           ...le,
@@ -2416,9 +2427,12 @@ RULES:
           sender_email: le.sender_email || le.sender || "",
           recipient: le.recipient || le.recipient_email || "",
           recipient_email: le.recipient || le.recipient_email || "",
+          status,
+          direction,
           isSent,
           isReceived,
-          direction: isReceived ? "received" : "sent",
+          isDraft,
+          isSpam: le.isSpam === true || rawStatus === "spam",
         });
       }
 
@@ -2426,45 +2440,79 @@ RULES:
 
       // Status Filter
       if (statusQuery && statusQuery !== "All") {
-        result = result.filter((e: any) => (e.status || "").toLowerCase() === statusQuery.toLowerCase());
+        const stQ = statusQuery.toLowerCase().trim();
+        result = result.filter((e: any) => {
+          const s = (e.status || "").toLowerCase();
+          if (stQ === "draft") return e.isDraft || s === "draft";
+          if (stQ === "sent") return !e.isDraft && (s === "sent" || s === "delivered");
+          if (stQ === "received") return !e.isDraft && s === "received";
+          if (stQ === "spam") return e.isSpam || s === "spam";
+          return s === stQ;
+        });
       }
 
-      // Category Filter
+      // Category Filter (Flexible keyword & situation matching)
       if (categoryQuery && categoryQuery !== "All") {
-        result = result.filter((e: any) => (e.category || "").toLowerCase() === categoryQuery.toLowerCase());
+        const catQ = categoryQuery.toLowerCase().trim();
+        result = result.filter((e: any) => {
+          const cat = ((e.category || "") + " " + (e.situation || "") + " " + (e.email_type || "")).toLowerCase();
+          if (cat.includes(catQ)) return true;
+          if ((catQ.includes("official") || catQ.includes("prof")) && (cat.includes("official") || cat.includes("professional") || cat.includes("work"))) return true;
+          if (catQ.includes("leave") && (cat.includes("leave") || cat.includes("holiday") || cat.includes("vacation") || cat.includes("sick"))) return true;
+          if (catQ.includes("meet") && (cat.includes("meet") || cat.includes("appointment") || cat.includes("sync"))) return true;
+          if ((catQ.includes("job") || catQ.includes("app")) && (cat.includes("job") || cat.includes("resume") || cat.includes("career") || cat.includes("interview") || cat.includes("application"))) return true;
+          if (catQ.includes("pay") && (cat.includes("payment") || cat.includes("fee") || cat.includes("invoice") || cat.includes("receipt") || cat.includes("billing") || cat.includes("salary"))) return true;
+          if (catQ.includes("emerg") && (cat.includes("emergency") || cat.includes("urgent"))) return true;
+          if (catQ.includes("complaint") && (cat.includes("complaint") || cat.includes("grievance"))) return true;
+          if (catQ.includes("follow") && (cat.includes("follow") || cat.includes("reminder"))) return true;
+          if (catQ.includes("request") && cat.includes("request")) return true;
+          return false;
+        });
       }
 
       // Direction Filter
       if (directionQuery && directionQuery !== "All") {
-        if (directionQuery.toLowerCase() === "sent") {
-          result = result.filter((e: any) => e.isSent || (e.direction || "").toLowerCase() === "sent" || (e.status || "").toLowerCase() === "sent");
-        } else if (directionQuery.toLowerCase() === "received") {
-          result = result.filter((e: any) => e.isReceived || (e.direction || "").toLowerCase() === "received" || (e.status || "").toLowerCase() === "received");
+        const dirQ = directionQuery.toLowerCase().trim();
+        if (dirQ === "sent") {
+          result = result.filter((e: any) => !e.isDraft && (e.status || "").toLowerCase() !== "draft" && (e.isSent || (e.direction || "").toLowerCase() === "sent"));
+        } else if (dirQ === "received") {
+          result = result.filter((e: any) => !e.isDraft && (e.status || "").toLowerCase() !== "draft" && (e.isReceived || (e.direction || "").toLowerCase() === "received"));
+        } else if (dirQ === "draft" || dirQ === "drafts") {
+          result = result.filter((e: any) => e.isDraft || (e.direction || "").toLowerCase() === "draft" || (e.status || "").toLowerCase() === "draft");
         }
       }
 
       // Tone Filter
       if (toneQuery && toneQuery !== "All") {
-        result = result.filter((e: any) => (e.tone || "").toLowerCase().includes(toneQuery.toLowerCase()));
+        result = result.filter((e: any) => (e.tone || "").toLowerCase().includes(toneQuery.toLowerCase().trim()));
       }
 
       // Importance Filter
       if (importanceQuery && importanceQuery !== "All") {
-        result = result.filter((e: any) => (e.priority || e.importance || "").toLowerCase() === importanceQuery.toLowerCase());
+        const impQ = importanceQuery.toLowerCase().trim();
+        result = result.filter((e: any) => {
+          const imp = (e.priority || e.importance || "").toLowerCase();
+          return imp === impQ || imp.includes(impQ);
+        });
       }
 
-      // Date Range Filter
+      // Date Range Filter (timezone-resilient rolling window)
       if (dateRangeQuery && dateRangeQuery !== "All") {
-        const now = new Date();
-        let cutoff = new Date(0);
+        const nowMs = Date.now();
+        let cutoffMs = 0;
         if (dateRangeQuery === "today") {
-          cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          cutoffMs = nowMs - 24 * 60 * 60 * 1000;
         } else if (dateRangeQuery === "week") {
-          cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          cutoffMs = nowMs - 7 * 24 * 60 * 60 * 1000;
         } else if (dateRangeQuery === "month") {
-          cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          cutoffMs = nowMs - 30 * 24 * 60 * 60 * 1000;
         }
-        result = result.filter((e: any) => new Date(e.sentAt || e.receivedAt || e.createdAt) >= cutoff);
+        result = result.filter((e: any) => {
+          const dStr = e.sentAt || e.receivedAt || e.createdAt;
+          if (!dStr) return false;
+          const t = new Date(dStr).getTime();
+          return !isNaN(t) && t >= cutoffMs;
+        });
       }
 
       // Text Search Filter
@@ -2473,6 +2521,7 @@ RULES:
         result = result.filter((e: any) => 
           (e.subject || "").toLowerCase().includes(q) ||
           (e.recipient || "").toLowerCase().includes(q) ||
+          (e.recipient_email || "").toLowerCase().includes(q) ||
           (e.sender || "").toLowerCase().includes(q) ||
           (e.sender_email || "").toLowerCase().includes(q) ||
           (e.body || "").toLowerCase().includes(q)
@@ -2480,7 +2529,11 @@ RULES:
       }
 
       // Sort by date descending
-      result.sort((a, b) => new Date(b.receivedAt || b.sentAt || b.createdAt).getTime() - new Date(a.receivedAt || a.sentAt || a.createdAt).getTime());
+      result.sort((a, b) => {
+        const tA = new Date(a.sentAt || a.receivedAt || a.createdAt || 0).getTime();
+        const tB = new Date(b.sentAt || b.receivedAt || b.createdAt || 0).getTime();
+        return tB - tA;
+      });
 
       return jsonResponse(result);
     }

@@ -317,7 +317,7 @@ export default function App() {
     switch (activeTab) {
       case 'dashboard': return 'Dashboard';
       case 'compose': return 'AI Smart Email Compose';
-      case 'history': return 'Sent Email History';
+      case 'history': return 'Email History & Archives';
       case 'notifications': return 'Notifications';
       case 'contacts': return 'Contacts & Address Book';
       case 'templates': return 'Canned Email Templates';
