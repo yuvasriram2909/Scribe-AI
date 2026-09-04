@@ -520,7 +520,7 @@ export default function App() {
             >
               <div className="flex items-center gap-3">
                 <Users className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'contacts' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
-                <span>Contacts</span>
+                <span>Contacts & Address Book</span>
               </div>
             </button>
 
@@ -538,35 +538,7 @@ export default function App() {
             >
               <div className="flex items-center gap-3">
                 <Layout className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'templates' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
-                <span>Templates</span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
-                theme === 'dark'
-                  ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Calendar className="w-4 h-4 text-stone-400 nav-icon group-hover:text-amber-400 transition-all duration-200" />
-                <span>Scheduled Emails</span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
-                theme === 'dark'
-                  ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <BarChart2 className="w-4 h-4 text-stone-400 nav-icon group-hover:text-amber-400 transition-all duration-200" />
-                <span>Analytics</span>
+                <span>Canned Templates</span>
               </div>
             </button>
 
@@ -730,6 +702,16 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Live Gmail Connection Status Pill (Matching Screenshot) */}
+            <div className={`hidden sm:inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+              isGmailConnected
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-xs'
+                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-xs'
+            }`}>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-xs shadow-emerald-400/50"></span>
+              <span>Gmail Connected</span>
+            </div>
+
             {/* Dark / Light Mode Toggle Button with Micro-Scale */}
             <button
               onClick={toggleTheme}
@@ -764,7 +746,7 @@ export default function App() {
               title="Notifications"
             >
               <Bell className="w-4.5 h-4.5" />
-              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-amber-500 text-stone-950 text-[9px] font-extrabold shadow-sm">
+              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-extrabold shadow-sm">
                 {unreadNotifCount > 0 ? unreadNotifCount : '3'}
               </span>
             </button>
@@ -789,7 +771,7 @@ export default function App() {
                     {displayName}
                   </span>
                   <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
-                    Premium Plan
+                    👑 Premium Plan
                   </span>
                 </div>
                 <ChevronDown className={`w-3.5 h-3.5 text-stone-400 transition-transform duration-200 ${userDropdownOpen ? 'rotate-180' : ''}`} />

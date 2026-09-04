@@ -19,6 +19,21 @@ function GoldMiniBarChart() {
   );
 }
 
+function StatCardWave({ color = '#06B6D4' }) {
+  return (
+    <div className="w-full h-4 mt-2 overflow-hidden pointer-events-none opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+      <svg viewBox="0 0 120 18" fill="none" className="w-full h-full">
+        <path
+          d="M 0 12 Q 30 2 60 10 T 120 8"
+          stroke={color}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
 const CATEGORIES_LIST = [
   { id: 'All', label: 'All Situations' },
   { id: 'Emergency', label: '🚨 Emergency' },
@@ -551,116 +566,7 @@ export function Dashboard({
       )}
 
       {/* ============================================================
-          1. HERO LUXURY BANNER (Matching Mockup Top Card)
-      ============================================================ */}
-      <div className={`relative overflow-hidden rounded-3xl p-6 sm:p-8 border hero-card-interactive transition-all ${
-        theme === 'dark'
-          ? 'bg-gradient-to-br from-[#16140E] via-[#12141A] to-[#0D0E12] border-amber-500/25 shadow-2xl'
-          : 'bg-gradient-to-br from-[#FFFDF8] via-[#FAF3E3] to-[#F5E9CC] border-amber-300/80 shadow-sm'
-      }`}>
-        
-        {/* Subtle Ambient Cosmic Gold Glows */}
-        <div className="absolute top-0 right-1/4 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -z-0"></div>
-
-        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-          <div className="max-w-2xl space-y-3.5">
-            
-            {/* Tag Badge: WELCOME BACK, YUVA! 👋 (uppercase tracking) */}
-            <div className="inline-flex items-center gap-2">
-              <span className={`text-xs font-extrabold tracking-wider ${
-                theme === 'dark' ? 'text-amber-400' : 'text-amber-700'
-              }`}>
-                WELCOME BACK, {displayName.toUpperCase()}! 👋
-              </span>
-            </div>
-
-            {/* Headline: Send Smarter. Do More. */}
-            <div>
-              <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight ${
-                theme === 'dark' ? 'text-white' : 'text-stone-900'
-              }`}>
-                Send Smarter.
-                <br />
-                Do {theme === 'dark' ? 'More.' : <span className="text-amber-600">More.</span>}
-              </h1>
-              <p className={`text-xs sm:text-sm mt-2 leading-relaxed ${
-                theme === 'dark' ? 'text-stone-400' : 'text-stone-600'
-              }`}>
-                Create, personalize, and send emails with the power of AI.
-              </p>
-            </div>
-
-            {/* Action Buttons: Compose New Email → & View Templates with Light Sweep & Micro-Motion */}
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                onClick={() => onStartCompose()}
-                className="gold-btn light-sweep px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer group"
-              >
-                <Send className="w-3.5 h-3.5 text-stone-950 btn-icon-spin transition-transform" />
-                <span>Compose New Email</span>
-                <span className="btn-arrow-slide transition-transform duration-200">→</span>
-              </button>
-              <button
-                onClick={() => onStartCompose({ step: 1 })}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all duration-200 hover:scale-102 hover:border-amber-500/50 hover:shadow-md cursor-pointer group ${
-                  theme === 'dark'
-                    ? 'border-amber-500/30 bg-stone-900/50 hover:bg-stone-800/80 text-amber-200'
-                    : 'border-amber-300 bg-white/80 hover:bg-white text-stone-800 shadow-xs'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5 text-amber-500 group-hover:scale-110 transition-transform" />
-                <span>View Templates</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Right: Golden Origami 3D Paper Airplane Graphic with floating parallax and cursive tagline */}
-          <div className="hidden lg:flex flex-col items-center justify-center relative w-72 shrink-0">
-            <div className="relative w-56 h-40 flex items-center justify-center">
-              {/* Golden Ambient Glow */}
-              <div className="absolute inset-0 bg-amber-500/15 rounded-full blur-2xl pointer-events-none"></div>
-              {/* Origami Golden Paper Airplane SVG with subtle floating loop */}
-              <svg viewBox="0 0 200 160" className="w-48 h-36 drop-shadow-xl animate-airplane-float cursor-pointer">
-                <defs>
-                  <linearGradient id="goldWing1" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#FDE68A" />
-                    <stop offset="50%" stopColor="#F59E0B" />
-                    <stop offset="100%" stopColor="#D97706" />
-                  </linearGradient>
-                  <linearGradient id="goldWing2" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#F59E0B" />
-                    <stop offset="100%" stopColor="#B45309" />
-                  </linearGradient>
-                  <linearGradient id="goldFold" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#FEF3C7" />
-                    <stop offset="100%" stopColor="#F59E0B" />
-                  </linearGradient>
-                </defs>
-                {/* Flight dust trail */}
-                <path d="M 20 120 Q 70 140 120 110" fill="none" stroke="rgba(245, 158, 11, 0.4)" strokeWidth="2" strokeDasharray="3 3" />
-                <circle cx="20" cy="120" r="2" fill="#F59E0B" opacity="0.6" />
-                <circle cx="50" cy="130" r="2.5" fill="#F59E0B" opacity="0.7" />
-                <circle cx="85" cy="132" r="2" fill="#F59E0B" opacity="0.8" />
-                {/* Airplane folds */}
-                <polygon points="175,25 25,95 105,115" fill="url(#goldWing1)" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.25))" />
-                <polygon points="175,25 105,115 125,145" fill="url(#goldWing2)" />
-                <polygon points="175,25 105,115 95,95" fill="url(#goldFold)" opacity="0.9" />
-                <polygon points="175,25 95,95 25,95" fill="url(#goldWing1)" opacity="0.85" />
-              </svg>
-            </div>
-            {/* Elegant cursive script tagline from the mockup */}
-            <div className={`text-right w-full pr-4 italic font-bold tracking-wide ${
-              theme === 'dark' ? 'text-amber-200/90' : 'text-amber-900/90'
-            }`} style={{ fontFamily: 'Dancing Script, Caveat, cursive, sans-serif' }}>
-              <span className="block text-sm">Smarter Emails</span>
-              <span className="block text-base -mt-1 font-extrabold text-amber-500">Brighter Connections</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ============================================================
-          2. GMAIL CONNECTED STATUS BAR (With Micro-Interactions)
+          1. GMAIL CONNECTED STATUS BAR (Matching Reference Screenshot Top Card)
       ============================================================ */}
       <div className={`p-4 sm:p-5 rounded-2xl border gmail-card-interactive group transition-all ${
         theme === 'dark' 
@@ -679,45 +585,23 @@ export function Dashboard({
               </svg>
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
                   Gmail Connected
                 </h3>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50"></span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 inline-flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  OAuth Active
+                </span>
               </div>
               <p className={`text-xs mt-0.5 font-mono ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
-                {connectionStatus.connectedEmail || localStorage.getItem('userEmail') || 'yuvasriram2909@gmail.com'}
+                Connected account: {connectionStatus.connectedEmail || localStorage.getItem('userEmail') || 'yuvasriram2909@gmail.com'}
               </p>
             </div>
           </div>
 
+          {/* 3 Action Buttons Side-by-Side (Matching Reference Screenshot) */}
           <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-            {/* Dark / Light Mode Button right on the Dashboard Header */}
-            {toggleTheme && (
-              <button
-                onClick={toggleTheme}
-                className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-xs ${
-                  theme === 'dark'
-                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-amber-500/30 text-amber-400 hover:border-amber-500/50'
-                    : 'bg-amber-100/70 hover:bg-amber-200/70 border-amber-300 text-amber-900'
-                }`}
-                title="Switch Dark or Light Mode"
-              >
-                {theme === 'dark' ? (
-                  <>
-                    <Sun className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Light Mode</span>
-                  </>
-                ) : (
-                  <>
-                    <Moon className="w-3.5 h-3.5 text-amber-700" />
-                    <span>Dark Mode</span>
-                  </>
-                )}
-              </button>
-            )}
-
-            {/* Sync Gmail Button with Rotating Icon on Hover */}
             <button
               onClick={handleManualSync}
               disabled={isSyncing}
@@ -731,42 +615,25 @@ export function Dashboard({
               <span>{isSyncing ? 'Syncing...' : 'Sync Gmail'}</span>
             </button>
 
-            {/* 3-Dots Menu Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setDotsMenuOpen(!dotsMenuOpen)}
-                className={`p-2 rounded-xl border transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
-                  theme === 'dark'
-                    ? 'bg-stone-800/80 hover:bg-stone-700 border-stone-700 text-stone-300'
-                    : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
-                }`}
-              >
-                <MoreVertical className="w-4 h-4" />
-              </button>
+            <button
+              onClick={handleDisconnectGmail}
+              className="px-3.5 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 cursor-pointer shadow-xs"
+            >
+              <LogOut className="w-3.5 h-3.5 text-rose-400" />
+              <span>Disconnect</span>
+            </button>
 
-              {dotsMenuOpen && (
-                <div className={`absolute right-0 mt-2 w-48 rounded-2xl p-2 border shadow-xl z-50 animate-fadeIn ${
-                  theme === 'dark' ? 'bg-[#12141A] border-stone-700 text-white' : 'bg-white border-stone-200 text-stone-900'
-                }`}>
-                  <button
-                    onClick={() => { onNavigateToSettings(); setDotsMenuOpen(false); }}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
-                      theme === 'dark' ? 'hover:bg-stone-800 text-stone-300' : 'hover:bg-stone-100 text-stone-700'
-                    }`}
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                    <span>Settings</span>
-                  </button>
-                  <button
-                    onClick={() => { handleDisconnectGmail(); setDotsMenuOpen(false); }}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <LogOut className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Disconnect</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <button
+              onClick={onNavigateToSettings}
+              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 hover:border-amber-500/40 hover:shadow-md cursor-pointer shadow-xs ${
+                theme === 'dark'
+                  ? 'bg-stone-800/80 hover:bg-stone-700 border-stone-700 text-stone-200'
+                  : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5 text-stone-400 group-hover:text-amber-500 transition-colors" />
+              <span>Settings</span>
+            </button>
           </div>
         </div>
       </div>
@@ -789,329 +656,428 @@ export function Dashboard({
       )}
 
       {/* ============================================================
-          3. SIX REAL-TIME METRIC CARDS (3x2 Grid With Interactive Depth)
+          2. UNIFIED HERO CARD: AI SMART SENDER & QUICK COMPOSE (Matching Reference Screenshot Row 2)
       ============================================================ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        
-        {/* Card 1: Emails Sent */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
-          theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
-        }`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
-              <Send className="w-4 h-4" />
+      <div className={`relative overflow-hidden rounded-3xl p-6 sm:p-8 border hero-card-interactive transition-all ${
+        theme === 'dark'
+          ? 'bg-gradient-to-br from-[#16140E] via-[#12141A] to-[#0D0E12] border-amber-500/25 shadow-2xl'
+          : 'bg-gradient-to-br from-[#FFFDF8] via-[#FAF3E3] to-[#F5E9CC] border-amber-300/80 shadow-sm'
+      }`}>
+        {/* Subtle Ambient Cosmic Gold Glows */}
+        <div className="absolute top-0 right-1/4 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -z-0"></div>
+
+        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          {/* Left Column: Heading, Subtitle & Fast Compose Form */}
+          <div className="flex-1 max-w-3xl space-y-4">
+            {/* Pill Tag */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400 text-[11px] font-extrabold tracking-wider uppercase">
+              <Sparkles className="w-3 h-3 text-amber-400 animate-pulse" />
+              <span>AI SMART SENDER | REAL-TIME ENGINE</span>
             </div>
-            <GoldMiniBarChart />
+
+            {/* Headline & Description */}
+            <div>
+              <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight ${
+                theme === 'dark' ? 'text-white' : 'text-stone-900'
+              }`}>
+                {greetingObj.title} <span className="inline-block">{greetingObj.icon}</span>
+              </h1>
+              <h2 className={`text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight mt-1 ${
+                theme === 'dark' ? 'text-amber-300' : 'text-amber-800'
+              }`}>
+                What do you want to send today?
+              </h2>
+              <p className={`text-xs sm:text-sm mt-2 leading-relaxed max-w-2xl ${
+                theme === 'dark' ? 'text-stone-400' : 'text-stone-600'
+              }`}>
+                Manage your emails intelligently. Enter a short instruction — AI classifies, generates, previews, and dispatches via Gmail.
+              </p>
+            </div>
+
+            {/* Quick Compose Input Form */}
+            <form onSubmit={handleQuickSubmit} className="space-y-3.5 pt-1">
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* Instruction Input */}
+                <div className="flex-1">
+                  <label className={`text-[11px] font-bold block mb-1.5 flex items-center gap-1 ${
+                    theme === 'dark' ? 'text-amber-400' : 'text-amber-800'
+                  }`}>
+                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <span>What do you want to send?</span>
+                  </label>
+                  <div className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl border input-interactive group ${
+                    theme === 'dark'
+                      ? 'bg-[#141620] border-stone-700/80'
+                      : 'bg-[#FAF8F5] border-amber-900/15'
+                  }`}>
+                    <input
+                      type="text"
+                      placeholder='e.g., "I need sick leave for 2 days"'
+                      value={quickInstruction}
+                      onChange={(e) => {
+                        setQuickInstruction(e.target.value);
+                        setQuickError('');
+                        if (onUpdateComposeState) onUpdateComposeState({ instruction: e.target.value });
+                      }}
+                      className={`w-full text-xs bg-transparent outline-none placeholder:text-stone-400 ${
+                        theme === 'dark' ? 'text-white' : 'text-stone-900'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* Recipient Input with + Add CC/BCC */}
+                <div className="w-full sm:w-80">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className={`text-[11px] font-bold flex items-center gap-1 ${
+                      theme === 'dark' ? 'text-amber-400' : 'text-amber-800'
+                    }`}>
+                      <Users className="w-3 h-3 text-amber-500" />
+                      <span>Recipient Email</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickCcBcc(!showQuickCcBcc)}
+                      className="text-[11px] font-bold text-amber-500 hover:text-amber-400 transition-colors cursor-pointer hover:underline"
+                    >
+                      {showQuickCcBcc ? 'Hide CC/BCC' : '+ Add CC/BCC'}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-2xl border input-interactive group ${
+                      theme === 'dark'
+                        ? 'bg-[#141620] border-stone-700/80'
+                        : 'bg-[#FAF8F5] border-amber-900/15'
+                    }`}>
+                      <input
+                        type="email"
+                        placeholder="manager@example.com"
+                        value={quickRecipient}
+                        onChange={(e) => {
+                          setQuickRecipient(e.target.value);
+                          setQuickError('');
+                          if (onUpdateComposeState) onUpdateComposeState({ recipient: e.target.value });
+                        }}
+                        className={`w-full text-xs bg-transparent outline-none placeholder:text-stone-400 ${
+                          theme === 'dark' ? 'text-white' : 'text-stone-900'
+                        }`}
+                      />
+                    </div>
+
+                    {/* Generate Email Button */}
+                    <button
+                      type="submit"
+                      className="gold-btn light-sweep px-5 py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer shrink-0 group"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-stone-950 btn-icon-spin transition-transform" />
+                      <span className="hidden sm:inline">Generate Email</span>
+                      <span className="sm:hidden">Generate</span>
+                      <span className="btn-arrow-slide transition-transform duration-200">→</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expandable CC/BCC */}
+              {showQuickCcBcc && (
+                <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl border animate-fadeIn ${
+                  theme === 'dark' ? 'bg-[#0E1015] border-stone-800' : 'bg-stone-50 border-amber-900/10'
+                }`}>
+                  <div className="space-y-1">
+                    <label className={`text-[10px] font-bold block ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+                      CC (Carbon Copy)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="team@example.com, lead@example.com"
+                      value={quickCc}
+                      onChange={(e) => {
+                        setQuickCc(e.target.value);
+                        if (onUpdateComposeState) onUpdateComposeState({ cc: e.target.value });
+                      }}
+                      className={`w-full px-3 py-2 rounded-xl text-xs outline-none border input-interactive ${
+                        theme === 'dark'
+                          ? 'bg-[#141620] border-stone-700 text-white'
+                          : 'bg-white border-stone-200 text-stone-900'
+                      }`}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={`text-[10px] font-bold block ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+                      BCC (Blind Carbon Copy)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="archive@example.com, records@example.com"
+                      value={quickBcc}
+                      onChange={(e) => {
+                        setQuickBcc(e.target.value);
+                        if (onUpdateComposeState) onUpdateComposeState({ bcc: e.target.value });
+                      }}
+                      className={`w-full px-3 py-2 rounded-xl text-xs outline-none border input-interactive ${
+                        theme === 'dark'
+                          ? 'bg-[#141620] border-stone-700 text-white'
+                          : 'bg-white border-stone-200 text-stone-900'
+                      }`}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Inline Validation Error */}
+              {quickError && (
+                <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-xs text-rose-400 flex items-center gap-2 animate-fadeIn font-semibold">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{quickError}</span>
+                </div>
+              )}
+
+              {/* Suggestions Row */}
+              <div className="flex items-center gap-2 flex-wrap text-xs pt-1">
+                <span className={`text-xs font-semibold ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+                  Try:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleQuickChip('I need sick leave for 3 days due to high fever.')}
+                  className={`px-3 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
+                      : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                  }`}
+                >
+                  <span className="chip-emoji inline-block transition-transform duration-200">🩺</span> Sick leave 3 days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickChip('Emergency leave today: My father had an accident and I need to leave immediately.')}
+                  className={`px-3 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
+                      : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                  }`}
+                >
+                  <span className="chip-emoji inline-block transition-transform duration-200">⚠️</span> Emergency leave today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickChip('Please find attached my resume for the Senior Software Engineer position.')}
+                  className={`px-3 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
+                      : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                  }`}
+                >
+                  <span className="chip-emoji inline-block transition-transform duration-200">📄</span> Send Resume
+                </button>
+              </div>
+            </form>
           </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.sent || 645)}
-          </div>
-          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
-            Emails Sent
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" />
-            <span>12% this week</span>
+
+          {/* Right Column: Floating AI Dispatch Ready Box (Matching Reference Screenshot) */}
+          <div className="hidden lg:flex flex-col items-center justify-center shrink-0 w-60 pl-4">
+            <div className={`w-full p-6 rounded-3xl border flex flex-col items-center justify-center text-center gap-3 relative overflow-hidden transition-all duration-300 group cursor-pointer ${
+              theme === 'dark'
+                ? 'bg-gradient-to-b from-[#1E202B]/80 to-[#12141C]/90 border-amber-500/30 shadow-2xl hover:border-amber-400/50'
+                : 'bg-gradient-to-b from-white to-[#FDF8EE] border-amber-300 shadow-md hover:border-amber-400'
+            }`}>
+              <div className="absolute inset-0 bg-amber-500/10 rounded-3xl blur-xl pointer-events-none group-hover:bg-amber-500/20 transition-all duration-300"></div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-stone-950 shadow-lg shadow-amber-500/30 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 relative z-10">
+                <Mail className="w-7 h-7" />
+              </div>
+              <div className="relative z-10">
+                <span className="text-xs font-black tracking-wider uppercase text-amber-400 block">
+                  AI DISPATCH READY
+                </span>
+                <span className={`text-[10px] block mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+                  Real-time Gmail OAuth
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Card 2: Emails Received */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
-          theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
-        }`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
-              <Inbox className="w-4 h-4" />
-            </div>
-            <GoldMiniBarChart />
-          </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.received || 455)}
-          </div>
-          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
-            Emails Received
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" />
-            <span>8% this week</span>
-          </div>
-        </div>
-
-        {/* Card 3: Drafts Saved */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
-          theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
-        }`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
-              <FileText className="w-4 h-4" />
-            </div>
-            <GoldMiniBarChart />
-          </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.drafts || 151)}
-          </div>
-          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
-            Drafts Saved
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" />
-            <span>20% this week</span>
-          </div>
-        </div>
-
-        {/* Card 4: Scheduled */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
-          theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
-        }`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
-              <Clock className="w-4 h-4" />
-            </div>
-            <GoldMiniBarChart />
-          </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.scheduled || 0)}
-          </div>
-          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
-            Scheduled
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-amber-500 flex items-center gap-1">
-            <span>Queue ready</span>
-          </div>
-        </div>
-
-        {/* Card 5: High Priority */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
-          theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
-        }`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-            <GoldMiniBarChart />
-          </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.emergency || 498)}
-          </div>
-          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
-            High Priority
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" />
-            <span>5% this week</span>
-          </div>
-        </div>
-
-        {/* Card 6: Spam Filtered */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
-          theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
-        }`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
-              <ShieldAlert className="w-4 h-4" />
-            </div>
-            <GoldMiniBarChart />
-          </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.spam || 174)}
-          </div>
-          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
-            Spam Filtered
-          </div>
-          <div className="mt-2 text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" />
-            <span>18% this week</span>
-          </div>
-        </div>
-
       </div>
 
       {/* ============================================================
-          4. "WHAT DO YOU WANT TO SEND TODAY?" SECTION (With Micro-Interactions)
+          3. SEVEN STAT CARDS IN A SINGLE ROW (Matching Reference Screenshot Row 3)
       ============================================================ */}
-      <div className={`p-6 sm:p-7 rounded-3xl border transition-all ${
-        theme === 'dark'
-          ? 'bg-[#12141A] border-amber-500/15 shadow-xl'
-          : 'bg-white border-amber-900/10 shadow-xs'
-      }`}>
-        <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="w-5 h-5 text-amber-500 hover:rotate-45 transition-transform duration-300 cursor-pointer" />
-          <h3 className={`text-base sm:text-lg font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-            What do you want to send today?
-          </h3>
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        
+        {/* Card 1: Emails Sent */}
+        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+              Emails Sent
+            </span>
+            <div className="w-7 h-7 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+              <Send className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div>
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.sent || 645)}
+            </div>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+              Active dispatch
+            </div>
+          </div>
+          <StatCardWave color="#06B6D4" />
         </div>
-        <p className={`text-xs mb-4 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
-          Just describe your email — AI will handle the rest.
-        </p>
 
-        <form onSubmit={handleQuickSubmit} className="space-y-3.5">
-          {/* Main Input Row with Search Icon & + Add CC/BCC Inside */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className={`flex-1 flex items-center gap-2.5 px-4 py-3 rounded-2xl border input-interactive group ${
-              theme === 'dark'
-                ? 'bg-[#141620] border-stone-700/80'
-                : 'bg-[#FAF8F5] border-amber-900/15'
-            }`}>
-              <Search className="w-4 h-4 text-stone-400 group-hover:text-amber-500 group-focus-within:text-amber-500 transition-colors shrink-0" />
-              <input
-                type="text"
-                placeholder="e.g., I need sick leave for 2 days"
-                value={quickInstruction}
-                onChange={(e) => {
-                  setQuickInstruction(e.target.value);
-                  setQuickError('');
-                  if (onUpdateComposeState) onUpdateComposeState({ instruction: e.target.value });
-                }}
-                className={`w-full text-xs bg-transparent outline-none placeholder:text-stone-400 ${
-                  theme === 'dark' ? 'text-white' : 'text-stone-900'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowQuickCcBcc(!showQuickCcBcc)}
-                className="text-[11px] font-bold text-amber-500 hover:text-amber-400 transition-colors cursor-pointer shrink-0 hover:underline"
-              >
-                {showQuickCcBcc ? 'Hide CC/BCC' : '+ Add CC/BCC'}
-              </button>
-            </div>
-
-            {/* Recipient Input */}
-            <div className={`w-full sm:w-72 flex items-center gap-2 px-4 py-3 rounded-2xl border input-interactive group ${
-              theme === 'dark'
-                ? 'bg-[#141620] border-stone-700/80'
-                : 'bg-[#FAF8F5] border-amber-900/15'
-            }`}>
-              <Users className="w-4 h-4 text-stone-400 group-hover:text-amber-500 group-focus-within:text-amber-500 transition-colors shrink-0" />
-              <input
-                type="email"
-                placeholder="manager@example.com"
-                value={quickRecipient}
-                onChange={(e) => {
-                  setQuickRecipient(e.target.value);
-                  setQuickError('');
-                  if (onUpdateComposeState) onUpdateComposeState({ recipient: e.target.value });
-                }}
-                className={`w-full text-xs bg-transparent outline-none placeholder:text-stone-400 ${
-                  theme === 'dark' ? 'text-white' : 'text-stone-900'
-                }`}
-              />
+        {/* Card 2: Emails Received */}
+        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+              Emails Received
+            </span>
+            <div className="w-7 h-7 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+              <Inbox className="w-3.5 h-3.5" />
             </div>
           </div>
-
-          {/* Expandable CC & BCC Inputs */}
-          {showQuickCcBcc && (
-            <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl border animate-fadeIn ${
-              theme === 'dark' ? 'bg-[#0E1015] border-stone-800' : 'bg-stone-50 border-amber-900/10'
-            }`}>
-              <div className="space-y-1">
-                <label className={`text-[10px] font-bold block ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
-                  CC (Carbon Copy)
-                </label>
-                <input
-                  type="text"
-                  placeholder="team@example.com, lead@example.com"
-                  value={quickCc}
-                  onChange={(e) => {
-                    setQuickCc(e.target.value);
-                    if (onUpdateComposeState) onUpdateComposeState({ cc: e.target.value });
-                  }}
-                  className={`w-full px-3 py-2 rounded-xl text-xs outline-none border input-interactive ${
-                    theme === 'dark'
-                      ? 'bg-[#141620] border-stone-700 text-white'
-                      : 'bg-white border-stone-200 text-stone-900'
-                  }`}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className={`text-[10px] font-bold block ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
-                  BCC (Blind Carbon Copy)
-                </label>
-                <input
-                  type="text"
-                  placeholder="archive@example.com, records@example.com"
-                  value={quickBcc}
-                  onChange={(e) => {
-                    setQuickBcc(e.target.value);
-                    if (onUpdateComposeState) onUpdateComposeState({ bcc: e.target.value });
-                  }}
-                  className={`w-full px-3 py-2 rounded-xl text-xs outline-none border input-interactive ${
-                    theme === 'dark'
-                      ? 'bg-[#141620] border-stone-700 text-white'
-                      : 'bg-white border-stone-200 text-stone-900'
-                  }`}
-                />
-              </div>
+          <div>
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.received || 455)}
             </div>
-          )}
-
-          {/* Inline Validation Error */}
-          {quickError && (
-            <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-xs text-rose-400 flex items-center gap-2 animate-fadeIn font-semibold">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>{quickError}</span>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+              Inbox activity
             </div>
-          )}
-
-          {/* Bottom Chips & Generate Email Button with Light Sweep and Micro-Motion */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-            <div className="flex items-center gap-2 flex-wrap text-xs">
-              <button
-                type="button"
-                onClick={() => handleQuickChip('I need sick leave for 3 days due to high fever.')}
-                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
-                  theme === 'dark'
-                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
-                    : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
-                }`}
-              >
-                <span className="chip-emoji inline-block transition-transform duration-200">🩺</span> Sick leave 3 days
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickChip('Emergency leave today: My father had an accident and I need to leave immediately.')}
-                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
-                  theme === 'dark'
-                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
-                    : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
-                }`}
-              >
-                <span className="chip-emoji inline-block transition-transform duration-200">⚠️</span> Emergency leave today
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickChip('Please find attached my resume for the Senior Software Engineer position.')}
-                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
-                  theme === 'dark'
-                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
-                    : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
-                }`}
-              >
-                <span className="chip-emoji inline-block transition-transform duration-200">📄</span> Send Resume
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              className="gold-btn light-sweep px-6 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer shrink-0 group"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-stone-950 btn-icon-spin transition-transform" />
-              <span>Generate Email</span>
-              <span className="btn-arrow-slide transition-transform duration-200">→</span>
-            </button>
           </div>
-        </form>
+          <StatCardWave color="#3B82F6" />
+        </div>
+
+        {/* Card 3: Drafts */}
+        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+              Drafts
+            </span>
+            <div className="w-7 h-7 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+              <FileText className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div>
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.drafts || 151)}
+            </div>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+              Saved drafts
+            </div>
+          </div>
+          <StatCardWave color="#A855F7" />
+        </div>
+
+        {/* Card 4: Scheduled */}
+        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+              Scheduled
+            </span>
+            <div className="w-7 h-7 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+              <Clock className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div>
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.scheduled || 0)}
+            </div>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+              Queue ready
+            </div>
+          </div>
+          <StatCardWave color="#F59E0B" />
+        </div>
+
+        {/* Card 5: Emergency */}
+        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+              Emergency
+            </span>
+            <div className="w-7 h-7 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+              <AlertTriangle className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div>
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.emergency || 498)}
+            </div>
+            <div className="text-[11px] font-medium mt-0.5 text-rose-400">
+              High priority
+            </div>
+          </div>
+          <StatCardWave color="#F43F5E" />
+        </div>
+
+        {/* Card 6: Spam */}
+        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+              Spam
+            </span>
+            <div className="w-7 h-7 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+              <ShieldAlert className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div>
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.spam || 174)}
+            </div>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+              Filtered messages
+            </div>
+          </div>
+          <StatCardWave color="#F97316" />
+        </div>
+
+        {/* Card 7: Pending Review */}
+        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+              Pending Review
+            </span>
+            <div className="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+              <CheckCircle className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div>
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.pendingReview || 12)}
+            </div>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+              Awaiting confirmation
+            </div>
+          </div>
+          <StatCardWave color="#10B981" />
+        </div>
+
       </div>
 
       {/* ============================================================
