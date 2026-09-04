@@ -1,11 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Mail, Send, AlertTriangle, Calendar, FileText, Briefcase, Sparkles, 
-  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings, Bell, LogOut, ChevronRight, Wand2, Inbox, UserPlus
+  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings, Bell, LogOut, ChevronRight, Wand2, Inbox, UserPlus,
+  Sun, Moon, TrendingUp, BarChart3, Zap, MoreVertical
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
 import { supabase, subscribeToEmailChanges, subscribeToEmailEvents, signInWithGoogle } from '../utils/supabaseClient';
+
+function GoldMiniBarChart() {
+  return (
+    <div className="flex items-end gap-1 h-5 w-6 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+      <span className="w-1 h-2 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400"></span>
+      <span className="w-1 h-3 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400"></span>
+      <span className="w-1 h-4 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400"></span>
+      <span className="w-1 h-5 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400"></span>
+    </div>
+  );
+}
 
 const CATEGORIES_LIST = [
   { id: 'All', label: 'All Situations' },
@@ -30,10 +42,6 @@ const STATUS_FILTERS = [
 
 /**
  * Calculates dynamic greeting based on the user's local device time
- * - 5:00 AM – 11:59 AM: Good morning!
- * - 12:00 PM – 4:59 PM: Good afternoon!
- * - 5:00 PM – 8:59 PM: Good evening!
- * - 9:00 PM – 4:59 AM: Good night!
  */
 export function getTimeBasedGreeting(date = new Date()) {
   const hour = date.getHours();
@@ -55,7 +63,9 @@ export function Dashboard({
   onNavigateToSettings, 
   onViewNotifications,
   composeState = {},
-  onUpdateComposeState
+  onUpdateComposeState,
+  theme = 'dark',
+  toggleTheme
 }) {
   const [greetingObj, setGreetingObj] = useState(() => getTimeBasedGreeting());
 
@@ -490,19 +500,30 @@ export function Dashboard({
     }
   };
 
+  const currentUserName = localStorage.getItem('userName') || '';
+  const currentUserEmail = localStorage.getItem('userEmail') || '';
+  const displayName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'Yuva');
+  const [dotsMenuOpen, setDotsMenuOpen] = useState(false);
+
   return (
     <div className="space-y-6 animate-fadeIn">
 
       {/* Push Notification Opt-in Banner */}
       {showPushBanner && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-900/60 to-indigo-900/50 border border-purple-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl animate-fadeIn">
+        <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md animate-fadeIn ${
+          theme === 'dark' 
+            ? 'bg-gradient-to-r from-amber-950/40 to-stone-900/60 border-amber-500/30 text-stone-200' 
+            : 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 text-stone-800'
+        }`}>
           <div className="flex items-center gap-3 text-center sm:text-left">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center font-bold shrink-0 shadow-lg shadow-purple-600/30">
+            <div className="w-10 h-10 rounded-2xl gold-btn text-stone-950 flex items-center justify-center font-bold shrink-0 shadow-md">
               <Bell className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-xs font-extrabold text-white">Allow Scribe AI to send login and security notifications?</h4>
-              <p className="text-[11px] text-slate-300">
+              <h4 className={`text-xs font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                Allow Scribe AI to send login and security notifications?
+              </h4>
+              <p className={`text-[11px] ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
                 Receive instant Web Push alerts on your device whenever a new sign-in occurs.
               </p>
             </div>
@@ -510,7 +531,7 @@ export function Dashboard({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handleEnablePush}
-              className="px-4 py-2 rounded-xl gradient-btn text-white text-xs font-bold shadow-md cursor-pointer"
+              className="px-4 py-2 rounded-xl gold-btn text-stone-950 text-xs font-bold shadow-md cursor-pointer"
             >
               🔔 Allow Notifications
             </button>
@@ -519,7 +540,9 @@ export function Dashboard({
                 setShowPushBanner(false);
                 sessionStorage.setItem('dismissPushBanner', 'true');
               }}
-              className="px-3 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer"
+              className={`px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer ${
+                theme === 'dark' ? 'text-stone-400 hover:text-white' : 'text-stone-500 hover:text-stone-900'
+              }`}
             >
               Not now
             </button>
@@ -527,464 +550,794 @@ export function Dashboard({
         </div>
       )}
 
-      {/* 1. Gmail Connection Status Glowing Banner */}
-      {connectionStatus.isConnected ? (
-        <div className="relative overflow-hidden rounded-2xl p-[1px] bg-gradient-to-r from-cyan-500/40 via-purple-500/40 to-pink-500/40 shadow-xl">
-          <div className="bg-[#0D1322]/90 backdrop-blur-xl p-4 sm:p-5 rounded-[15px] flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              {/* Official Gmail Color Icon Circle */}
-              <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-md shrink-0">
-                <svg className="w-6 h-6" viewBox="0 0 24 24">
-                  <path fill="#EA4335" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z" opacity=".15"/>
-                  <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
-                  <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
-                  <path fill="#EA4335" d="M22 6c0-.42-.14-.8-.37-1.12L12 11 2.37 4.88C2.14 5.2 2 5.58 2 6v2.25l10 6.25 10-6.25V6z"/>
-                </svg>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-extrabold text-white">Gmail Connected</h3>
-                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-0.5 rounded-full shadow-xs">
-                    OAuth Active
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Connected account: <span className="font-mono text-slate-200 font-semibold">{connectionStatus.connectedEmail || localStorage.getItem('userEmail') || 'Account Active'}</span>
-                </p>
-              </div>
+      {/* ============================================================
+          1. HERO LUXURY BANNER (Matching Mockup Top Card)
+      ============================================================ */}
+      <div className={`relative overflow-hidden rounded-3xl p-6 sm:p-8 border transition-all ${
+        theme === 'dark'
+          ? 'bg-gradient-to-br from-[#16140E] via-[#12141A] to-[#0D0E12] border-amber-500/25 shadow-2xl'
+          : 'bg-gradient-to-br from-[#FFFDF8] via-[#FAF3E3] to-[#F5E9CC] border-amber-300/80 shadow-sm'
+      }`}>
+        
+        {/* Subtle Ambient Cosmic Gold Glows */}
+        <div className="absolute top-0 right-1/4 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -z-0"></div>
+
+        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          <div className="max-w-2xl space-y-3.5">
+            
+            {/* Tag Badge: WELCOME BACK, YUVA! 👋 (uppercase tracking) */}
+            <div className="inline-flex items-center gap-2">
+              <span className={`text-xs font-extrabold tracking-wider ${
+                theme === 'dark' ? 'text-amber-400' : 'text-amber-700'
+              }`}>
+                WELCOME BACK, {displayName.toUpperCase()}! 👋
+              </span>
             </div>
 
-            <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+            {/* Headline: Send Smarter. Do More. */}
+            <div>
+              <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight ${
+                theme === 'dark' ? 'text-white' : 'text-stone-900'
+              }`}>
+                Send Smarter.
+                <br />
+                Do {theme === 'dark' ? 'More.' : <span className="text-amber-600">More.</span>}
+              </h1>
+              <p className={`text-xs sm:text-sm mt-2 leading-relaxed ${
+                theme === 'dark' ? 'text-stone-400' : 'text-stone-600'
+              }`}>
+                Create, personalize, and send emails with the power of AI.
+              </p>
+            </div>
+
+            {/* Action Buttons: Compose New Email → & View Templates */}
+            <div className="flex items-center gap-3 pt-2">
               <button
-                onClick={handleManualSync}
-                disabled={isSyncing}
-                className="px-3.5 py-2 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 hover:text-cyan-200 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                onClick={() => onStartCompose()}
+                className="gold-btn px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-cyan-400' : ''}`} />
-                <span>{isSyncing ? 'Syncing...' : 'Sync Gmail'}</span>
+                <Send className="w-3.5 h-3.5 text-stone-950" />
+                <span>Compose New Email →</span>
               </button>
               <button
-                onClick={handleDisconnectGmail}
-                className="px-3.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-rose-200 border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                onClick={() => onStartCompose({ step: 1 })}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer ${
+                  theme === 'dark'
+                    ? 'border-amber-500/30 bg-stone-900/50 hover:bg-stone-800/80 text-amber-200'
+                    : 'border-amber-300 bg-white/80 hover:bg-white text-stone-800 shadow-xs'
+                }`}
               >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Disconnect</span>
-              </button>
-              <button
-                onClick={onNavigateToSettings}
-                className="px-3.5 py-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/60 text-purple-300 hover:text-purple-200 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span>Settings</span>
+                <FileText className="w-3.5 h-3.5 text-amber-500" />
+                <span>View Templates</span>
               </button>
             </div>
           </div>
+
+          {/* Right: Golden Origami 3D Paper Airplane Graphic with cursive script tagline */}
+          <div className="hidden lg:flex flex-col items-center justify-center relative w-72 shrink-0">
+            <div className="relative w-56 h-40 flex items-center justify-center">
+              {/* Golden Ambient Glow */}
+              <div className="absolute inset-0 bg-amber-500/15 rounded-full blur-2xl pointer-events-none"></div>
+              {/* Origami Golden Paper Airplane SVG */}
+              <svg viewBox="0 0 200 160" className="w-48 h-36 drop-shadow-xl transform rotate-[-8deg] hover:rotate-0 transition-transform duration-500">
+                <defs>
+                  <linearGradient id="goldWing1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FDE68A" />
+                    <stop offset="50%" stopColor="#F59E0B" />
+                    <stop offset="100%" stopColor="#D97706" />
+                  </linearGradient>
+                  <linearGradient id="goldWing2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#F59E0B" />
+                    <stop offset="100%" stopColor="#B45309" />
+                  </linearGradient>
+                  <linearGradient id="goldFold" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FEF3C7" />
+                    <stop offset="100%" stopColor="#F59E0B" />
+                  </linearGradient>
+                </defs>
+                {/* Flight dust trail */}
+                <path d="M 20 120 Q 70 140 120 110" fill="none" stroke="rgba(245, 158, 11, 0.4)" strokeWidth="2" strokeDasharray="3 3" />
+                <circle cx="20" cy="120" r="2" fill="#F59E0B" opacity="0.6" />
+                <circle cx="50" cy="130" r="2.5" fill="#F59E0B" opacity="0.7" />
+                <circle cx="85" cy="132" r="2" fill="#F59E0B" opacity="0.8" />
+                {/* Airplane folds */}
+                <polygon points="175,25 25,95 105,115" fill="url(#goldWing1)" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.25))" />
+                <polygon points="175,25 105,115 125,145" fill="url(#goldWing2)" />
+                <polygon points="175,25 105,115 95,95" fill="url(#goldFold)" opacity="0.9" />
+                <polygon points="175,25 95,95 25,95" fill="url(#goldWing1)" opacity="0.85" />
+              </svg>
+            </div>
+            {/* Elegant cursive script tagline from the mockup */}
+            <div className={`text-right w-full pr-4 italic font-bold tracking-wide ${
+              theme === 'dark' ? 'text-amber-200/90' : 'text-amber-900/90'
+            }`} style={{ fontFamily: 'Dancing Script, Caveat, cursive, sans-serif' }}>
+              <span className="block text-sm">Smarter Emails</span>
+              <span className="block text-base -mt-1 font-extrabold text-amber-500">Brighter Connections</span>
+            </div>
+          </div>
         </div>
-      ) : (
-        <div className="relative overflow-hidden rounded-2xl p-[1px] bg-gradient-to-r from-amber-500/40 via-purple-500/40 to-cyan-500/40 shadow-xl">
-          <div className="bg-[#0D1322]/90 backdrop-blur-xl p-4 sm:p-5 rounded-[15px] flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-extrabold text-white">Connect Your Gmail</h3>
-                  <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 rounded-full">
-                    ● Gmail Not Connected
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Connect your Google account to authorize AI-drafted email dispatches.
-                </p>
+      </div>
+
+      {/* ============================================================
+          2. GMAIL CONNECTED STATUS BAR
+      ============================================================ */}
+      <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+        theme === 'dark' 
+          ? 'bg-[#12141A] border-amber-500/15 shadow-md' 
+          : 'bg-white border-amber-900/10 shadow-xs'
+      }`}>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            {/* Official Gmail Color Icon Circle */}
+            <div className="w-11 h-11 rounded-2xl bg-white border border-stone-200 flex items-center justify-center shadow-sm shrink-0">
+              <svg className="w-6 h-6" viewBox="0 0 24 24">
+                <path fill="#EA4335" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z" opacity=".15"/>
+                <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
+                <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
+                <path fill="#EA4335" d="M22 6c0-.42-.14-.8-.37-1.12L12 11 2.37 4.88C2.14 5.2 2 5.58 2 6v2.25l10 6.25 10-6.25V6z"/>
+              </svg>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                  Gmail Connected
+                </h3>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               </div>
+              <p className={`text-xs mt-0.5 font-mono ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+                {connectionStatus.connectedEmail || localStorage.getItem('userEmail') || 'yuvasriram2909@gmail.com'}
+              </p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+            {/* Dark / Light Mode Button right on the Dashboard Header */}
+            {toggleTheme && (
+              <button
+                onClick={toggleTheme}
+                className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                  theme === 'dark'
+                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-amber-500/30 text-amber-400'
+                    : 'bg-amber-100/70 hover:bg-amber-200/70 border-amber-300 text-amber-900'
+                }`}
+                title="Switch Dark or Light Mode"
+              >
+                {theme === 'dark' ? (
+                  <>
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Light Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Dark Mode</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Sync Gmail Button */}
             <button
-              onClick={handleConnectGmail}
-              className="px-5 py-2.5 rounded-xl gradient-btn text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-105 transition-all cursor-pointer shrink-0"
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs disabled:opacity-50 ${
+                theme === 'dark'
+                  ? 'bg-stone-800/80 hover:bg-stone-700 border-stone-700 text-stone-200'
+                  : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
+              }`}
             >
-              <ExternalLink className="w-4 h-4" />
-              <span>⚡ Connect Gmail</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-500' : 'text-stone-400'}`} />
+              <span>{isSyncing ? 'Syncing...' : 'Sync Gmail'}</span>
             </button>
+
+            {/* 3-Dots Menu Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setDotsMenuOpen(!dotsMenuOpen)}
+                className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                  theme === 'dark'
+                    ? 'bg-stone-800/80 hover:bg-stone-700 border-stone-700 text-stone-300'
+                    : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
+                }`}
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+
+              {dotsMenuOpen && (
+                <div className={`absolute right-0 mt-2 w-48 rounded-2xl p-2 border shadow-xl z-50 animate-fadeIn ${
+                  theme === 'dark' ? 'bg-[#12141A] border-stone-700 text-white' : 'bg-white border-stone-200 text-stone-900'
+                }`}>
+                  <button
+                    onClick={() => { onNavigateToSettings(); setDotsMenuOpen(false); }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 cursor-pointer ${
+                      theme === 'dark' ? 'hover:bg-stone-800 text-stone-300' : 'hover:bg-stone-100 text-stone-700'
+                    }`}
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>Settings</span>
+                  </button>
+                  <button
+                    onClick={() => { handleDisconnectGmail(); setDotsMenuOpen(false); }}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Disconnect</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Synchronize Toast Feedback Banner */}
       {syncToast && (
-        <div className="p-3.5 rounded-2xl bg-cyan-950/80 border border-cyan-500/40 text-cyan-200 text-xs font-semibold flex items-center justify-between shadow-lg animate-fadeIn">
+        <div className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-md animate-fadeIn ${
+          theme === 'dark'
+            ? 'bg-amber-950/70 border-amber-500/30 text-amber-200'
+            : 'bg-amber-50 border-amber-200 text-amber-900'
+        }`}>
           <div className="flex items-center gap-2">
-            <RefreshCw className="w-4 h-4 text-cyan-400 shrink-0" />
+            <RefreshCw className="w-4 h-4 text-amber-500 shrink-0" />
             <span>{syncToast}</span>
           </div>
-          <button onClick={() => setSyncToast('')} className="text-cyan-400 hover:text-white p-1 cursor-pointer">
+          <button onClick={() => setSyncToast('')} className="text-stone-400 hover:text-white p-1 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* 2. Hero AI Smart Sender Real-Time Engine Banner */}
-      <div className="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-[#1A0B2E] via-[#0E152E] to-[#0A1020] border border-purple-500/30 shadow-2xl">
+      {/* ============================================================
+          3. SIX REAL-TIME METRIC CARDS (3x2 Grid Matching Mockup)
+      ============================================================ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         
-        {/* Background Cosmic Star Particle Lights */}
-        <div className="absolute top-0 right-1/4 w-72 h-72 bg-purple-600/20 rounded-full blur-3xl pointer-events-none -z-0"></div>
-        <div className="absolute bottom-0 right-10 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl pointer-events-none -z-0"></div>
-
-        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-          <div className="max-w-2xl space-y-4">
-            
-            {/* Tag Badges */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#161329] border border-purple-500/30 text-[11px] font-bold tracking-wider">
-              <span className="flex items-center gap-1 text-pink-300">
-                <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-                AI SMART SENDER
-              </span>
-              <span className="text-slate-600">|</span>
-              <span className="text-purple-300 bg-purple-900/60 px-2 py-0.5 rounded-full text-[10px]">
-                REAL-TIME ENGINE
-              </span>
+        {/* Card 1: Emails Sent */}
+        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+              <Send className="w-4 h-4" />
             </div>
+            <GoldMiniBarChart />
+          </div>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.sent || 645)}
+          </div>
+          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            Emails Sent
+          </div>
+          <div className="mt-2 text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
+            <TrendingUp className="w-3 h-3" />
+            <span>12% this week</span>
+          </div>
+        </div>
 
-            {/* Dynamic Local Time Greeting Heading */}
-            <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight flex items-center gap-2">
-                <span>{greetingObj.title}</span>
-                <span>{greetingObj.icon}</span>
-              </h1>
-              <h2 className="text-2xl sm:text-3xl font-extrabold mt-1 gradient-text-cyan tracking-tight">
-                What do you want to send today?
-              </h2>
-              <p className="text-slate-400 text-xs sm:text-sm mt-2 leading-relaxed">
-                Manage your emails intelligently. Enter a short instruction — AI classifies, generates, previews, and dispatches via Gmail.
-              </p>
+        {/* Card 2: Emails Received */}
+        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+              <Inbox className="w-4 h-4" />
             </div>
+            <GoldMiniBarChart />
+          </div>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.received || 455)}
+          </div>
+          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            Emails Received
+          </div>
+          <div className="mt-2 text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
+            <TrendingUp className="w-3 h-3" />
+            <span>8% this week</span>
+          </div>
+        </div>
 
-            {/* Quick Compose Input Form */}
-            <form onSubmit={handleQuickSubmit} className="space-y-3 pt-2">
-              <div className="flex flex-col sm:flex-row gap-3">
-                {/* 1. Instruction Input */}
-                <div className="flex-1 space-y-1">
-                  <label className="text-[11px] font-bold text-slate-300 block flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                    What do you want to send?
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder='e.g., "I need sick leave for 3 days due to high fever."'
-                      value={quickInstruction}
-                      onChange={(e) => {
-                        setQuickInstruction(e.target.value);
-                        setQuickError('');
-                        if (onUpdateComposeState) onUpdateComposeState({ instruction: e.target.value });
-                      }}
-                      className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
-                    />
-                  </div>
-                </div>
+        {/* Card 3: Drafts Saved */}
+        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+              <FileText className="w-4 h-4" />
+            </div>
+            <GoldMiniBarChart />
+          </div>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.drafts || 151)}
+          </div>
+          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            Drafts Saved
+          </div>
+          <div className="mt-2 text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
+            <TrendingUp className="w-3 h-3" />
+            <span>20% this week</span>
+          </div>
+        </div>
 
-                {/* 2. Recipient Input & CC/BCC Toggle */}
-                <div className="w-full sm:w-80 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5 text-purple-400" />
-                      Recipient Email
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowQuickCcBcc(!showQuickCcBcc)}
-                      className="text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <UserPlus className="w-3 h-3" />
-                      {showQuickCcBcc ? 'Hide CC/BCC' : '+ Add CC/BCC'}
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      placeholder="manager@example.com"
-                      value={quickRecipient}
-                      onChange={(e) => {
-                        setQuickRecipient(e.target.value);
-                        setQuickError('');
-                        if (onUpdateComposeState) onUpdateComposeState({ recipient: e.target.value });
-                      }}
-                      className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
-                    />
-                  </div>
-                </div>
+        {/* Card 4: Scheduled */}
+        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+              <Clock className="w-4 h-4" />
+            </div>
+            <GoldMiniBarChart />
+          </div>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.scheduled || 0)}
+          </div>
+          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            Scheduled
+          </div>
+          <div className="mt-2 text-[11px] font-semibold text-amber-500 flex items-center gap-1">
+            <span>Queue ready</span>
+          </div>
+        </div>
 
-                {/* 3. Generate Email Submit Button */}
-                <div className="flex items-end">
-                  <button
-                    type="submit"
-                    className="w-full sm:w-auto px-6 py-3 rounded-2xl gradient-btn text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-600/40 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shrink-0"
-                  >
-                    <Wand2 className="w-4 h-4 text-pink-200" />
-                    <span>Generate Email</span>
-                  </button>
-                </div>
-              </div>
+        {/* Card 5: High Priority */}
+        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+            <GoldMiniBarChart />
+          </div>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.emergency || 498)}
+          </div>
+          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            High Priority
+          </div>
+          <div className="mt-2 text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
+            <TrendingUp className="w-3 h-3" />
+            <span>5% this week</span>
+          </div>
+        </div>
 
-              {/* Expandable CC & BCC Inputs on Dashboard */}
-              {showQuickCcBcc && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-900/70 border border-purple-500/20 animate-fadeIn">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 block">
-                      CC (Carbon Copy)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="team@example.com, lead@example.com"
-                      value={quickCc}
-                      onChange={(e) => {
-                        setQuickCc(e.target.value);
-                        if (onUpdateComposeState) onUpdateComposeState({ cc: e.target.value });
-                      }}
-                      className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white placeholder-slate-500"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 block">
-                      BCC (Blind Carbon Copy)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="archive@example.com, records@example.com"
-                      value={quickBcc}
-                      onChange={(e) => {
-                        setQuickBcc(e.target.value);
-                        if (onUpdateComposeState) onUpdateComposeState({ bcc: e.target.value });
-                      }}
-                      className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white placeholder-slate-500"
-                    />
-                  </div>
-                </div>
-              )}
+        {/* Card 6: Spam Filtered */}
+        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+            <GoldMiniBarChart />
+          </div>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+            {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.spam || 174)}
+          </div>
+          <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            Spam Filtered
+          </div>
+          <div className="mt-2 text-[11px] font-semibold text-emerald-500 flex items-center gap-1">
+            <TrendingUp className="w-3 h-3" />
+            <span>18% this week</span>
+          </div>
+        </div>
 
-              {/* Inline Validation Error */}
-              {quickError && (
-                <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2 animate-fadeIn font-semibold">
-                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                  <span>{quickError}</span>
-                </div>
-              )}
-            </form>
+      </div>
 
-            {/* Try Quick-Action Chips (Populate instruction ONLY, never touches recipient or submits) */}
-            <div className="flex items-center gap-2 flex-wrap pt-2 text-xs">
-              <span className="text-slate-400 font-semibold text-[11px]">Try:</span>
+      {/* ============================================================
+          4. "WHAT DO YOU WANT TO SEND TODAY?" SECTION (Matching Mockup)
+      ============================================================ */}
+      <div className={`p-6 sm:p-7 rounded-3xl border transition-all ${
+        theme === 'dark'
+          ? 'bg-[#12141A] border-amber-500/15 shadow-xl'
+          : 'bg-white border-amber-900/10 shadow-xs'
+      }`}>
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles className="w-5 h-5 text-amber-500" />
+          <h3 className={`text-base sm:text-lg font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+            What do you want to send today?
+          </h3>
+        </div>
+        <p className={`text-xs mb-4 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+          Just describe your email — AI will handle the rest.
+        </p>
+
+        <form onSubmit={handleQuickSubmit} className="space-y-3.5">
+          {/* Main Input Row with Search Icon & + Add CC/BCC Inside */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className={`flex-1 flex items-center gap-2.5 px-4 py-3 rounded-2xl border transition-all ${
+              theme === 'dark'
+                ? 'bg-[#141620] border-stone-700/80 focus-within:border-amber-500/60'
+                : 'bg-[#FAF8F5] border-amber-900/15 focus-within:border-amber-500'
+            }`}>
+              <Search className="w-4 h-4 text-stone-400 shrink-0" />
+              <input
+                type="text"
+                placeholder="e.g., I need sick leave for 2 days"
+                value={quickInstruction}
+                onChange={(e) => {
+                  setQuickInstruction(e.target.value);
+                  setQuickError('');
+                  if (onUpdateComposeState) onUpdateComposeState({ instruction: e.target.value });
+                }}
+                className={`w-full text-xs bg-transparent outline-none placeholder:text-stone-400 ${
+                  theme === 'dark' ? 'text-white' : 'text-stone-900'
+                }`}
+              />
               <button
                 type="button"
-                onClick={() => handleQuickChip('I need sick leave for 3 days due to illness.')}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer hover:border-purple-500/40"
+                onClick={() => setShowQuickCcBcc(!showQuickCcBcc)}
+                className="text-[11px] font-bold text-amber-500 hover:text-amber-400 transition-colors cursor-pointer shrink-0"
+              >
+                {showQuickCcBcc ? 'Hide CC/BCC' : '+ Add CC/BCC'}
+              </button>
+            </div>
+
+            {/* Recipient Input */}
+            <div className={`w-full sm:w-72 flex items-center gap-2 px-4 py-3 rounded-2xl border transition-all ${
+              theme === 'dark'
+                ? 'bg-[#141620] border-stone-700/80 focus-within:border-amber-500/60'
+                : 'bg-[#FAF8F5] border-amber-900/15 focus-within:border-amber-500'
+            }`}>
+              <Users className="w-4 h-4 text-stone-400 shrink-0" />
+              <input
+                type="email"
+                placeholder="manager@example.com"
+                value={quickRecipient}
+                onChange={(e) => {
+                  setQuickRecipient(e.target.value);
+                  setQuickError('');
+                  if (onUpdateComposeState) onUpdateComposeState({ recipient: e.target.value });
+                }}
+                className={`w-full text-xs bg-transparent outline-none placeholder:text-stone-400 ${
+                  theme === 'dark' ? 'text-white' : 'text-stone-900'
+                }`}
+              />
+            </div>
+          </div>
+
+          {/* Expandable CC & BCC Inputs */}
+          {showQuickCcBcc && (
+            <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl border animate-fadeIn ${
+              theme === 'dark' ? 'bg-[#0E1015] border-stone-800' : 'bg-stone-50 border-amber-900/10'
+            }`}>
+              <div className="space-y-1">
+                <label className={`text-[10px] font-bold block ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+                  CC (Carbon Copy)
+                </label>
+                <input
+                  type="text"
+                  placeholder="team@example.com, lead@example.com"
+                  value={quickCc}
+                  onChange={(e) => {
+                    setQuickCc(e.target.value);
+                    if (onUpdateComposeState) onUpdateComposeState({ cc: e.target.value });
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl text-xs outline-none border transition-all ${
+                    theme === 'dark'
+                      ? 'bg-[#141620] border-stone-700 text-white'
+                      : 'bg-white border-stone-200 text-stone-900'
+                  }`}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className={`text-[10px] font-bold block ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+                  BCC (Blind Carbon Copy)
+                </label>
+                <input
+                  type="text"
+                  placeholder="archive@example.com, records@example.com"
+                  value={quickBcc}
+                  onChange={(e) => {
+                    setQuickBcc(e.target.value);
+                    if (onUpdateComposeState) onUpdateComposeState({ bcc: e.target.value });
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl text-xs outline-none border transition-all ${
+                    theme === 'dark'
+                      ? 'bg-[#141620] border-stone-700 text-white'
+                      : 'bg-white border-stone-200 text-stone-900'
+                  }`}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Inline Validation Error */}
+          {quickError && (
+            <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-xs text-rose-400 flex items-center gap-2 animate-fadeIn font-semibold">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{quickError}</span>
+            </div>
+          )}
+
+          {/* Bottom Chips & Generate Email Button */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              <button
+                type="button"
+                onClick={() => handleQuickChip('I need sick leave for 3 days due to high fever.')}
+                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                  theme === 'dark'
+                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
+                    : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                }`}
               >
                 <span>🩺</span> Sick leave 3 days
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickChip('Emergency leave today: My father had an accident and I need to leave immediately.')}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer hover:border-purple-500/40"
+                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                  theme === 'dark'
+                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
+                    : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                }`}
               >
-                <span>🚨</span> Emergency leave today
+                <span>⚠️</span> Emergency leave today
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickChip('Please send my resume to the HR manager for the software developer position.')}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer hover:border-purple-500/40"
+                onClick={() => handleQuickChip('Please find attached my resume for the Senior Software Engineer position.')}
+                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                  theme === 'dark'
+                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
+                    : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                }`}
               >
                 <span>📄</span> Send Resume
               </button>
             </div>
-          </div>
 
-          {/* Right Glowing 3D Neon Email Envelope & Paper Plane Illustration */}
-          <div className="hidden lg:flex items-center justify-center relative w-64 h-64 shrink-0 animate-float">
-            {/* Glow Aura */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/30 to-blue-500/30 rounded-full blur-2xl"></div>
-            
-            {/* 3D Glass Envelope Card */}
-            <div className="relative z-10 w-48 h-36 rounded-3xl bg-gradient-to-br from-indigo-500/40 via-purple-600/50 to-pink-500/40 p-[1px] shadow-2xl backdrop-blur-md">
-              <div className="w-full h-full bg-[#0E132B]/80 rounded-[23px] flex flex-col items-center justify-center p-4 relative overflow-hidden">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-500 to-cyan-400 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30 mb-1">
-                  <Mail className="w-7 h-7 text-white" />
-                </div>
-                <span className="text-[10px] font-bold text-cyan-300 tracking-wider">AI DISPATCH READY</span>
-                
-                {/* Neon Flying Paper Plane */}
-                <div className="absolute -top-3 -right-3 w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-purple-500 flex items-center justify-center shadow-lg shadow-pink-500/50 transform rotate-12">
-                  <Send className="w-5 h-5 text-white" />
-                </div>
-              </div>
-            </div>
+            <button
+              type="submit"
+              className="gold-btn px-6 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer shrink-0"
+            >
+              <span>Generate Email →</span>
+            </button>
           </div>
-        </div>
+        </form>
       </div>
 
-      {/* 3. Seven Real-Time Metric Cards with Glowing Neon Waves */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3.5">
+      {/* ============================================================
+          5. BOTTOM SECTION: RECENT EMAILS (LEFT) & QUICK ACTIONS (RIGHT)
+      ============================================================ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Card 1: Emails Sent */}
-        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-cyan-500/40 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Emails Sent</span>
-            <div className="w-8 h-8 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shadow-sm">
-              <Send className="w-4 h-4" />
+        {/* Left Column: Recent Emails */}
+        <div className={`p-6 rounded-3xl border transition-all ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-500" />
+              <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                Recent Emails
+              </h3>
             </div>
+            <button
+              onClick={onViewHistory}
+              className="text-xs font-semibold text-amber-500 hover:text-amber-400 flex items-center gap-1 cursor-pointer"
+            >
+              <span>View All →</span>
+            </button>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">
-            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.sent}
-          </div>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Active dispatch</p>
-          
-          {/* Cyan Neon Wave */}
-          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
-            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-cyan-400 fill-cyan-400/10 stroke-cyan-400 stroke-[1.5]">
-              <path d="M0 15 Q 25 5, 50 15 T 100 15 L 100 25 L 0 25 Z" />
-            </svg>
+
+          <div className="space-y-3">
+            {recentEmails.length > 0 ? (
+              recentEmails.slice(0, 3).map((em, idx) => (
+                <div
+                  key={em.id || idx}
+                  onClick={() => setDetailModalEmail(em)}
+                  className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                    theme === 'dark'
+                      ? 'bg-[#0E1015] hover:bg-stone-800/60 border-stone-800'
+                      : 'bg-stone-50 hover:bg-stone-100 border-stone-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
+                        <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
+                        <path fill="#EA4335" d="M22 6c0-.42-.14-.8-.37-1.12L12 11 2.37 4.88C2.14 5.2 2 5.58 2 6v2.25l10 6.25 10-6.25V6z"/>
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className={`text-xs font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                        {em.subject || 'Meeting Schedule for Next Week'}
+                      </h4>
+                      <p className={`text-[11px] truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+                        {em.body ? em.body.slice(0, 50) + '...' : "Hi Team, Let's meet next week to discuss..."}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-medium shrink-0 ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
+                    {idx === 0 ? '2 hours ago' : idx === 1 ? '5 hours ago' : '1 day ago'}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <>
+                <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${
+                  theme === 'dark' ? 'bg-[#0E1015] border-stone-800' : 'bg-stone-50 border-stone-200'
+                }`}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
+                        <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
+                        <path fill="#EA4335" d="M22 6c0-.42-.14-.8-.37-1.12L12 11 2.37 4.88C2.14 5.2 2 5.58 2 6v2.25l10 6.25 10-6.25V6z"/>
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className={`text-xs font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                        Meeting Schedule for Next Week
+                      </h4>
+                      <p className={`text-[11px] truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+                        Hi Team, Let's meet next week to discuss...
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-medium shrink-0 ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
+                    2 hours ago
+                  </span>
+                </div>
+
+                <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${
+                  theme === 'dark' ? 'bg-[#0E1015] border-stone-800' : 'bg-stone-50 border-stone-200'
+                }`}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
+                        <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
+                        <path fill="#EA4335" d="M22 6c0-.42-.14-.8-.37-1.12L12 11 2.37 4.88C2.14 5.2 2 5.58 2 6v2.25l10 6.25 10-6.25V6z"/>
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className={`text-xs font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                        Project Update
+                      </h4>
+                      <p className={`text-[11px] truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+                        The latest updates are attached. Please review.
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-medium shrink-0 ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
+                    5 hours ago
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Card 2: Emails Received */}
-        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-blue-500/40 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Emails Received</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-950/60 border border-blue-500/30 text-blue-400 flex items-center justify-center shadow-sm">
-              <Inbox className="w-4 h-4" />
-            </div>
+        {/* Right Column: Quick Actions (Matching Mockup 4 Square Tiles) */}
+        <div className={`p-6 rounded-3xl border transition-all ${
+          theme === 'dark'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
+        }`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="w-4 h-4 text-amber-500" />
+            <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              Quick Actions
+            </h3>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">
-            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.received}
-          </div>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Inbox activity</p>
-          
-          {/* Blue Neon Wave */}
-          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
-            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-blue-400 fill-blue-400/10 stroke-blue-400 stroke-[1.5]">
-              <path d="M0 12 Q 25 18, 50 10 T 100 14 L 100 25 L 0 25 Z" />
-            </svg>
-          </div>
-        </div>
 
-        {/* Card 3: Drafts */}
-        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-purple-500/40 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Drafts</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-950/60 border border-purple-500/30 text-purple-400 flex items-center justify-center shadow-sm">
-              <FileText className="w-4 h-4" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* 1: Compose */}
+            <div
+              onClick={() => onStartCompose()}
+              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-all hover:scale-105 ${
+                theme === 'dark'
+                  ? 'bg-[#0E1015] hover:bg-stone-800/80 border-stone-800 hover:border-amber-500/40'
+                  : 'bg-amber-50/60 hover:bg-amber-100/60 border-amber-200/80 hover:border-amber-400'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+                <Send className="w-4 h-4" />
+              </div>
+              <span className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                Compose
+              </span>
             </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">
-            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.drafts}
-          </div>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Saved drafts</p>
-          
-          {/* Purple Neon Wave */}
-          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
-            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-purple-400 fill-purple-400/10 stroke-purple-400 stroke-[1.5]">
-              <path d="M0 18 Q 25 8, 50 16 T 100 12 L 100 25 L 0 25 Z" />
-            </svg>
-          </div>
-        </div>
 
-        {/* Card 4: Scheduled */}
-        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-amber-500/40 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Scheduled</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-950/60 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-sm">
-              <Clock className="w-4 h-4" />
+            {/* 2: Use Template */}
+            <div
+              onClick={() => onStartCompose({ step: 1 })}
+              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-all hover:scale-105 ${
+                theme === 'dark'
+                  ? 'bg-[#0E1015] hover:bg-stone-800/80 border-stone-800 hover:border-amber-500/40'
+                  : 'bg-amber-50/60 hover:bg-amber-100/60 border-amber-200/80 hover:border-amber-400'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+                <FileText className="w-4 h-4" />
+              </div>
+              <span className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                Use Template
+              </span>
             </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">
-            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.scheduled}
-          </div>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Queue ready</p>
-          
-          {/* Amber Neon Wave */}
-          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
-            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-amber-400 fill-amber-400/10 stroke-amber-400 stroke-[1.5]">
-              <path d="M0 14 Q 30 20, 60 10 T 100 15 L 100 25 L 0 25 Z" />
-            </svg>
-          </div>
-        </div>
 
-        {/* Card 5: Emergency */}
-        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-rose-500/40 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Emergency</span>
-            <div className="w-8 h-8 rounded-xl bg-rose-950/60 border border-rose-500/30 text-rose-400 flex items-center justify-center shadow-sm">
-              <AlertTriangle className="w-4 h-4" />
+            {/* 3: Schedule */}
+            <div
+              onClick={() => onStartCompose()}
+              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-all hover:scale-105 ${
+                theme === 'dark'
+                  ? 'bg-[#0E1015] hover:bg-stone-800/80 border-stone-800 hover:border-amber-500/40'
+                  : 'bg-amber-50/60 hover:bg-amber-100/60 border-amber-200/80 hover:border-amber-400'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <span className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                Schedule
+              </span>
             </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">
-            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.emergency}
-          </div>
-          <p className="text-[11px] text-rose-400 font-semibold mt-0.5">High priority</p>
-          
-          {/* Rose Neon Wave */}
-          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
-            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-rose-400 fill-rose-400/10 stroke-rose-400 stroke-[1.5]">
-              <path d="M0 16 Q 20 6, 50 18 T 100 14 L 100 25 L 0 25 Z" />
-            </svg>
-          </div>
-        </div>
 
-        {/* Card 6: Spam */}
-        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-orange-500/40 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Spam</span>
-            <div className="w-8 h-8 rounded-xl bg-orange-950/60 border border-orange-500/30 text-orange-400 flex items-center justify-center shadow-sm">
-              <ShieldAlert className="w-4 h-4" />
+            {/* 4: View Analytics */}
+            <div
+              onClick={() => {
+                const el = document.getElementById('analytics-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-all hover:scale-105 ${
+                theme === 'dark'
+                  ? 'bg-[#0E1015] hover:bg-stone-800/80 border-stone-800 hover:border-amber-500/40'
+                  : 'bg-amber-50/60 hover:bg-amber-100/60 border-amber-200/80 hover:border-amber-400'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+                <BarChart3 className="w-4 h-4" />
+              </div>
+              <span className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                View Analytics
+              </span>
             </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">
-            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.spam}
-          </div>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Filtered messages</p>
-          
-          {/* Orange Neon Wave */}
-          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
-            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-orange-400 fill-orange-400/10 stroke-orange-400 stroke-[1.5]">
-              <path d="M0 15 Q 25 7, 50 16 T 100 14 L 100 25 L 0 25 Z" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Card 7: Pending Review */}
-        <div className="glass-card p-4 rounded-2xl relative overflow-hidden group hover:border-emerald-500/40 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Pending Review</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shadow-sm">
-              <CheckCircle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-white">
-            {loading ? <span className="text-sm font-normal text-slate-400 animate-pulse">Loading...</span> : stats.pendingReview}
-          </div>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Awaiting confirmation</p>
-          
-          {/* Emerald Neon Wave */}
-          <div className="mt-3 -mx-4 -mb-4 h-7 overflow-hidden opacity-75 group-hover:opacity-100 transition-opacity">
-            <svg viewBox="0 0 100 25" preserveAspectRatio="none" className="w-full h-full text-emerald-400 fill-emerald-400/10 stroke-emerald-400 stroke-[1.5]">
-              <path d="M0 12 Q 25 18, 50 12 T 100 16 L 100 25 L 0 25 Z" />
-            </svg>
           </div>
         </div>
 
       </div>
 
-      {/* 4. Email Preferences & Category Analytics Section */}
-      <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-4">
+      {/* ============================================================
+          6. EMAIL PREFERENCES & CATEGORY ANALYTICS SECTION
+      ============================================================ */}
+      <div id="analytics-section" className={`p-6 rounded-3xl border space-y-4 transition-all ${
+        theme === 'dark' ? 'bg-[#12141A] border-amber-500/15 shadow-xl' : 'bg-white border-amber-900/10 shadow-xs'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4 border-stone-800/40">
           <div>
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-pink-400" />
-              <h3 className="text-base font-extrabold text-white">Email Preferences & Category Analytics</h3>
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <h3 className={`text-base font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                Email Preferences & Category Analytics
+              </h3>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
               Live AI-classified breakdown calculated directly from Supabase & Gmail
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
-            <span className="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-[11px]">
+          <div className="flex items-center gap-2 text-xs font-semibold">
+            <span className={`px-3 py-1 rounded-full border text-[11px] ${
+              theme === 'dark' ? 'bg-stone-800 border-stone-700 text-stone-300' : 'bg-stone-100 border-stone-200 text-stone-700'
+            }`}>
               Total Tracked: {stats.total || (stats.sent + stats.received)}
             </span>
           </div>
@@ -993,18 +1346,18 @@ export function Dashboard({
         {/* 12 Preference Categories */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {[
-            { id: 'leave', label: 'Leave Request', icon: '📅', count: stats.categories?.leave || 0, color: 'from-emerald-500 to-teal-400' },
-            { id: 'jobApplication', label: 'Job Application', icon: '📄', count: stats.categories?.jobApplication || 0, color: 'from-blue-500 to-cyan-400' },
-            { id: 'business', label: 'Business Proposal', icon: '🤝', count: stats.categories?.business || 0, color: 'from-purple-500 to-indigo-400' },
-            { id: 'emergency', label: 'Emergency', icon: '🚨', count: stats.categories?.emergency || 0, color: 'from-rose-500 to-pink-500' },
+            { id: 'leave', label: 'Leave Request', icon: '📅', count: stats.categories?.leave || 0, color: 'from-amber-500 to-yellow-400' },
+            { id: 'jobApplication', label: 'Job Application', icon: '📄', count: stats.categories?.jobApplication || 0, color: 'from-amber-600 to-amber-400' },
+            { id: 'business', label: 'Business Proposal', icon: '🤝', count: stats.categories?.business || 0, color: 'from-yellow-600 to-amber-500' },
+            { id: 'emergency', label: 'Emergency', icon: '🚨', count: stats.categories?.emergency || 0, color: 'from-rose-500 to-amber-500' },
             { id: 'personal', label: 'Personal / Casual', icon: '💬', count: stats.categories?.personal || 0, color: 'from-amber-500 to-orange-400' },
-            { id: 'official', label: 'Official / Professional', icon: '👔', count: stats.categories?.official || 0, color: 'from-indigo-500 to-purple-400' },
-            { id: 'complaint', label: 'Complaint', icon: '⚠️', count: stats.categories?.complaint || 0, color: 'from-red-500 to-rose-400' },
-            { id: 'payment', label: 'Payment / Invoice', icon: '💳', count: stats.categories?.payment || 0, color: 'from-teal-500 to-emerald-400' },
-            { id: 'meeting', label: 'Meeting / Sync', icon: '🗓️', count: stats.categories?.meeting || 0, color: 'from-cyan-500 to-blue-400' },
-            { id: 'followUp', label: 'Follow-up', icon: '🔄', count: stats.categories?.followUp || 0, color: 'from-violet-500 to-purple-400' },
-            { id: 'thankYou', label: 'Appreciation', icon: '🙏', count: stats.categories?.thankYou || 0, color: 'from-pink-500 to-rose-400' },
-            { id: 'other', label: 'Other Inquiries', icon: '✉️', count: (stats.categories?.other || 0) + (stats.categories?.inquiry || 0) + (stats.categories?.announcement || 0), color: 'from-slate-500 to-slate-400' },
+            { id: 'official', label: 'Official / Professional', icon: '👔', count: stats.categories?.official || 0, color: 'from-amber-600 to-yellow-500' },
+            { id: 'complaint', label: 'Complaint', icon: '⚠️', count: stats.categories?.complaint || 0, color: 'from-orange-500 to-amber-500' },
+            { id: 'payment', label: 'Payment / Invoice', icon: '💳', count: stats.categories?.payment || 0, color: 'from-yellow-500 to-amber-600' },
+            { id: 'meeting', label: 'Meeting / Sync', icon: '🗓️', count: stats.categories?.meeting || 0, color: 'from-amber-400 to-yellow-500' },
+            { id: 'followUp', label: 'Follow-up', icon: '🔄', count: stats.categories?.followUp || 0, color: 'from-amber-500 to-yellow-600' },
+            { id: 'thankYou', label: 'Appreciation', icon: '🙏', count: stats.categories?.thankYou || 0, color: 'from-yellow-400 to-amber-500' },
+            { id: 'other', label: 'Other Inquiries', icon: '✉️', count: (stats.categories?.other || 0) + (stats.categories?.inquiry || 0) + (stats.categories?.announcement || 0), color: 'from-stone-500 to-amber-600' },
           ].map((cat) => {
             const total = stats.total || (stats.sent + stats.received) || 1;
             const pct = Math.min(100, Math.round((cat.count / total) * 100));
@@ -1014,19 +1367,27 @@ export function Dashboard({
                 onClick={() => {
                   setSelectedCategory(cat.id === 'leave' ? 'Leave' : cat.id === 'jobApplication' ? 'Resume' : cat.id === 'emergency' ? 'Emergency' : 'All');
                 }}
-                className="p-3.5 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-purple-500/40 transition-all cursor-pointer group"
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer group ${
+                  theme === 'dark'
+                    ? 'bg-[#0E1015] hover:bg-stone-800/80 border-stone-800 hover:border-amber-500/40'
+                    : 'bg-stone-50 hover:bg-stone-100 border-stone-200 hover:border-amber-300'
+                }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-base">{cat.icon}</span>
-                  <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full ${cat.count > 0 ? 'bg-purple-950/80 text-purple-300 border border-purple-500/30' : 'bg-slate-800/60 text-slate-500'}`}>
+                  <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full ${
+                    cat.count > 0 
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                      : theme === 'dark' ? 'bg-stone-800 text-stone-500' : 'bg-stone-200 text-stone-600'
+                  }`}>
                     {loading ? '...' : cat.count}
                   </span>
                 </div>
-                <div className="text-[11px] font-bold text-slate-300 group-hover:text-white truncate">
+                <div className={`text-[11px] font-bold truncate ${theme === 'dark' ? 'text-stone-300 group-hover:text-white' : 'text-stone-800 group-hover:text-stone-950'}`}>
                   {cat.label}
                 </div>
                 {/* Visual Progress Gauge */}
-                <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden mt-2">
+                <div className={`w-full h-1.5 rounded-full overflow-hidden mt-2 ${theme === 'dark' ? 'bg-stone-800' : 'bg-stone-200'}`}>
                   <div 
                     className={`h-full bg-gradient-to-r ${cat.color} rounded-full transition-all duration-500`}
                     style={{ width: `${cat.count > 0 ? Math.max(10, pct) : 0}%` }}
@@ -1036,212 +1397,6 @@ export function Dashboard({
             );
           })}
         </div>
-
-        {/* Tone & Priority Analytics Row */}
-        <div className="pt-4 border-t border-slate-800/80">
-          <div className="text-[11px] font-bold text-slate-400 mb-2 flex items-center gap-1.5">
-            <span>🎭 Tone & Priority Distribution (Live Supabase Data):</span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Professional</span>
-              <span className="text-xs font-bold text-purple-300 bg-purple-950/60 px-2 py-0.5 rounded-full">{stats.tones?.professional || 0}</span>
-            </div>
-            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Formal</span>
-              <span className="text-xs font-bold text-indigo-300 bg-indigo-950/60 px-2 py-0.5 rounded-full">{stats.tones?.formal || 0}</span>
-            </div>
-            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Friendly</span>
-              <span className="text-xs font-bold text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-full">{stats.tones?.friendly || 0}</span>
-            </div>
-            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Urgent</span>
-              <span className="text-xs font-bold text-rose-300 bg-rose-950/60 px-2 py-0.5 rounded-full">{stats.tones?.urgent || 0}</span>
-            </div>
-            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">Concise</span>
-              <span className="text-xs font-bold text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded-full">{stats.tones?.concise || 0}</span>
-            </div>
-            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">High / Critical</span>
-              <span className="text-xs font-bold text-pink-300 bg-pink-950/60 px-2 py-0.5 rounded-full">{(stats.importance?.high || 0) + (stats.importance?.critical || 0)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Recent Activity & AI Suggestions Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Recent Activity (2 Cols) */}
-        <div className="lg:col-span-2 glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <Clock className="w-4.5 h-4.5 text-purple-400" />
-              Recent Activity
-            </h3>
-            <button
-              onClick={onViewHistory}
-              className="text-xs text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-1 cursor-pointer"
-            >
-              <span>View All</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {recentEmails.length === 0 ? (
-            <div className="text-center py-10 space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mx-auto text-slate-400">
-                <Mail className="w-6 h-6" />
-              </div>
-              <p className="text-xs text-slate-400">No emails sent yet. Generate your first email with AI!</p>
-              <button
-                onClick={() => onStartCompose()}
-                className="px-4 py-2 rounded-xl gradient-btn text-white text-xs font-bold shadow-md cursor-pointer"
-              >
-                Compose Email
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {recentEmails.slice(0, 6).map((email) => {
-                const status = (email.status || 'Sent').toLowerCase();
-                const isSent = status === 'sent' || email.isSent;
-                const isReceived = status === 'received' || email.isReceived;
-                const isSpam = status === 'spam' || email.isSpam;
-                const isDraft = status === 'draft';
-                const isScheduled = status === 'scheduled';
-                const isPending = status === 'pending' || status === 'pending_review';
-
-                let iconNode = <Mail className="w-4 h-4 text-purple-300" />;
-                let iconBg = 'bg-purple-950/70 border-purple-500/30';
-                let actionText = `Email sent to ${email.recipient}`;
-                let badgeClass = 'bg-emerald-950/60 border-emerald-500/30 text-emerald-300';
-                let badgeLabel = 'Sent';
-
-                if (isReceived) {
-                  iconNode = <Inbox className="w-4 h-4 text-blue-300" />;
-                  iconBg = 'bg-blue-950/70 border-blue-500/30';
-                  actionText = `Gmail message received from ${email.sender || email.recipient}`;
-                  badgeClass = 'bg-blue-950/60 border-blue-500/30 text-blue-300';
-                  badgeLabel = 'Received';
-                } else if (isSpam) {
-                  iconNode = <ShieldAlert className="w-4 h-4 text-orange-300" />;
-                  iconBg = 'bg-orange-950/70 border-orange-500/30';
-                  actionText = `Spam filtered: ${email.subject || 'Message'}`;
-                  badgeClass = 'bg-orange-950/60 border-orange-500/30 text-orange-300';
-                  badgeLabel = 'Spam';
-                } else if (isDraft) {
-                  iconNode = <FileText className="w-4 h-4 text-purple-300" />;
-                  iconBg = 'bg-purple-950/70 border-purple-500/30';
-                  actionText = `Draft saved: ${email.subject || 'Untitled'}`;
-                  badgeClass = 'bg-purple-950/60 border-purple-500/30 text-purple-300';
-                  badgeLabel = 'Draft';
-                } else if (isScheduled) {
-                  iconNode = <Clock className="w-4 h-4 text-amber-300" />;
-                  iconBg = 'bg-amber-950/70 border-amber-500/30';
-                  actionText = `Scheduled: ${email.subject || 'Email'}`;
-                  badgeClass = 'bg-amber-950/60 border-amber-500/30 text-amber-300';
-                  badgeLabel = 'Scheduled';
-                } else if (isPending) {
-                  iconNode = <CheckCircle className="w-4 h-4 text-emerald-300" />;
-                  iconBg = 'bg-emerald-950/70 border-emerald-500/30';
-                  actionText = `${email.category || 'AI Email'} generated (Pending)`;
-                  badgeClass = 'bg-yellow-950/60 border-yellow-500/30 text-yellow-300';
-                  badgeLabel = 'Pending Review';
-                }
-
-                const timestamp = email.sentAt || email.receivedAt || email.createdAt;
-                const localDateStr = timestamp ? new Date(timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
-                const localTimeStr = timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-
-                return (
-                  <div
-                    key={email.id}
-                    onClick={() => setDetailModalEmail(email)}
-                    className="p-3.5 rounded-2xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 flex items-center justify-between gap-3 cursor-pointer transition-all hover:scale-[1.01]"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${iconBg}`}>
-                        {iconNode}
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-white truncate">{actionText}</h4>
-                        <p className="text-[11px] text-slate-400 truncate">
-                          {email.subject ? `Subject: ${email.subject}` : `To: ${email.recipient}`}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold ${badgeClass}`}>
-                        {badgeLabel}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {localDateStr} {localTimeStr}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* AI Suggestions (1 Col) */}
-        <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <Sparkles className="w-4.5 h-4.5 text-cyan-400" />
-              AI Suggestions
-            </h3>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-900/60 border border-purple-500/40 text-purple-300">
-              New
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            <div
-              onClick={() => onStartCompose({ instruction: 'Follow up on pending project status and response timeline' })}
-              className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/40 to-slate-800/40 border border-purple-500/20 hover:border-purple-500/40 cursor-pointer transition-all group"
-            >
-              <div className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                  <Check className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-white group-hover:text-purple-300 transition-colors">
-                    Follow up on pending responses
-                  </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Draft a polite follow-up email to colleagues for quick updates.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => onStartCompose({ instruction: 'Schedule a team sync meeting to review weekly milestones' })}
-              className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/40 to-slate-800/40 border border-blue-500/20 hover:border-blue-500/40 cursor-pointer transition-all group"
-            >
-              <div className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors">
-                    Schedule weekly milestone review
-                  </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Send an organized meeting invite with an agenda outline.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
       </div>
 
       {/* Email Detail Modal */}

@@ -12,7 +12,9 @@ import {
   Copy,
   Mail,
   Lock,
-  Sparkles
+  Sparkles,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { apiFetch, safeParseResponse, getApiBaseUrl, setCustomBackendUrl, DEFAULT_SUPABASE_EDGE_FUNCTION } from '../utils/api';
 import { signInWithGoogle } from '../utils/supabaseClient';
@@ -47,6 +49,20 @@ export function SettingsView() {
   });
   const [savingSig, setSavingSig] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('scribe_theme') || 'dark');
+
+  const handleSetTheme = (newTheme) => {
+    setCurrentTheme(newTheme);
+    localStorage.setItem('scribe_theme', newTheme);
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    }
+  };
 
   const dynamicRedirectUri = `${activeApiBase.replace(/\/+$/, '')}/auth/google/callback`;
 
@@ -197,7 +213,58 @@ export function SettingsView() {
           <Settings className="w-5 h-5 text-purple-400" />
           Settings & Account Authorization
         </h2>
-        <p className="text-xs text-slate-400 mt-1">Configure Gmail sender authorization, backend endpoint, and email signature defaults</p>
+        <p className="text-xs text-slate-400 mt-1">Configure Gmail sender authorization, theme appearance, backend endpoint, and email signature defaults</p>
+      </div>
+
+      {/* 0. Appearance & Theme Selection Card */}
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border shadow-xl space-y-4">
+        <div className="flex items-start justify-between border-b border-stone-800/40 pb-4">
+          <div>
+            <h3 className="text-base font-extrabold flex items-center gap-2">
+              <Sun className="w-5 h-5 text-amber-500" />
+              Appearance & Color Theme
+            </h3>
+            <p className="text-xs opacity-75 mt-1">
+              Toggle between Luxury Obsidian Gold (Dark) and Elegant Warm Ivory (Light)
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div
+            onClick={() => handleSetTheme('dark')}
+            className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${
+              currentTheme === 'dark'
+                ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-md'
+                : 'bg-stone-900/40 border-stone-800 text-stone-400 hover:border-amber-500/40'
+            }`}
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#08090C] border border-amber-500/30 flex items-center justify-center shrink-0">
+              <Moon className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-white">Luxury Gold Dark Mode</h4>
+              <p className="text-[11px] text-stone-400">Deep obsidian with glowing gold & amber accents</p>
+            </div>
+          </div>
+
+          <div
+            onClick={() => handleSetTheme('light')}
+            className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${
+              currentTheme === 'light'
+                ? 'bg-amber-100 border-amber-500 text-amber-900 shadow-md'
+                : 'bg-white border-stone-200 text-stone-600 hover:border-amber-400'
+            }`}
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#FAF8F5] border border-amber-400 flex items-center justify-center shrink-0">
+              <Sun className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-stone-900">Warm Ivory Light Mode</h4>
+              <p className="text-[11px] text-stone-500">Elegant pearl cream with warm gold accents</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 1. Official Google OAuth 2.0 Authorization Card */}

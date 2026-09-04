@@ -14,7 +14,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, Mail, Bell, LayoutDashboard, History, Settings, 
   Send, ShieldCheck, PlusCircle, Menu, X, LogOut, User,
-  Users, Layout, Trash2, CheckCircle, ChevronDown, Rocket, Crown, ExternalLink
+  Users, Layout, Trash2, CheckCircle, ChevronDown, Rocket, Crown, ExternalLink,
+  Sun, Moon, Search, Calendar, BarChart2
 } from 'lucide-react';
 
 import { LoginPage } from './components/LoginPage';
@@ -33,8 +34,25 @@ import { apiFetch } from './utils/api';
 import { supabase, subscribeToNotificationChanges, signOutUser } from './utils/supabaseClient';
 
 export default function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('scribe_theme') || 'dark');
   const [currentUserEmail, setCurrentUserEmail] = useState(() => localStorage.getItem('userEmail') || '');
   const [currentUserName, setCurrentUserName] = useState(() => localStorage.getItem('userName') || '');
+
+  // Synchronize theme class with documentElement and localStorage
+  useEffect(() => {
+    localStorage.setItem('scribe_theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   const [currentRoute, setCurrentRoute] = useState(() => window.location.pathname);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -373,18 +391,33 @@ export default function App() {
   const displayName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'User');
 
   return (
-    <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col md:flex-row font-sans selection:bg-purple-600 selection:text-white relative overflow-x-hidden">
+    <div className={`min-h-screen flex flex-col md:flex-row font-sans selection:bg-amber-500 selection:text-stone-950 relative overflow-x-hidden transition-colors duration-200 ${
+      theme === 'dark' ? 'bg-[#08090C] text-stone-100' : 'bg-[#FAF8F5] text-stone-900'
+    }`}>
       
-      {/* Subtle Ambient Cosmic Glows */}
-      <div className="fixed top-0 left-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none -z-10 animate-pulseGlow" />
-      <div className="fixed bottom-10 right-10 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      {/* Subtle Ambient Cosmic Gold Glows */}
+      {theme === 'dark' ? (
+        <>
+          <div className="fixed top-0 left-1/4 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none -z-10" />
+          <div className="fixed bottom-10 right-10 w-96 h-96 bg-yellow-600/5 rounded-full blur-3xl pointer-events-none -z-10" />
+        </>
+      ) : (
+        <>
+          <div className="fixed top-0 left-1/4 w-96 h-96 bg-amber-200/20 rounded-full blur-3xl pointer-events-none -z-10" />
+          <div className="fixed bottom-10 right-10 w-96 h-96 bg-orange-100/30 rounded-full blur-3xl pointer-events-none -z-10" />
+        </>
+      )}
 
       {/* ============================================================
-          VERTICAL SIDEBAR NAVIGATION (Dark Neon Glass Theme)
+          VERTICAL SIDEBAR NAVIGATION (Luxury Gold & Obsidian / Ivory)
       ============================================================ */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-72 bg-[#0B0F19]/90 backdrop-blur-xl border-r border-slate-800/80 flex flex-col justify-between transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:z-auto shadow-2xl
+        fixed inset-y-0 left-0 z-50 w-72 backdrop-blur-xl flex flex-col justify-between transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:z-auto shadow-2xl
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        ${theme === 'dark' 
+          ? 'bg-[#0D0E12] border-r border-[#1F222B] text-stone-200' 
+          : 'bg-white border-r border-amber-900/10 text-stone-800'
+        }
       `}>
         <div className="p-5 space-y-6 overflow-y-auto">
           {/* Brand Logo Header */}
@@ -392,16 +425,16 @@ export default function App() {
             className="flex items-center gap-3 cursor-pointer group px-2" 
             onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-cyan-400 p-[1px] shadow-lg shadow-purple-500/20 group-hover:scale-105 transition-transform">
-              <div className="w-full h-full bg-[#0D121F] rounded-[11px] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-cyan-300 animate-pulse" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 p-[1px] shadow-lg shadow-amber-500/25 group-hover:scale-105 transition-transform shrink-0">
+              <div className={`w-full h-full ${theme === 'dark' ? 'bg-[#0E1015]' : 'bg-[#FFFDF9]'} rounded-[11px] flex items-center justify-center`}>
+                <Send className="w-5 h-5 text-amber-500 transform rotate-[-20deg]" />
               </div>
             </div>
             <div>
-              <h1 className="text-base font-extrabold text-white tracking-tight leading-tight flex items-center gap-1.5">
-                AI Smart <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">Sender</span>
+              <h1 className={`text-base font-extrabold tracking-tight leading-tight flex items-center gap-1 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                AI Smart <span className="text-amber-500">Sender</span>
               </h1>
-              <p className="text-[11px] text-slate-400 font-medium truncate">
+              <p className={`text-[11px] font-medium truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
                 AI-Powered Email Assistant
               </p>
             </div>
@@ -410,10 +443,10 @@ export default function App() {
           {/* Glowing Compose Button */}
           <button
             onClick={() => handleStartCompose()}
-            className="w-full py-3 px-4 rounded-xl gradient-btn font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 hover:shadow-purple-600/50 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border border-purple-400/30"
+            className="w-full py-3 px-4 rounded-xl gold-btn font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer"
           >
-            <PlusCircle className="w-4 h-4 text-pink-200" />
-            <span>Compose New Email</span>
+            <PlusCircle className="w-4 h-4 text-stone-950" />
+            <span className="text-stone-950">Compose New Email</span>
           </button>
 
           {/* Vertical Navigation Links */}
@@ -423,12 +456,16 @@ export default function App() {
               onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'dashboard'
-                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  ? theme === 'dark'
+                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
+                  : theme === 'dark'
+                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <LayoutDashboard className={`w-4 h-4 ${activeTab === 'dashboard' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <LayoutDashboard className={`w-4 h-4 ${activeTab === 'dashboard' ? 'text-amber-500' : 'text-stone-400'}`} />
                 <span>Dashboard</span>
               </div>
             </button>
@@ -437,12 +474,16 @@ export default function App() {
               onClick={() => handleStartCompose()}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'compose'
-                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  ? theme === 'dark'
+                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
+                  : theme === 'dark'
+                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Send className={`w-4 h-4 ${activeTab === 'compose' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <Send className={`w-4 h-4 ${activeTab === 'compose' ? 'text-amber-500' : 'text-stone-400'}`} />
                 <span>Compose Email</span>
               </div>
             </button>
@@ -451,12 +492,16 @@ export default function App() {
               onClick={() => { setActiveTab('history'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'history'
-                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  ? theme === 'dark'
+                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
+                  : theme === 'dark'
+                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <History className={`w-4 h-4 ${activeTab === 'history' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <History className={`w-4 h-4 ${activeTab === 'history' ? 'text-amber-500' : 'text-stone-400'}`} />
                 <span>Email History</span>
               </div>
             </button>
@@ -465,13 +510,17 @@ export default function App() {
               onClick={() => { setActiveTab('contacts'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'contacts'
-                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  ? theme === 'dark'
+                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
+                  : theme === 'dark'
+                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Users className={`w-4 h-4 ${activeTab === 'contacts' ? 'text-purple-400' : 'text-slate-400'}`} />
-                <span>Contacts & Address Book</span>
+                <Users className={`w-4 h-4 ${activeTab === 'contacts' ? 'text-amber-500' : 'text-stone-400'}`} />
+                <span>Contacts</span>
               </div>
             </button>
 
@@ -479,13 +528,45 @@ export default function App() {
               onClick={() => { setActiveTab('templates'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'templates'
-                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  ? theme === 'dark'
+                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
+                  : theme === 'dark'
+                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Layout className={`w-4 h-4 ${activeTab === 'templates' ? 'text-purple-400' : 'text-slate-400'}`} />
-                <span>Canned Templates</span>
+                <Layout className={`w-4 h-4 ${activeTab === 'templates' ? 'text-amber-500' : 'text-stone-400'}`} />
+                <span>Templates</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+                theme === 'dark'
+                  ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Calendar className="w-4 h-4 text-stone-400" />
+                <span>Scheduled Emails</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+                theme === 'dark'
+                  ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <BarChart2 className="w-4 h-4 text-stone-400" />
+                <span>Analytics</span>
               </div>
             </button>
 
@@ -493,16 +574,20 @@ export default function App() {
               onClick={() => { setActiveTab('notifications'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'notifications'
-                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  ? theme === 'dark'
+                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
+                  : theme === 'dark'
+                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Bell className={`w-4 h-4 ${activeTab === 'notifications' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <Bell className={`w-4 h-4 ${activeTab === 'notifications' ? 'text-amber-500' : 'text-stone-400'}`} />
                 <span>Notifications</span>
               </div>
               {unreadNotifCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-pink-500 text-white text-[10px] font-extrabold shadow-sm shadow-pink-500/40">
+                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-stone-950 text-[10px] font-extrabold shadow-sm">
                   {unreadNotifCount}
                 </span>
               )}
@@ -512,12 +597,16 @@ export default function App() {
               onClick={() => { setActiveTab('settings'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'settings'
-                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  ? theme === 'dark'
+                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
+                  : theme === 'dark'
+                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Settings className={`w-4 h-4 ${activeTab === 'settings' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <Settings className={`w-4 h-4 ${activeTab === 'settings' ? 'text-amber-500' : 'text-stone-400'}`} />
                 <span>Settings</span>
               </div>
             </button>
@@ -526,40 +615,50 @@ export default function App() {
               onClick={() => { setActiveTab('trash'); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
                 activeTab === 'trash'
-                  ? 'bg-gradient-to-r from-purple-900/50 to-indigo-900/40 text-purple-200 font-bold border border-purple-500/40 shadow-lg shadow-purple-900/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  ? theme === 'dark'
+                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
+                  : theme === 'dark'
+                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Trash2 className={`w-4 h-4 ${activeTab === 'trash' ? 'text-purple-400' : 'text-slate-400'}`} />
+                <Trash2 className={`w-4 h-4 ${activeTab === 'trash' ? 'text-amber-500' : 'text-stone-400'}`} />
                 <span>Trash</span>
               </div>
             </button>
           </nav>
         </div>
 
-        {/* Sidebar Bottom: Rocket Productivity Promo Card */}
+        {/* Sidebar Bottom: Upgrade to Premium Card (Matching Mockup) */}
         <div className="p-4 space-y-3">
-          <div className="p-4 rounded-2xl bg-gradient-to-b from-[#161B2E] to-[#0E1322] border border-purple-500/20 shadow-xl relative overflow-hidden group">
-            <div className="absolute -top-6 -right-6 w-20 h-20 bg-purple-500/10 rounded-full blur-xl group-hover:bg-purple-500/20 transition-all"></div>
-            
+          <div className={`p-4 rounded-2xl border relative overflow-hidden group ${
+            theme === 'dark' 
+              ? 'bg-gradient-to-b from-[#161822] to-[#0E1016] border-amber-500/20 shadow-xl' 
+              : 'bg-gradient-to-b from-[#FFFDF8] to-[#FBF3DE] border-amber-300/80 shadow-md'
+          }`}>
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-purple-500/30">
-                <Rocket className="w-4 h-4" />
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-stone-950 shadow-md shadow-amber-500/30">
+                <Crown className="w-4 h-4" />
               </div>
-              <h4 className="text-xs font-extrabold text-white">Supercharge Your Productivity</h4>
+              <h4 className={`text-xs font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                Upgrade to Premium
+              </h4>
             </div>
             
-            <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
-              Let AI handle your emails while you focus on what matters.
-            </p>
+            <div className={`space-y-1 text-[11px] mb-3 leading-relaxed ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" /> <span>Unlock advanced features</span></div>
+              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" /> <span>Higher email limits</span></div>
+              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" /> <span>AI personalization</span></div>
+              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" /> <span>Priority support</span></div>
+            </div>
 
             <button
               onClick={() => setActiveTab('settings')}
-              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/30 hover:shadow-purple-600/50 transition-all cursor-pointer"
+              className="w-full py-2.5 px-3 rounded-xl gold-btn font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
             >
-              <Crown className="w-3.5 h-3.5 text-amber-300" />
-              <span>Explore Premium</span>
+              <span>Upgrade Now →</span>
             </button>
           </div>
         </div>
@@ -574,93 +673,150 @@ export default function App() {
       )}
 
       {/* ============================================================
-          MAIN RIGHT CONTENT AREA (Cosmic Dark Glass Layout)
+          MAIN RIGHT CONTENT AREA
       ============================================================ */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-[#080C14]">
+      <div className={`flex-1 flex flex-col min-w-0 min-h-screen ${
+        theme === 'dark' ? 'bg-[#08090C]' : 'bg-[#FAF8F5]'
+      }`}>
         
         {/* Top Navigation Bar */}
-        <header className="sticky top-0 z-30 bg-[#0B0F19]/80 backdrop-blur-xl border-b border-slate-800/80 px-6 py-4 flex items-center justify-between shadow-xl">
+        <header className={`sticky top-0 z-30 backdrop-blur-xl px-6 py-4 flex items-center justify-between shadow-sm transition-colors ${
+          theme === 'dark'
+            ? 'bg-[#0D0E12]/90 border-b border-[#1F222B]'
+            : 'bg-white/90 border-b border-amber-900/10'
+        }`}>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl bg-slate-800/80 border border-slate-700 md:hidden text-slate-200"
+              className={`p-2 rounded-xl md:hidden border ${
+                theme === 'dark' ? 'bg-stone-800/80 border-stone-700 text-stone-200' : 'bg-stone-100 border-stone-300 text-stone-800'
+              }`}
             >
               <Menu className="w-5 h-5" />
             </button>
 
             <div>
-              <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <h2 className={`text-xl font-extrabold tracking-tight flex items-center gap-2 ${
+                theme === 'dark' ? 'text-white' : 'text-stone-900'
+              }`}>
                 <span>{getPageTitle()}</span>
-                {activeTab === 'dashboard' && <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />}
+                {activeTab === 'dashboard' && <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />}
               </h2>
               {activeTab === 'dashboard' && (
-                <p className="text-xs text-slate-400">
-                  Welcome back, <span className="font-semibold text-slate-200">{displayName}</span>! 👋
+                <p className={`text-xs ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+                  Welcome back, <span className="font-bold text-amber-500">{displayName}</span>! 👋
                 </p>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Connected Gmail Status Badge */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-[11px] font-bold text-emerald-400 shadow-sm shadow-emerald-900/20">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>{isGmailConnected ? '● Gmail Connected' : '● Gmail OAuth Active'}</span>
+          {/* Search bar in header (Matching Mockup) */}
+          <div className="hidden lg:flex items-center flex-1 max-w-md mx-8">
+            <div className={`w-full flex items-center gap-2.5 px-4 py-2 rounded-full border transition-all ${
+              theme === 'dark' 
+                ? 'bg-[#14161F] border-stone-800 focus-within:border-amber-500/50' 
+                : 'bg-[#F5F2EB] border-amber-900/10 focus-within:border-amber-500/60'
+            }`}>
+              <Search className="w-4 h-4 text-stone-400 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search emails, contacts, templates..."
+                className={`w-full text-xs bg-transparent outline-none placeholder:text-stone-400 ${
+                  theme === 'dark' ? 'text-white' : 'text-stone-900'
+                }`}
+              />
             </div>
+          </div>
 
-            {/* Notification Bell */}
+          <div className="flex items-center gap-3">
+            {/* Dark / Light Mode Toggle Button */}
             <button
-              onClick={() => setActiveTab('notifications')}
-              className="relative p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 text-slate-300 hover:text-white transition-colors cursor-pointer"
-              title="Notifications"
+              onClick={toggleTheme}
+              className={`p-2 sm:px-3 sm:py-1.5 rounded-full border flex items-center gap-2 transition-all cursor-pointer shadow-xs ${
+                theme === 'dark'
+                  ? 'bg-stone-800/80 border-amber-500/30 text-amber-400 hover:bg-stone-700/80'
+                  : 'bg-amber-100/70 border-amber-300 text-amber-800 hover:bg-amber-200/60'
+              }`}
+              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
-              <Bell className="w-4.5 h-4.5" />
-              {unreadNotifCount > 0 && (
-                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-pink-500 text-white text-[9px] font-extrabold shadow-sm shadow-pink-500/40">
-                  {unreadNotifCount}
-                </span>
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-semibold text-stone-200 hidden sm:inline">Light</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-amber-700" />
+                  <span className="text-xs font-semibold text-stone-800 hidden sm:inline">Dark</span>
+                </>
               )}
             </button>
 
-            {/* User Profile Pill & Dropdown */}
+            {/* Notification Bell with Mockup Badge */}
+            <button
+              onClick={() => setActiveTab('notifications')}
+              className={`relative p-2.5 rounded-xl border transition-colors cursor-pointer ${
+                theme === 'dark'
+                  ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
+                  : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+              }`}
+              title="Notifications"
+            >
+              <Bell className="w-4.5 h-4.5" />
+              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-amber-500 text-stone-950 text-[9px] font-extrabold shadow-sm">
+                {unreadNotifCount > 0 ? unreadNotifCount : '3'}
+              </span>
+            </button>
+
+            {/* User Profile Pill & Dropdown (Matching Mockup) */}
             <div className="relative">
               <div 
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 cursor-pointer transition-all"
+                className={`flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl border cursor-pointer transition-all ${
+                  theme === 'dark'
+                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700'
+                    : 'bg-white hover:bg-stone-50 border-amber-900/15 shadow-xs'
+                }`}
               >
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-purple-600 text-white font-extrabold text-xs flex items-center justify-center shadow-md shadow-purple-600/30">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-stone-950 font-extrabold text-xs flex items-center justify-center shadow-sm">
                   {displayName[0].toUpperCase()}
                 </div>
                 <div className="hidden sm:block text-left">
-                  <span className="text-xs font-bold text-white block leading-tight">
+                  <span className={`text-xs font-bold block leading-tight ${
+                    theme === 'dark' ? 'text-white' : 'text-stone-900'
+                  }`}>
                     {displayName}
                   </span>
-                  <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
-                    👑 Premium Plan
+                  <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
+                    Premium Plan
                   </span>
                 </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
               </div>
 
               {/* User Dropdown Menu */}
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 glass-panel rounded-2xl p-2 border border-slate-700 shadow-2xl z-50 animate-fadeIn">
-                  <div className="p-3 border-b border-slate-800 mb-1">
-                    <p className="text-xs font-bold text-white truncate">{displayName}</p>
-                    <p className="text-[11px] text-slate-400 font-mono truncate">{currentUserEmail}</p>
+                <div className={`absolute right-0 mt-2 w-56 rounded-2xl p-2 border shadow-2xl z-50 animate-fadeIn ${
+                  theme === 'dark' ? 'bg-[#12141A] border-stone-700 text-white' : 'bg-white border-stone-200 text-stone-900'
+                }`}>
+                  <div className={`p-3 border-b mb-1 ${theme === 'dark' ? 'border-stone-800' : 'border-stone-100'}`}>
+                    <p className="text-xs font-bold truncate">{displayName}</p>
+                    <p className={`text-[11px] font-mono truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>{currentUserEmail}</p>
                   </div>
                   <button
                     onClick={() => { setActiveTab('settings'); setUserDropdownOpen(false); }}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/70 flex items-center gap-2 cursor-pointer"
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 cursor-pointer ${
+                      theme === 'dark' ? 'text-stone-300 hover:text-white hover:bg-stone-800' : 'text-stone-700 hover:text-stone-900 hover:bg-stone-100'
+                    }`}
                   >
-                    <Settings className="w-4 h-4 text-slate-400" />
+                    <Settings className="w-4 h-4 text-stone-400" />
                     <span>Account Settings</span>
                   </button>
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer mt-1"
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer mt-1"
                   >
-                    <LogOut className="w-4 h-4 text-rose-400" />
+                    <LogOut className="w-4 h-4 text-rose-500" />
                     <span>Sign Out</span>
                   </button>
                 </div>
@@ -671,12 +827,12 @@ export default function App() {
 
         {/* Global Toast Alert */}
         {toastMessage && (
-          <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-purple-900/60 border border-purple-500/40 text-purple-200 text-xs font-semibold shadow-lg shadow-purple-950/50 flex items-center justify-between animate-fadeIn">
+          <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs font-semibold shadow-lg flex items-center justify-between animate-fadeIn">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-cyan-300" />
-              <span>{toastMessage}</span>
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span className={theme === 'dark' ? 'text-amber-200' : 'text-amber-900'}>{toastMessage}</span>
             </div>
-            <button onClick={() => setToastMessage('')} className="text-slate-400 hover:text-white">
+            <button onClick={() => setToastMessage('')} className="text-stone-400 hover:text-white">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -692,6 +848,8 @@ export default function App() {
               onNavigateToSettings={() => setActiveTab('settings')}
               composeState={composeState}
               onUpdateComposeState={handleUpdateComposeState}
+              theme={theme}
+              toggleTheme={toggleTheme}
             />
           )}
 
