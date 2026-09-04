@@ -632,7 +632,7 @@ BEGIN
       'thankYou', COUNT(*) FILTER (WHERE email_type ILIKE '%thank%' OR email_type ILIKE '%appreciation%'),
       'apology', COUNT(*) FILTER (WHERE email_type ILIKE '%apology%'),
       'other', COUNT(*) FILTER (
-        email_type NOT ILIKE '%leave%' AND email_type NOT ILIKE '%sick%' AND 
+        WHERE email_type NOT ILIKE '%leave%' AND email_type NOT ILIKE '%sick%' AND 
         email_type NOT ILIKE '%job%' AND email_type NOT ILIKE '%resume%' AND 
         email_type NOT ILIKE '%follow%' AND email_type NOT ILIKE '%complaint%' AND 
         email_type NOT ILIKE '%payment%' AND email_type NOT ILIKE '%fee%' AND
