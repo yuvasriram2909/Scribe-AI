@@ -11,10 +11,10 @@ import { supabase, subscribeToEmailChanges, subscribeToEmailEvents, signInWithGo
 function GoldMiniBarChart() {
   return (
     <div className="flex items-end gap-1 h-5 w-6 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
-      <span className="w-1 h-2 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400"></span>
-      <span className="w-1 h-3 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400"></span>
-      <span className="w-1 h-4 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400"></span>
-      <span className="w-1 h-5 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400"></span>
+      <span className="w-1 h-2 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400 group-hover:h-3 transition-all duration-300"></span>
+      <span className="w-1 h-3 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400 group-hover:h-4.5 transition-all duration-300 delay-75"></span>
+      <span className="w-1 h-4 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400 group-hover:h-3.5 transition-all duration-300 delay-100"></span>
+      <span className="w-1 h-5 rounded-xs bg-gradient-to-t from-amber-600 to-amber-400 group-hover:h-5 transition-all duration-300"></span>
     </div>
   );
 }
@@ -553,7 +553,7 @@ export function Dashboard({
       {/* ============================================================
           1. HERO LUXURY BANNER (Matching Mockup Top Card)
       ============================================================ */}
-      <div className={`relative overflow-hidden rounded-3xl p-6 sm:p-8 border transition-all ${
+      <div className={`relative overflow-hidden rounded-3xl p-6 sm:p-8 border hero-card-interactive transition-all ${
         theme === 'dark'
           ? 'bg-gradient-to-br from-[#16140E] via-[#12141A] to-[#0D0E12] border-amber-500/25 shadow-2xl'
           : 'bg-gradient-to-br from-[#FFFDF8] via-[#FAF3E3] to-[#F5E9CC] border-amber-300/80 shadow-sm'
@@ -590,36 +590,37 @@ export function Dashboard({
               </p>
             </div>
 
-            {/* Action Buttons: Compose New Email → & View Templates */}
+            {/* Action Buttons: Compose New Email → & View Templates with Light Sweep & Micro-Motion */}
             <div className="flex items-center gap-3 pt-2">
               <button
                 onClick={() => onStartCompose()}
-                className="gold-btn px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer"
+                className="gold-btn light-sweep px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer group"
               >
-                <Send className="w-3.5 h-3.5 text-stone-950" />
-                <span>Compose New Email →</span>
+                <Send className="w-3.5 h-3.5 text-stone-950 btn-icon-spin transition-transform" />
+                <span>Compose New Email</span>
+                <span className="btn-arrow-slide transition-transform duration-200">→</span>
               </button>
               <button
                 onClick={() => onStartCompose({ step: 1 })}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all duration-200 hover:scale-102 hover:border-amber-500/50 hover:shadow-md cursor-pointer group ${
                   theme === 'dark'
                     ? 'border-amber-500/30 bg-stone-900/50 hover:bg-stone-800/80 text-amber-200'
                     : 'border-amber-300 bg-white/80 hover:bg-white text-stone-800 shadow-xs'
                 }`}
               >
-                <FileText className="w-3.5 h-3.5 text-amber-500" />
+                <FileText className="w-3.5 h-3.5 text-amber-500 group-hover:scale-110 transition-transform" />
                 <span>View Templates</span>
               </button>
             </div>
           </div>
 
-          {/* Right: Golden Origami 3D Paper Airplane Graphic with cursive script tagline */}
+          {/* Right: Golden Origami 3D Paper Airplane Graphic with floating parallax and cursive tagline */}
           <div className="hidden lg:flex flex-col items-center justify-center relative w-72 shrink-0">
             <div className="relative w-56 h-40 flex items-center justify-center">
               {/* Golden Ambient Glow */}
               <div className="absolute inset-0 bg-amber-500/15 rounded-full blur-2xl pointer-events-none"></div>
-              {/* Origami Golden Paper Airplane SVG */}
-              <svg viewBox="0 0 200 160" className="w-48 h-36 drop-shadow-xl transform rotate-[-8deg] hover:rotate-0 transition-transform duration-500">
+              {/* Origami Golden Paper Airplane SVG with subtle floating loop */}
+              <svg viewBox="0 0 200 160" className="w-48 h-36 drop-shadow-xl animate-airplane-float cursor-pointer">
                 <defs>
                   <linearGradient id="goldWing1" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#FDE68A" />
@@ -659,17 +660,17 @@ export function Dashboard({
       </div>
 
       {/* ============================================================
-          2. GMAIL CONNECTED STATUS BAR
+          2. GMAIL CONNECTED STATUS BAR (With Micro-Interactions)
       ============================================================ */}
-      <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+      <div className={`p-4 sm:p-5 rounded-2xl border gmail-card-interactive group transition-all ${
         theme === 'dark' 
           ? 'bg-[#12141A] border-amber-500/15 shadow-md' 
           : 'bg-white border-amber-900/10 shadow-xs'
       }`}>
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            {/* Official Gmail Color Icon Circle */}
-            <div className="w-11 h-11 rounded-2xl bg-white border border-stone-200 flex items-center justify-center shadow-sm shrink-0">
+            {/* Official Gmail Color Icon Circle with Micro-Scale */}
+            <div className="w-11 h-11 rounded-2xl bg-white border border-stone-200 flex items-center justify-center shadow-sm shrink-0 gmail-brand-icon transition-transform duration-200">
               <svg className="w-6 h-6" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z" opacity=".15"/>
                 <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
@@ -682,7 +683,7 @@ export function Dashboard({
                 <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
                   Gmail Connected
                 </h3>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50"></span>
               </div>
               <p className={`text-xs mt-0.5 font-mono ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
                 {connectionStatus.connectedEmail || localStorage.getItem('userEmail') || 'yuvasriram2909@gmail.com'}
@@ -695,9 +696,9 @@ export function Dashboard({
             {toggleTheme && (
               <button
                 onClick={toggleTheme}
-                className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-xs ${
                   theme === 'dark'
-                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-amber-500/30 text-amber-400'
+                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-amber-500/30 text-amber-400 hover:border-amber-500/50'
                     : 'bg-amber-100/70 hover:bg-amber-200/70 border-amber-300 text-amber-900'
                 }`}
                 title="Switch Dark or Light Mode"
@@ -716,17 +717,17 @@ export function Dashboard({
               </button>
             )}
 
-            {/* Sync Gmail Button */}
+            {/* Sync Gmail Button with Rotating Icon on Hover */}
             <button
               onClick={handleManualSync}
               disabled={isSyncing}
-              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs disabled:opacity-50 ${
+              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 hover:border-amber-500/40 hover:shadow-md cursor-pointer shadow-xs disabled:opacity-50 group ${
                 theme === 'dark'
                   ? 'bg-stone-800/80 hover:bg-stone-700 border-stone-700 text-stone-200'
                   : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
               }`}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-500' : 'text-stone-400'}`} />
+              <RefreshCw className={`w-3.5 h-3.5 transition-transform duration-500 ${isSyncing ? 'animate-spin text-amber-500' : 'text-stone-400 group-hover:text-amber-500 group-hover:rotate-180'}`} />
               <span>{isSyncing ? 'Syncing...' : 'Sync Gmail'}</span>
             </button>
 
@@ -734,7 +735,7 @@ export function Dashboard({
             <div className="relative">
               <button
                 onClick={() => setDotsMenuOpen(!dotsMenuOpen)}
-                className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                className={`p-2 rounded-xl border transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
                   theme === 'dark'
                     ? 'bg-stone-800/80 hover:bg-stone-700 border-stone-700 text-stone-300'
                     : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
@@ -749,7 +750,7 @@ export function Dashboard({
                 }`}>
                   <button
                     onClick={() => { onNavigateToSettings(); setDotsMenuOpen(false); }}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 cursor-pointer ${
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
                       theme === 'dark' ? 'hover:bg-stone-800 text-stone-300' : 'hover:bg-stone-100 text-stone-700'
                     }`}
                   >
@@ -758,7 +759,7 @@ export function Dashboard({
                   </button>
                   <button
                     onClick={() => { handleDisconnectGmail(); setDotsMenuOpen(false); }}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer transition-colors"
                   >
                     <LogOut className="w-3.5 h-3.5 text-rose-500" />
                     <span>Disconnect</span>
@@ -788,23 +789,23 @@ export function Dashboard({
       )}
 
       {/* ============================================================
-          3. SIX REAL-TIME METRIC CARDS (3x2 Grid Matching Mockup)
+          3. SIX REAL-TIME METRIC CARDS (3x2 Grid With Interactive Depth)
       ============================================================ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         
         {/* Card 1: Emails Sent */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
-            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
               <Send className="w-4 h-4" />
             </div>
             <GoldMiniBarChart />
           </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
             {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.sent || 645)}
           </div>
           <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
@@ -817,18 +818,18 @@ export function Dashboard({
         </div>
 
         {/* Card 2: Emails Received */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
-            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
               <Inbox className="w-4 h-4" />
             </div>
             <GoldMiniBarChart />
           </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
             {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.received || 455)}
           </div>
           <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
@@ -841,18 +842,18 @@ export function Dashboard({
         </div>
 
         {/* Card 3: Drafts Saved */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
-            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
               <FileText className="w-4 h-4" />
             </div>
             <GoldMiniBarChart />
           </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
             {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.drafts || 151)}
           </div>
           <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
@@ -865,18 +866,18 @@ export function Dashboard({
         </div>
 
         {/* Card 4: Scheduled */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
-            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
               <Clock className="w-4 h-4" />
             </div>
             <GoldMiniBarChart />
           </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
             {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.scheduled || 0)}
           </div>
           <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
@@ -888,18 +889,18 @@ export function Dashboard({
         </div>
 
         {/* Card 5: High Priority */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
-            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
               <AlertTriangle className="w-4 h-4" />
             </div>
             <GoldMiniBarChart />
           </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
             {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.emergency || 498)}
           </div>
           <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
@@ -912,18 +913,18 @@ export function Dashboard({
         </div>
 
         {/* Card 6: Spam Filtered */}
-        <div className={`p-5 rounded-2xl border relative overflow-hidden transition-all group hover:scale-[1.01] ${
+        <div className={`p-5 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 hover:border-amber-500/35 shadow-md'
-            : 'bg-white border-amber-900/10 hover:border-amber-500/40 shadow-xs'
+            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
               <ShieldAlert className="w-4 h-4" />
             </div>
             <GoldMiniBarChart />
           </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
             {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">Loading...</span> : (stats.spam || 174)}
           </div>
           <div className={`text-xs font-medium mt-1 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
@@ -938,7 +939,7 @@ export function Dashboard({
       </div>
 
       {/* ============================================================
-          4. "WHAT DO YOU WANT TO SEND TODAY?" SECTION (Matching Mockup)
+          4. "WHAT DO YOU WANT TO SEND TODAY?" SECTION (With Micro-Interactions)
       ============================================================ */}
       <div className={`p-6 sm:p-7 rounded-3xl border transition-all ${
         theme === 'dark'
@@ -946,7 +947,7 @@ export function Dashboard({
           : 'bg-white border-amber-900/10 shadow-xs'
       }`}>
         <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="w-5 h-5 text-amber-500" />
+          <Sparkles className="w-5 h-5 text-amber-500 hover:rotate-45 transition-transform duration-300 cursor-pointer" />
           <h3 className={`text-base sm:text-lg font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
             What do you want to send today?
           </h3>
@@ -958,12 +959,12 @@ export function Dashboard({
         <form onSubmit={handleQuickSubmit} className="space-y-3.5">
           {/* Main Input Row with Search Icon & + Add CC/BCC Inside */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <div className={`flex-1 flex items-center gap-2.5 px-4 py-3 rounded-2xl border transition-all ${
+            <div className={`flex-1 flex items-center gap-2.5 px-4 py-3 rounded-2xl border input-interactive group ${
               theme === 'dark'
-                ? 'bg-[#141620] border-stone-700/80 focus-within:border-amber-500/60'
-                : 'bg-[#FAF8F5] border-amber-900/15 focus-within:border-amber-500'
+                ? 'bg-[#141620] border-stone-700/80'
+                : 'bg-[#FAF8F5] border-amber-900/15'
             }`}>
-              <Search className="w-4 h-4 text-stone-400 shrink-0" />
+              <Search className="w-4 h-4 text-stone-400 group-hover:text-amber-500 group-focus-within:text-amber-500 transition-colors shrink-0" />
               <input
                 type="text"
                 placeholder="e.g., I need sick leave for 2 days"
@@ -980,19 +981,19 @@ export function Dashboard({
               <button
                 type="button"
                 onClick={() => setShowQuickCcBcc(!showQuickCcBcc)}
-                className="text-[11px] font-bold text-amber-500 hover:text-amber-400 transition-colors cursor-pointer shrink-0"
+                className="text-[11px] font-bold text-amber-500 hover:text-amber-400 transition-colors cursor-pointer shrink-0 hover:underline"
               >
                 {showQuickCcBcc ? 'Hide CC/BCC' : '+ Add CC/BCC'}
               </button>
             </div>
 
             {/* Recipient Input */}
-            <div className={`w-full sm:w-72 flex items-center gap-2 px-4 py-3 rounded-2xl border transition-all ${
+            <div className={`w-full sm:w-72 flex items-center gap-2 px-4 py-3 rounded-2xl border input-interactive group ${
               theme === 'dark'
-                ? 'bg-[#141620] border-stone-700/80 focus-within:border-amber-500/60'
-                : 'bg-[#FAF8F5] border-amber-900/15 focus-within:border-amber-500'
+                ? 'bg-[#141620] border-stone-700/80'
+                : 'bg-[#FAF8F5] border-amber-900/15'
             }`}>
-              <Users className="w-4 h-4 text-stone-400 shrink-0" />
+              <Users className="w-4 h-4 text-stone-400 group-hover:text-amber-500 group-focus-within:text-amber-500 transition-colors shrink-0" />
               <input
                 type="email"
                 placeholder="manager@example.com"
@@ -1026,7 +1027,7 @@ export function Dashboard({
                     setQuickCc(e.target.value);
                     if (onUpdateComposeState) onUpdateComposeState({ cc: e.target.value });
                   }}
-                  className={`w-full px-3 py-2 rounded-xl text-xs outline-none border transition-all ${
+                  className={`w-full px-3 py-2 rounded-xl text-xs outline-none border input-interactive ${
                     theme === 'dark'
                       ? 'bg-[#141620] border-stone-700 text-white'
                       : 'bg-white border-stone-200 text-stone-900'
@@ -1045,7 +1046,7 @@ export function Dashboard({
                     setQuickBcc(e.target.value);
                     if (onUpdateComposeState) onUpdateComposeState({ bcc: e.target.value });
                   }}
-                  className={`w-full px-3 py-2 rounded-xl text-xs outline-none border transition-all ${
+                  className={`w-full px-3 py-2 rounded-xl text-xs outline-none border input-interactive ${
                     theme === 'dark'
                       ? 'bg-[#141620] border-stone-700 text-white'
                       : 'bg-white border-stone-200 text-stone-900'
@@ -1063,49 +1064,51 @@ export function Dashboard({
             </div>
           )}
 
-          {/* Bottom Chips & Generate Email Button */}
+          {/* Bottom Chips & Generate Email Button with Light Sweep and Micro-Motion */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
             <div className="flex items-center gap-2 flex-wrap text-xs">
               <button
                 type="button"
                 onClick={() => handleQuickChip('I need sick leave for 3 days due to high fever.')}
-                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
                   theme === 'dark'
                     ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
                     : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
                 }`}
               >
-                <span>🩺</span> Sick leave 3 days
+                <span className="chip-emoji inline-block transition-transform duration-200">🩺</span> Sick leave 3 days
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickChip('Emergency leave today: My father had an accident and I need to leave immediately.')}
-                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
                   theme === 'dark'
                     ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
                     : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
                 }`}
               >
-                <span>⚠️</span> Emergency leave today
+                <span className="chip-emoji inline-block transition-transform duration-200">⚠️</span> Emergency leave today
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickChip('Please find attached my resume for the Senior Software Engineer position.')}
-                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
                   theme === 'dark'
                     ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
                     : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
                 }`}
               >
-                <span>📄</span> Send Resume
+                <span className="chip-emoji inline-block transition-transform duration-200">📄</span> Send Resume
               </button>
             </div>
 
             <button
               type="submit"
-              className="gold-btn px-6 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer shrink-0"
+              className="gold-btn light-sweep px-6 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer shrink-0 group"
             >
-              <span>Generate Email →</span>
+              <Sparkles className="w-3.5 h-3.5 text-stone-950 btn-icon-spin transition-transform" />
+              <span>Generate Email</span>
+              <span className="btn-arrow-slide transition-transform duration-200">→</span>
             </button>
           </div>
         </form>
@@ -1131,9 +1134,10 @@ export function Dashboard({
             </div>
             <button
               onClick={onViewHistory}
-              className="text-xs font-semibold text-amber-500 hover:text-amber-400 flex items-center gap-1 cursor-pointer"
+              className="text-xs font-semibold text-amber-500 hover:text-amber-400 flex items-center gap-1 cursor-pointer group"
             >
-              <span>View All →</span>
+              <span>View All</span>
+              <span className="group-hover:translate-x-1 transition-transform duration-200">→</span>
             </button>
           </div>
 
@@ -1143,14 +1147,14 @@ export function Dashboard({
                 <div
                   key={em.id || idx}
                   onClick={() => setDetailModalEmail(em)}
-                  className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                  className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer recent-email-row group ${
                     theme === 'dark'
-                      ? 'bg-[#0E1015] hover:bg-stone-800/60 border-stone-800'
-                      : 'bg-stone-50 hover:bg-stone-100 border-stone-200'
+                      ? 'bg-[#0E1015] border-stone-800'
+                      : 'bg-stone-50 border-stone-200'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0 recent-mail-icon transition-transform duration-200 shadow-xs">
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
                         <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
@@ -1158,7 +1162,7 @@ export function Dashboard({
                       </svg>
                     </div>
                     <div className="min-w-0">
-                      <h4 className={`text-xs font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                      <h4 className={`text-xs font-bold truncate group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
                         {em.subject || 'Meeting Schedule for Next Week'}
                       </h4>
                       <p className={`text-[11px] truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
@@ -1166,18 +1170,21 @@ export function Dashboard({
                       </p>
                     </div>
                   </div>
-                  <span className={`text-[10px] font-medium shrink-0 ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
-                    {idx === 0 ? '2 hours ago' : idx === 1 ? '5 hours ago' : '1 day ago'}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
+                      {idx === 0 ? '2 hours ago' : idx === 1 ? '5 hours ago' : '1 day ago'}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-amber-500 recent-row-arrow opacity-0 -translate-x-2 transition-all duration-200 shrink-0" />
+                  </div>
                 </div>
               ))
             ) : (
               <>
-                <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${
+                <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 recent-email-row group cursor-pointer ${
                   theme === 'dark' ? 'bg-[#0E1015] border-stone-800' : 'bg-stone-50 border-stone-200'
                 }`}>
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0 recent-mail-icon transition-transform duration-200 shadow-xs">
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
                         <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
@@ -1185,7 +1192,7 @@ export function Dashboard({
                       </svg>
                     </div>
                     <div className="min-w-0">
-                      <h4 className={`text-xs font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                      <h4 className={`text-xs font-bold truncate group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
                         Meeting Schedule for Next Week
                       </h4>
                       <p className={`text-[11px] truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
@@ -1193,16 +1200,19 @@ export function Dashboard({
                       </p>
                     </div>
                   </div>
-                  <span className={`text-[10px] font-medium shrink-0 ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
-                    2 hours ago
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
+                      2 hours ago
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-amber-500 recent-row-arrow opacity-0 -translate-x-2 transition-all duration-200 shrink-0" />
+                  </div>
                 </div>
 
-                <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${
+                <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 recent-email-row group cursor-pointer ${
                   theme === 'dark' ? 'bg-[#0E1015] border-stone-800' : 'bg-stone-50 border-stone-200'
                 }`}>
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0 recent-mail-icon transition-transform duration-200 shadow-xs">
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
                         <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
@@ -1210,7 +1220,7 @@ export function Dashboard({
                       </svg>
                     </div>
                     <div className="min-w-0">
-                      <h4 className={`text-xs font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                      <h4 className={`text-xs font-bold truncate group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
                         Project Update
                       </h4>
                       <p className={`text-[11px] truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
@@ -1218,16 +1228,19 @@ export function Dashboard({
                       </p>
                     </div>
                   </div>
-                  <span className={`text-[10px] font-medium shrink-0 ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
-                    5 hours ago
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
+                      5 hours ago
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-amber-500 recent-row-arrow opacity-0 -translate-x-2 transition-all duration-200 shrink-0" />
+                  </div>
                 </div>
               </>
             )}
           </div>
         </div>
 
-        {/* Right Column: Quick Actions (Matching Mockup 4 Square Tiles) */}
+        {/* Right Column: Quick Actions (Matching Mockup 4 Square Tiles With Interactive Lift) */}
         <div className={`p-6 rounded-3xl border transition-all ${
           theme === 'dark'
             ? 'bg-[#12141A] border-amber-500/15 shadow-md'
@@ -1244,16 +1257,16 @@ export function Dashboard({
             {/* 1: Compose */}
             <div
               onClick={() => onStartCompose()}
-              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-all hover:scale-105 ${
+              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer quick-action-tile group ${
                 theme === 'dark'
-                  ? 'bg-[#0E1015] hover:bg-stone-800/80 border-stone-800 hover:border-amber-500/40'
-                  : 'bg-amber-50/60 hover:bg-amber-100/60 border-amber-200/80 hover:border-amber-400'
+                  ? 'bg-[#0E1015] border-stone-800'
+                  : 'bg-amber-50/60 border-amber-200/80'
               }`}
             >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
                 <Send className="w-4 h-4" />
               </div>
-              <span className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              <span className={`text-xs font-bold group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
                 Compose
               </span>
             </div>
@@ -1261,16 +1274,16 @@ export function Dashboard({
             {/* 2: Use Template */}
             <div
               onClick={() => onStartCompose({ step: 1 })}
-              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-all hover:scale-105 ${
+              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer quick-action-tile group ${
                 theme === 'dark'
-                  ? 'bg-[#0E1015] hover:bg-stone-800/80 border-stone-800 hover:border-amber-500/40'
-                  : 'bg-amber-50/60 hover:bg-amber-100/60 border-amber-200/80 hover:border-amber-400'
+                  ? 'bg-[#0E1015] border-stone-800'
+                  : 'bg-amber-50/60 border-amber-200/80'
               }`}
             >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
                 <FileText className="w-4 h-4" />
               </div>
-              <span className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              <span className={`text-xs font-bold group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
                 Use Template
               </span>
             </div>
@@ -1278,16 +1291,16 @@ export function Dashboard({
             {/* 3: Schedule */}
             <div
               onClick={() => onStartCompose()}
-              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-all hover:scale-105 ${
+              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer quick-action-tile group ${
                 theme === 'dark'
-                  ? 'bg-[#0E1015] hover:bg-stone-800/80 border-stone-800 hover:border-amber-500/40'
-                  : 'bg-amber-50/60 hover:bg-amber-100/60 border-amber-200/80 hover:border-amber-400'
+                  ? 'bg-[#0E1015] border-stone-800'
+                  : 'bg-amber-50/60 border-amber-200/80'
               }`}
             >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
                 <Calendar className="w-4 h-4" />
               </div>
-              <span className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              <span className={`text-xs font-bold group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
                 Schedule
               </span>
             </div>
@@ -1298,16 +1311,16 @@ export function Dashboard({
                 const el = document.getElementById('analytics-section');
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
-              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-all hover:scale-105 ${
+              className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer quick-action-tile group ${
                 theme === 'dark'
-                  ? 'bg-[#0E1015] hover:bg-stone-800/80 border-stone-800 hover:border-amber-500/40'
-                  : 'bg-amber-50/60 hover:bg-amber-100/60 border-amber-200/80 hover:border-amber-400'
+                  ? 'bg-[#0E1015] border-stone-800'
+                  : 'bg-amber-50/60 border-amber-200/80'
               }`}
             >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
                 <BarChart3 className="w-4 h-4" />
               </div>
-              <span className={`text-xs font-bold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              <span className={`text-xs font-bold group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
                 View Analytics
               </span>
             </div>
@@ -1367,23 +1380,23 @@ export function Dashboard({
                 onClick={() => {
                   setSelectedCategory(cat.id === 'leave' ? 'Leave' : cat.id === 'jobApplication' ? 'Resume' : cat.id === 'emergency' ? 'Emergency' : 'All');
                 }}
-                className={`p-3.5 rounded-2xl border transition-all cursor-pointer group ${
+                className={`p-3.5 rounded-2xl border chip-interactive group cursor-pointer ${
                   theme === 'dark'
-                    ? 'bg-[#0E1015] hover:bg-stone-800/80 border-stone-800 hover:border-amber-500/40'
-                    : 'bg-stone-50 hover:bg-stone-100 border-stone-200 hover:border-amber-300'
+                    ? 'bg-[#0E1015] border-stone-800'
+                    : 'bg-stone-50 border-stone-200'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-base">{cat.icon}</span>
-                  <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full ${
+                  <span className="text-base chip-emoji inline-block transition-transform duration-200">{cat.icon}</span>
+                  <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full transition-all duration-200 ${
                     cat.count > 0 
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 group-hover:scale-105' 
                       : theme === 'dark' ? 'bg-stone-800 text-stone-500' : 'bg-stone-200 text-stone-600'
                   }`}>
                     {loading ? '...' : cat.count}
                   </span>
                 </div>
-                <div className={`text-[11px] font-bold truncate ${theme === 'dark' ? 'text-stone-300 group-hover:text-white' : 'text-stone-800 group-hover:text-stone-950'}`}>
+                <div className={`text-[11px] font-bold truncate transition-colors duration-200 ${theme === 'dark' ? 'text-stone-300 group-hover:text-white' : 'text-stone-800 group-hover:text-amber-900'}`}>
                   {cat.label}
                 </div>
                 {/* Visual Progress Gauge */}

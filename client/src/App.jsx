@@ -440,21 +440,21 @@ export default function App() {
             </div>
           </div>
 
-          {/* Glowing Compose Button */}
+          {/* Glowing Compose Button with Light Sweep and Micro-Motion */}
           <button
             onClick={() => handleStartCompose()}
-            className="w-full py-3 px-4 rounded-xl gold-btn font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+            className="w-full py-3 px-4 rounded-xl gold-btn light-sweep font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer group"
           >
-            <PlusCircle className="w-4 h-4 text-stone-950" />
+            <PlusCircle className="w-4 h-4 text-stone-950 btn-icon-spin transition-transform" />
             <span className="text-stone-950">Compose New Email</span>
           </button>
 
-          {/* Vertical Navigation Links */}
+          {/* Vertical Navigation Links with Premium Hover Transitions */}
           <nav className="space-y-1.5 pt-1">
             
             <button
               onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'dashboard'
                   ? theme === 'dark'
                     ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
@@ -465,14 +465,14 @@ export default function App() {
               }`}
             >
               <div className="flex items-center gap-3">
-                <LayoutDashboard className={`w-4 h-4 ${activeTab === 'dashboard' ? 'text-amber-500' : 'text-stone-400'}`} />
+                <LayoutDashboard className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'dashboard' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
                 <span>Dashboard</span>
               </div>
             </button>
 
             <button
               onClick={() => handleStartCompose()}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'compose'
                   ? theme === 'dark'
                     ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
@@ -483,14 +483,14 @@ export default function App() {
               }`}
             >
               <div className="flex items-center gap-3">
-                <Send className={`w-4 h-4 ${activeTab === 'compose' ? 'text-amber-500' : 'text-stone-400'}`} />
+                <Send className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'compose' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
                 <span>Compose Email</span>
               </div>
             </button>
 
             <button
               onClick={() => { setActiveTab('history'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'history'
                   ? theme === 'dark'
                     ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
@@ -501,14 +501,14 @@ export default function App() {
               }`}
             >
               <div className="flex items-center gap-3">
-                <History className={`w-4 h-4 ${activeTab === 'history' ? 'text-amber-500' : 'text-stone-400'}`} />
+                <History className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'history' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
                 <span>Email History</span>
               </div>
             </button>
 
             <button
               onClick={() => { setActiveTab('contacts'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'contacts'
                   ? theme === 'dark'
                     ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
@@ -519,14 +519,14 @@ export default function App() {
               }`}
             >
               <div className="flex items-center gap-3">
-                <Users className={`w-4 h-4 ${activeTab === 'contacts' ? 'text-amber-500' : 'text-stone-400'}`} />
+                <Users className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'contacts' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
                 <span>Contacts</span>
               </div>
             </button>
 
             <button
               onClick={() => { setActiveTab('templates'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'templates'
                   ? theme === 'dark'
                     ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
@@ -537,42 +537,42 @@ export default function App() {
               }`}
             >
               <div className="flex items-center gap-3">
-                <Layout className={`w-4 h-4 ${activeTab === 'templates' ? 'text-amber-500' : 'text-stone-400'}`} />
+                <Layout className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'templates' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
                 <span>Templates</span>
               </div>
             </button>
 
             <button
               onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 theme === 'dark'
                   ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
                   : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Calendar className="w-4 h-4 text-stone-400" />
+                <Calendar className="w-4 h-4 text-stone-400 nav-icon group-hover:text-amber-400 transition-all duration-200" />
                 <span>Scheduled Emails</span>
               </div>
             </button>
 
             <button
               onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 theme === 'dark'
                   ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
                   : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <BarChart2 className="w-4 h-4 text-stone-400" />
+                <BarChart2 className="w-4 h-4 text-stone-400 nav-icon group-hover:text-amber-400 transition-all duration-200" />
                 <span>Analytics</span>
               </div>
             </button>
 
             <button
               onClick={() => { setActiveTab('notifications'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'notifications'
                   ? theme === 'dark'
                     ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
@@ -583,7 +583,7 @@ export default function App() {
               }`}
             >
               <div className="flex items-center gap-3">
-                <Bell className={`w-4 h-4 ${activeTab === 'notifications' ? 'text-amber-500' : 'text-stone-400'}`} />
+                <Bell className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'notifications' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
                 <span>Notifications</span>
               </div>
               {unreadNotifCount > 0 && (
@@ -595,7 +595,7 @@ export default function App() {
 
             <button
               onClick={() => { setActiveTab('settings'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'settings'
                   ? theme === 'dark'
                     ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
@@ -606,14 +606,14 @@ export default function App() {
               }`}
             >
               <div className="flex items-center gap-3">
-                <Settings className={`w-4 h-4 ${activeTab === 'settings' ? 'text-amber-500' : 'text-stone-400'}`} />
+                <Settings className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'settings' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
                 <span>Settings</span>
               </div>
             </button>
 
             <button
               onClick={() => { setActiveTab('trash'); setMobileMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-200 cursor-pointer ${
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'trash'
                   ? theme === 'dark'
                     ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
@@ -624,7 +624,7 @@ export default function App() {
               }`}
             >
               <div className="flex items-center gap-3">
-                <Trash2 className={`w-4 h-4 ${activeTab === 'trash' ? 'text-amber-500' : 'text-stone-400'}`} />
+                <Trash2 className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'trash' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
                 <span>Trash</span>
               </div>
             </button>
@@ -656,9 +656,10 @@ export default function App() {
 
             <button
               onClick={() => setActiveTab('settings')}
-              className="w-full py-2.5 px-3 rounded-xl gold-btn font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+              className="w-full py-2.5 px-3 rounded-xl gold-btn light-sweep font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-md cursor-pointer group"
             >
-              <span>Upgrade Now →</span>
+              <span>Upgrade Now</span>
+              <span className="btn-arrow-slide transition-transform duration-200">→</span>
             </button>
           </div>
         </div>
@@ -688,7 +689,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className={`p-2 rounded-xl md:hidden border ${
+              className={`p-2 rounded-xl md:hidden border transition-transform active:scale-95 cursor-pointer ${
                 theme === 'dark' ? 'bg-stone-800/80 border-stone-700 text-stone-200' : 'bg-stone-100 border-stone-300 text-stone-800'
               }`}
             >
@@ -710,14 +711,14 @@ export default function App() {
             </div>
           </div>
 
-          {/* Search bar in header (Matching Mockup) */}
+          {/* Search bar in header (Matching Mockup with Interactive Glow) */}
           <div className="hidden lg:flex items-center flex-1 max-w-md mx-8">
-            <div className={`w-full flex items-center gap-2.5 px-4 py-2 rounded-full border transition-all ${
+            <div className={`w-full flex items-center gap-2.5 px-4 py-2 rounded-full border input-interactive group ${
               theme === 'dark' 
-                ? 'bg-[#14161F] border-stone-800 focus-within:border-amber-500/50' 
-                : 'bg-[#F5F2EB] border-amber-900/10 focus-within:border-amber-500/60'
+                ? 'bg-[#14161F] border-stone-800' 
+                : 'bg-[#F5F2EB] border-amber-900/10'
             }`}>
-              <Search className="w-4 h-4 text-stone-400 shrink-0" />
+              <Search className="w-4 h-4 text-stone-400 group-hover:text-amber-500 group-focus-within:text-amber-500 group-hover:scale-110 transition-all duration-200 shrink-0" />
               <input
                 type="text"
                 placeholder="Search emails, contacts, templates..."
@@ -729,13 +730,13 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Dark / Light Mode Toggle Button */}
+            {/* Dark / Light Mode Toggle Button with Micro-Scale */}
             <button
               onClick={toggleTheme}
-              className={`p-2 sm:px-3 sm:py-1.5 rounded-full border flex items-center gap-2 transition-all cursor-pointer shadow-xs ${
+              className={`p-2 sm:px-3 sm:py-1.5 rounded-full border flex items-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-xs ${
                 theme === 'dark'
-                  ? 'bg-stone-800/80 border-amber-500/30 text-amber-400 hover:bg-stone-700/80'
-                  : 'bg-amber-100/70 border-amber-300 text-amber-800 hover:bg-amber-200/60'
+                  ? 'bg-stone-800/80 border-amber-500/30 text-amber-400 hover:bg-stone-700/80 hover:border-amber-500/50'
+                  : 'bg-amber-100/70 border-amber-300 text-amber-800 hover:bg-amber-200/70'
               }`}
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
@@ -752,13 +753,13 @@ export default function App() {
               )}
             </button>
 
-            {/* Notification Bell with Mockup Badge */}
+            {/* Notification Bell with Bell-Hover Shake Animation */}
             <button
               onClick={() => setActiveTab('notifications')}
-              className={`relative p-2.5 rounded-xl border transition-colors cursor-pointer ${
+              className={`relative p-2.5 rounded-xl border transition-all duration-200 bell-hover hover:scale-105 active:scale-95 cursor-pointer ${
                 theme === 'dark'
-                  ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
-                  : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                  ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 hover:border-amber-500/40 text-stone-300'
+                  : 'bg-stone-100 hover:bg-stone-200 border-stone-200 hover:border-amber-400 text-stone-700'
               }`}
               title="Notifications"
             >
@@ -768,11 +769,11 @@ export default function App() {
               </span>
             </button>
 
-            {/* User Profile Pill & Dropdown (Matching Mockup) */}
+            {/* User Profile Pill & Dropdown with Hover Lift & Glow */}
             <div className="relative">
               <div 
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className={`flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl border cursor-pointer transition-all ${
+                className={`flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl border cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:border-amber-500/40 hover:shadow-md active:scale-[0.98] ${
                   theme === 'dark'
                     ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700'
                     : 'bg-white hover:bg-stone-50 border-amber-900/15 shadow-xs'
@@ -791,7 +792,7 @@ export default function App() {
                     Premium Plan
                   </span>
                 </div>
-                <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+                <ChevronDown className={`w-3.5 h-3.5 text-stone-400 transition-transform duration-200 ${userDropdownOpen ? 'rotate-180' : ''}`} />
               </div>
 
               {/* User Dropdown Menu */}
@@ -805,7 +806,7 @@ export default function App() {
                   </div>
                   <button
                     onClick={() => { setActiveTab('settings'); setUserDropdownOpen(false); }}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 cursor-pointer ${
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
                       theme === 'dark' ? 'text-stone-300 hover:text-white hover:bg-stone-800' : 'text-stone-700 hover:text-stone-900 hover:bg-stone-100'
                     }`}
                   >
@@ -814,7 +815,7 @@ export default function App() {
                   </button>
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer mt-1"
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer mt-1 transition-colors"
                   >
                     <LogOut className="w-4 h-4 text-rose-500" />
                     <span>Sign Out</span>

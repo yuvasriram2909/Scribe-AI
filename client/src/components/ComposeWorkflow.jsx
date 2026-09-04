@@ -577,10 +577,11 @@ export function ComposeWorkflow({
               <button
                 type="submit"
                 disabled={aiLoading}
-                className="px-8 py-3 rounded-xl gradient-btn text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-8 py-3 rounded-xl gold-btn light-sweep text-stone-950 font-bold text-xs flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
               >
-                <Sparkles className="w-4 h-4 text-pink-200" />
-                {aiLoading ? 'Analyzing & Generating...' : 'Generate Intelligent Email ✦'}
+                <Sparkles className="w-4 h-4 text-stone-950 btn-icon-spin transition-transform" />
+                <span>{aiLoading ? 'Analyzing & Generating...' : 'Generate Intelligent Email'}</span>
+                <span className="btn-arrow-slide transition-transform duration-200">✦</span>
               </button>
             </div>
           </form>
@@ -921,10 +922,11 @@ export function ComposeWorkflow({
               <button
                 onClick={handleStartSending}
                 disabled={aiLoading}
-                className="px-6 py-2.5 rounded-xl gradient-btn text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-[1.02] active:scale-[0.98] transition-transform cursor-pointer"
+                className="px-6 py-2.5 rounded-xl gold-btn light-sweep text-stone-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer group"
               >
-                <ShieldCheck className="w-4 h-4 text-pink-200" />
-                Confirm & Send Email ✈
+                <ShieldCheck className="w-4 h-4 text-stone-950 btn-icon-spin transition-transform" />
+                <span>Confirm & Send Email</span>
+                <span className="btn-arrow-slide transition-transform duration-200">✈</span>
               </button>
             </div>
           </div>

@@ -54,13 +54,51 @@
   background: var(--bg-card);
   border: 1px solid var(--border-gold);
   box-shadow: 0 4px 20px -2px var(--gold-glow);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 260ms cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, box-shadow;
 }
 
-.gold-card:hover {
-  border-color: rgba(245, 158, 11, 0.4);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px -4px var(--gold-glow);
+@media (hover: hover) and (pointer: fine) {
+  .gold-card:hover {
+    border-color: rgba(245, 158, 11, 0.45);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px -4px var(--gold-glow);
+  }
+}
+
+/* Light Sweep Effect */
+.light-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.light-sweep::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -70%;
+  width: 45%;
+  height: 200%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 100%
+  );
+  transform: rotate(25deg);
+  pointer-events: none;
+  opacity: 0;
+  transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .light-sweep:hover::after {
+    opacity: 1;
+    transform: rotate(25deg) translateX(360%);
+  }
 }
 
 /* Luxury Gold Gradient Button */
@@ -69,17 +107,28 @@
   color: #0A0A0C;
   font-weight: 700;
   box-shadow: 0 4px 18px rgba(245, 158, 11, 0.3);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
+              filter 200ms ease;
+  will-change: transform, box-shadow;
 }
 
-.gold-btn:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 6px 24px rgba(245, 158, 11, 0.45);
-  transform: translateY(-1px) scale(1.015);
+@media (hover: hover) and (pointer: fine) {
+  .gold-btn:hover {
+    filter: brightness(1.07);
+    box-shadow: 0 8px 26px rgba(245, 158, 11, 0.48);
+    transform: translateY(-2px) scale(1.02);
+  }
+  .gold-btn:hover .btn-arrow-slide {
+    transform: translateX(3.5px);
+  }
+  .gold-btn:hover .btn-icon-spin {
+    transform: rotate(15deg) scale(1.1);
+  }
 }
 
 .gold-btn:active {
-  transform: translateY(1px) scale(0.985);
+  transform: translateY(1px) scale(0.98) !important;
 }
 
 /* Outline Gold Button */
@@ -275,7 +324,7 @@
 
 /* Interactive Button Micro-Interactions */
 .interactive-btn {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease;
   will-change: transform, box-shadow;
 }
 
@@ -289,6 +338,239 @@
   transform: translateY(1px) scale(0.985) !important;
 }
 
+/* ==========================================================================
+   Comprehensive Micro-Interaction & Modern Hover Motion System
+   ========================================================================== */
+
+/* 1. Sidebar Navigation Interactive Item */
+.nav-item-interactive {
+  transition: background-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nav-item-interactive:hover {
+    transform: translateX(2.5px) scale(1.01);
+  }
+  .nav-item-interactive:hover .nav-icon {
+    transform: translateX(2.5px);
+    filter: brightness(1.2);
+  }
+}
+
+.nav-item-interactive:active {
+  transform: scale(0.99) !important;
+}
+
+/* 2. Hero Card Hover Depth */
+.hero-card-interactive {
+  transition: border-color 300ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 300ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, box-shadow;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hero-card-interactive:hover {
+    border-color: rgba(245, 158, 11, 0.45);
+    box-shadow: 0 16px 40px -8px var(--gold-glow);
+  }
+}
+
+/* Origami Paper Airplane Floating Animation */
+@keyframes airplaneFloat {
+  0%, 100% {
+    transform: translateY(0px) rotate(-8deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(-5deg);
+  }
+}
+
+.animate-airplane-float {
+  animation: airplaneFloat 4.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .animate-airplane-float:hover {
+    transform: translateY(-4px) rotate(0deg) scale(1.04);
+  }
+}
+
+/* 3. Gmail Connected Card Interactive */
+.gmail-card-interactive {
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, box-shadow;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .gmail-card-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px -4px var(--gold-glow);
+    border-color: rgba(245, 158, 11, 0.35);
+  }
+  .gmail-card-interactive:hover .gmail-brand-icon {
+    transform: scale(1.05);
+  }
+}
+
+/* 4. 6 Real-time Stat Cards Interactive */
+.stat-card-interactive {
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 260ms cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, box-shadow;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .stat-card-interactive:hover {
+    transform: translateY(-4px) scale(1.015);
+    border-color: rgba(245, 158, 11, 0.45);
+    box-shadow: 0 14px 34px -4px var(--gold-glow);
+  }
+  .stat-card-interactive:hover .stat-icon-box {
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
+    border-color: rgba(245, 158, 11, 0.6);
+    transform: scale(1.06);
+  }
+  .stat-card-interactive:hover .stat-metric-number {
+    filter: brightness(1.12);
+  }
+}
+
+.stat-card-interactive:active {
+  transform: translateY(-1px) scale(0.995);
+}
+
+/* 5. Quick Action Tiles (Compose, Use Template, Schedule, Analytics) */
+.quick-action-tile {
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 240ms cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, box-shadow;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .quick-action-tile:hover {
+    transform: translateY(-3px) scale(1.025);
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 10px 26px -4px var(--gold-glow);
+  }
+  .quick-action-tile:hover .quick-tile-icon {
+    transform: translate(2px, -2px) scale(1.08);
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
+  }
+}
+
+.quick-action-tile:active {
+  transform: translateY(0px) scale(0.98) !important;
+}
+
+/* 6. AI Suggestions & Quick Prompt Chips */
+.chip-interactive {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .chip-interactive:hover {
+    transform: translateY(-2px) scale(1.02);
+    border-color: rgba(245, 158, 11, 0.45);
+    box-shadow: 0 4px 14px -2px var(--gold-glow);
+  }
+  .chip-interactive:hover .chip-emoji {
+    transform: scale(1.18) rotate(6deg);
+  }
+}
+
+.chip-interactive:active {
+  transform: translateY(0px) scale(0.98) !important;
+}
+
+/* 7. Recent Email Rows */
+.recent-email-row {
+  transition: background-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .recent-email-row:hover {
+    transform: translateY(-1.5px);
+    border-color: rgba(245, 158, 11, 0.35);
+    box-shadow: 0 6px 20px -4px var(--gold-glow);
+  }
+  .recent-email-row:hover .recent-mail-icon {
+    transform: scale(1.04);
+  }
+  .recent-email-row:hover .recent-row-arrow {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.recent-email-row:active {
+  transform: translateY(0) scale(0.995);
+}
+
+/* 8. Input Fields & Dropdowns - Rock Solid Focus with Glowing Borders */
+.input-interactive {
+  transition: border-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.input-interactive:hover {
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.input-interactive:focus,
+.input-interactive:focus-within {
+  border-color: #F59E0B !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2), 0 0 16px rgba(245, 158, 11, 0.15) !important;
+}
+
+/* 9. Interactive Icon Micro-Interactions */
+.icon-micro {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), filter 220ms ease;
+  will-change: transform;
+}
+
+@keyframes bellShake {
+  0% { transform: rotate(0); }
+  20% { transform: rotate(14deg); }
+  40% { transform: rotate(-12deg); }
+  60% { transform: rotate(8deg); }
+  80% { transform: rotate(-4deg); }
+  100% { transform: rotate(0); }
+}
+
+.bell-hover:hover {
+  animation: bellShake 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.settings-hover {
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.settings-hover:hover {
+  transform: rotate(45deg);
+}
+
 /* Accessibility: Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
@@ -297,7 +579,8 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .animate-float, .animate-pulseGlow, .animate-hero-badge, .animate-hero-title, .animate-hero-box, .animate-hero-cta {
+  .animate-float, .animate-pulseGlow, .animate-hero-badge, .animate-hero-title, 
+  .animate-hero-box, .animate-hero-cta, .animate-airplane-float, .bell-hover:hover, .light-sweep::after {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
