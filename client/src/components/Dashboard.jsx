@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Mail, Send, AlertTriangle, Calendar, FileText, Briefcase, Sparkles, 
-  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings, Bell, LogOut, ChevronRight, Wand2, Inbox
+  ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings, Bell, LogOut, ChevronRight, Wand2, Inbox, UserPlus
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
@@ -125,6 +125,9 @@ export function Dashboard({
   // Quick compose state - single source of truth initialized with composeState
   const [quickInstruction, setQuickInstruction] = useState(composeState.instruction || '');
   const [quickRecipient, setQuickRecipient] = useState(composeState.recipient || '');
+  const [quickCc, setQuickCc] = useState(composeState.cc || '');
+  const [quickBcc, setQuickBcc] = useState(composeState.bcc || '');
+  const [showQuickCcBcc, setShowQuickCcBcc] = useState(Boolean(composeState.cc || composeState.bcc));
   const [quickError, setQuickError] = useState('');
 
   useEffect(() => {
@@ -134,7 +137,13 @@ export function Dashboard({
     if (composeState.recipient && !quickRecipient) {
       setQuickRecipient(composeState.recipient);
     }
-  }, [composeState.instruction, composeState.recipient]);
+    if (composeState.cc && !quickCc) {
+      setQuickCc(composeState.cc);
+    }
+    if (composeState.bcc && !quickBcc) {
+      setQuickBcc(composeState.bcc);
+    }
+  }, [composeState.instruction, composeState.recipient, composeState.cc, composeState.bcc]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -436,6 +445,8 @@ export function Dashboard({
     onStartCompose({
       instruction: cleanInstruction,
       recipient: cleanRecipient,
+      cc: quickCc.trim(),
+      bcc: quickBcc.trim(),
       autoGenerate: true
     });
   };
@@ -670,12 +681,22 @@ export function Dashboard({
                   </div>
                 </div>
 
-                {/* 2. Recipient Input */}
-                <div className="w-full sm:w-72 space-y-1">
-                  <label className="text-[11px] font-bold text-slate-300 block flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-purple-400" />
-                    Recipient Email
-                  </label>
+                {/* 2. Recipient Input & CC/BCC Toggle */}
+                <div className="w-full sm:w-80 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-purple-400" />
+                      Recipient Email
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickCcBcc(!showQuickCcBcc)}
+                      className="text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      {showQuickCcBcc ? 'Hide CC/BCC' : '+ Add CC/BCC'}
+                    </button>
+                  </div>
                   <div className="relative">
                     <input
                       type="email"
@@ -702,6 +723,42 @@ export function Dashboard({
                   </button>
                 </div>
               </div>
+
+              {/* Expandable CC & BCC Inputs on Dashboard */}
+              {showQuickCcBcc && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-900/70 border border-purple-500/20 animate-fadeIn">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 block">
+                      CC (Carbon Copy)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="team@example.com, lead@example.com"
+                      value={quickCc}
+                      onChange={(e) => {
+                        setQuickCc(e.target.value);
+                        if (onUpdateComposeState) onUpdateComposeState({ cc: e.target.value });
+                      }}
+                      className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white placeholder-slate-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 block">
+                      BCC (Blind Carbon Copy)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="archive@example.com, records@example.com"
+                      value={quickBcc}
+                      onChange={(e) => {
+                        setQuickBcc(e.target.value);
+                        if (onUpdateComposeState) onUpdateComposeState({ bcc: e.target.value });
+                      }}
+                      className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white placeholder-slate-500"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Inline Validation Error */}
               {quickError && (

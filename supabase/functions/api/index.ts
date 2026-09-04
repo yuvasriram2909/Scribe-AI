@@ -989,107 +989,174 @@ function generateNaturalEmailContent(params: {
 }) {
   const { instruction, subject, recipient, recipientName, senderName, situationObj } = params;
   const sit = situationObj || detectSituationEngine(instruction || subject || "");
-  const lower = (instruction || subject || "").toLowerCase();
+  
+  // Clean trailing stray letters (e.g. "d" or ".") and conversational prefixes
+  let cleanInput = (instruction || subject || "").trim().replace(/\s+[a-zA-Z]$/, "").trim();
+  cleanInput = cleanInput.replace(/^(?:please\s+)?(?:send\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|saying\s+that\s+|saying\s+|about\s+)?|i\s+want\s+to\s+(?:send|write)\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|about\s+)?|write\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|about\s+)?)/i, "").trim();
+  const lower = cleanInput.toLowerCase();
 
-  const greeting = recipientName ? `Dear ${recipientName},` : "Dear Sir/Madam,";
-  const myName = senderName || "[Your Name]";
-  const closing = `Best regards,\n${myName}`;
+  let greeting = "Hello,";
+  if (recipientName && recipientName.trim()) {
+    greeting = `Dear ${recipientName.trim()},`;
+  } else if (recipient && recipient.includes("@")) {
+    const local = recipient.split("@")[0].replace(/[0-9._-]/g, " ").trim();
+    if (local.length > 2 && !local.includes("info") && !local.includes("support") && !local.includes("contact") && !local.includes("admin")) {
+      const formatted = local.split(/\s+/)[0];
+      greeting = `Dear ${formatted.charAt(0).toUpperCase() + formatted.slice(1).toLowerCase()},`;
+    }
+  }
 
-  let outSubject = subject || "";
+  const myName = senderName && !senderName.includes("[Your Name]") ? senderName : "Yuva Sriram";
+  const closing = `Warm regards,\n${myName}`;
+
+  let outSubject = subject ? subject.trim() : "";
   let outBody = "";
 
-  // 1. Leave / Holiday Detection
-  if (sit.category === "Leave/Holiday" || lower.includes("leave") || lower.includes("sick") || lower.includes("illness")) {
+  // 1. Leave / Sick Leave
+  if (sit.category === "Leave/Holiday" || lower.includes("leave") || lower.includes("sick") || lower.includes("illness") || lower.includes("fever")) {
     let days = "a few days";
-    const dayMatch = lower.match(/(\d+|one|two|three|four|five)\s*days?/);
+    const dayMatch = lower.match(/(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*days?/);
     if (dayMatch) {
       days = `${dayMatch[1]} days`;
     }
 
-    let reason = "personal reasons";
-    if (lower.includes("illness") || lower.includes("sick") || lower.includes("fever") || lower.includes("unwell")) {
-      reason = "illness";
+    let reasonDetail = "personal matters";
+    if (lower.includes("fever")) {
+      reasonDetail = "a high fever and acute weakness";
+    } else if (lower.includes("sick") || lower.includes("illness") || lower.includes("unwell")) {
+      reasonDetail = "an unexpected illness";
+    } else if (lower.includes("doctor") || lower.includes("hospital")) {
+      reasonDetail = "a medical appointment and prescribed recovery";
     } else if (lower.includes("vacation") || lower.includes("trip")) {
-      reason = "vacation";
-    } else if (lower.includes("family")) {
-      reason = "family commitments";
+      reasonDetail = "personal travel";
     }
 
     if (!outSubject) {
-      outSubject = `Leave Application: ${days.charAt(0).toUpperCase() + days.slice(1)} Leave Due to ${reason.charAt(0).toUpperCase() + reason.slice(1)}`;
+      outSubject = `Sick Leave Application – ${days.charAt(0).toUpperCase() + days.slice(1)}`;
     }
 
     outBody = `${greeting}
 
-I am writing to formally request ${days} of leave from work due to ${reason}.
+I am writing to let you know that I am unwell with ${reasonDetail} and will need to take sick leave for ${days} to consult a doctor and rest.
 
-During my absence, I will ensure that any urgent tasks are handed over appropriately and will be reachable via email if required for any critical matters.
+I have organized my active assignments so that pending responsibilities remain covered in my absence. If anything critical comes up that requires my direct attention, please feel free to reach me by email or phone.
 
-I kindly request you to approve my leave application, and I will keep you updated on my return.
-
-Thank you for your understanding.
+I expect to return to work once I am recovered and will keep you informed of my progress. Thank you very much for your understanding and support.
 
 ${closing}`;
   }
   // 2. Emergency
-  else if (sit.category === "Emergency" || lower.includes("emergency") || lower.includes("hospital")) {
+  else if (sit.category === "Emergency" || lower.includes("emergency") || lower.includes("accident") || lower.includes("hospital")) {
+    let emergDetail = cleanInput.replace(/^emergency\s*(?:leave)?\s*(?:today)?[:\s-]*/i, "").trim();
+    if (!emergDetail) emergDetail = "an urgent family emergency that requires my immediate presence";
+
     if (!outSubject) {
-      outSubject = `Urgent: Emergency Notification & Absence Notice`;
+      outSubject = `Urgent: Emergency Leave Notice – Today`;
     }
+
     outBody = `${greeting}
 
-I am writing to urgently notify you of an unexpected emergency situation regarding ${instruction}.
+I am writing to urgently inform you of an unforeseen emergency that has arisen today: ${emergDetail}.
 
-Due to these unforeseen circumstances, I will be temporarily unavailable. I am taking necessary steps to manage any urgent pending tasks and will provide an update as soon as possible.
+Because of these urgent circumstances, I need to step away immediately to attend to the situation. I have coordinated with my team to ensure immediate deliverables are covered.
 
-Thank you for your prompt understanding and support.
+Should any critical matter arise, you can reach me directly on my mobile phone. I will provide an update as soon as the situation is under control.
+
+Thank you very much for your prompt understanding and cooperation.
 
 ${closing}`;
   }
   // 3. Resume / Job Application
-  else if (sit.category === "Resume/Job Application" || lower.includes("resume") || lower.includes("job")) {
+  else if (sit.category === "Resume/Job Application" || lower.includes("resume") || lower.includes("job") || lower.includes("apply")) {
+    let role = "Software Developer";
+    const roleMatch = cleanInput.match(/for\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
+    if (roleMatch) role = roleMatch[1].trim();
+
     if (!outSubject) {
-      outSubject = `Application for Job Position - ${myName}`;
+      outSubject = `Application for ${role.charAt(0).toUpperCase() + role.slice(1)} Position – ${myName}`;
     }
+
     outBody = `${greeting}
 
-I am writing to formally express my strong interest in the open position.
+I am writing to express my strong interest in the ${role} opportunity at your organization.
 
-With my background and experience, I am confident in my ability to make a meaningful contribution to your organization. I have attached my resume for your review and consideration.
+With a dedicated background in this domain, practical problem-solving experience, and a track record of delivering quality results, I am confident in my ability to make a meaningful and immediate contribution to your team's goals. I have attached my resume and credentials for your review.
 
-I would welcome the opportunity to discuss my qualifications with you in an interview.
-
-Thank you for your time and consideration.
+I would welcome the opportunity to discuss how my experience and qualifications align with your requirements in an interview. Thank you very much for your time and consideration.
 
 ${closing}`;
   }
-  // 4. Follow-up / Payment
-  else if (sit.category === "Follow-up" || lower.includes("follow") || lower.includes("payment")) {
+  // 4. Meeting / Reschedule
+  else if (sit.category === "Meeting" || lower.includes("reschedule") || lower.includes("meeting")) {
+    let meetDetail = cleanInput.replace(/^reschedule\s*(?:our)?\s*meeting[:\s-]*/i, "").trim();
     if (!outSubject) {
-      outSubject = `Follow-up Regarding: ${instruction.slice(0, 45)}`;
+      outSubject = `Meeting Schedule Update: ${meetDetail.slice(0, 40)}`;
     }
+
+    outBody = `${greeting}
+
+I hope you are having a productive week.
+
+Regarding our scheduled discussion: ${meetDetail}.
+
+Please let me know if this proposed timing works with your calendar, or feel free to suggest another time slot that fits your availability. I appreciate your flexibility and look forward to speaking soon.
+
+${closing}`;
+  }
+  // 5. Follow-up / Check-in
+  else if (sit.category === "Follow-up" || lower.includes("follow")) {
+    let followTopic = cleanInput.replace(/^follow\s*up\s*(?:on)?[:\s-]*/i, "").trim();
+    if (!outSubject) {
+      outSubject = `Following Up: ${followTopic.slice(0, 40)}`;
+    }
+
+    outBody = `${greeting}
+
+I hope you're having a great week.
+
+I am writing to briefly follow up on our earlier communication regarding ${followTopic}.
+
+Could you please let me know if you have had an opportunity to review this, or if any additional details are needed from my end to help move things forward? I am happy to jump on a brief call whenever convenient.
+
+Thank you for your time and assistance.
+
+${closing}`;
+  }
+  // 6. Payment / Invoicing
+  else if (sit.category === "Payment/Fee" || lower.includes("payment") || lower.includes("invoice")) {
+    let payDetail = cleanInput.replace(/^invoice\s*(?:and)?\s*payment[:\s-]*/i, "").trim();
+    if (!outSubject) {
+      outSubject = `Invoice & Payment Request: ${payDetail.slice(0, 40)}`;
+    }
+
     outBody = `${greeting}
 
 I hope this email finds you well.
 
-I am writing to follow up regarding ${instruction}. Could you please share a brief status update or let me know if any additional details are needed from my end?
+I am writing to share the billing statement and payment details regarding ${payDetail}.
 
-I appreciate your prompt attention to this matter.
+Please review the invoice and arrange for processing in accordance with our agreed timeline. Kindly confirm receipt and let me know if your accounts team requires any additional documentation.
+
+Thank you very much for your prompt cooperation and continued partnership.
 
 ${closing}`;
   }
-  // 5. Official / Default
+  // 7. General / Official
   else {
+    let cleanGeneral = cleanInput.replace(/^(?:regarding|about)[:\s-]*/i, "").trim();
     if (!outSubject) {
-      outSubject = `Regarding: ${instruction.slice(0, 50)}`;
+      outSubject = `Regarding: ${cleanGeneral.slice(0, 45)}`;
     }
+
     outBody = `${greeting}
 
-I am writing to formally communicate regarding ${instruction}.
+I hope you are doing well.
 
-Please let me know if you require any further information or clarification on this matter, and I will be happy to assist.
+I am reaching out to communicate regarding ${cleanGeneral}.
 
-Thank you for your time and assistance.
+Please let me know if you need any additional information or have questions regarding this. I am happy to provide further details at your convenience.
+
+Thank you for your time and consideration.
 
 ${closing}`;
   }
@@ -2201,7 +2268,14 @@ serve(async (req: Request) => {
       if (!input.trim()) return errorResponse("Please enter a subject or instruction.");
 
       const user = await getAuthUser(req, supabase);
-      const senderName = user?.signature?.[0]?.name || user?.name || "";
+      let senderName = user?.signature?.[0]?.name || user?.name || "";
+      if (!senderName && user?.email) {
+        const prefix = user.email.split("@")[0].replace(/[0-9._-]/g, " ").trim();
+        if (prefix) {
+          senderName = prefix.split(/\s+/).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+        }
+      }
+      if (!senderName || senderName.includes("[Your Name]")) senderName = "Yuva Sriram";
 
       // 1. Generate via Situation Pattern Engine
       const sitObj = situation 
@@ -2224,20 +2298,26 @@ serve(async (req: Request) => {
       const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("AI_API_KEY");
       if (geminiApiKey) {
         try {
-          const geminiPrompt = `You are a professional email writing assistant. Write a high quality email body based strictly on this situation:
-User Problem / Situation: "${input}"
-User Subject: "${subject || ''}"
-Tone: "${tone || generated.tone}"
-Recipient: "${recipientName || recipient || 'Manager/Colleague'}"
+          const geminiPrompt = `You are an expert human professional communication assistant.
+Write a completely natural, human-written, warm, and authentic email tailored precisely to the user's situation.
+DO NOT sound like an AI, corporate robot, or generic chatbot. Write like an authentic, thoughtful person.
 
-RULES:
-1. Generate an email body tailored specifically to the user's problem.
-2. Incorporate all specific details (e.g. number of days, reasons, symptoms, requests).
-3. Do not invent fake dates or names; use placeholders like [Date], [Company Name] if needed.
-4. Return ONLY valid JSON:
+USER SITUATION / INSTRUCTION: "${input}"
+USER SUBJECT: "${subject || ''}"
+DESIRED TONE: "${tone || generated.tone}"
+RECIPIENT: "${recipientName || recipient || 'Recipient'}"
+SENDER NAME: "${senderName}"
+
+HUMAN-WRITTEN WRITING GUIDELINES:
+1. Address the recipient naturally (e.g. "Hi [Name]," or "Dear [Name],").
+2. Get straight to the point with natural phrasing, without stiff robotic clichés like "I am writing to formally request...".
+3. Incorporate every specific detail from the instruction (duration, reason, role, symptoms, timeline).
+4. Keep the body concise, polite, empathetic, and formatted with clean paragraphs.
+5. Sign off naturally with the sender's real name: "${senderName}".
+6. Return strictly valid JSON:
 {
-  "subject": "Clear concise subject line",
-  "body": "Full body text formatted with paragraphs and line breaks"
+  "subject": "Concise, descriptive subject line",
+  "body": "Full body text formatted with proper line breaks"
 }`;
 
           const aiRes = await fetch(

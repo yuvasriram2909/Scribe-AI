@@ -329,7 +329,44 @@ export function extractFactualDetails(input = '') {
 }
 
 /**
- * Determines appropriate recipient greeting
+ * Formats a clean human display name from email or username
+ */
+export function formatDisplayName(emailOrName = '') {
+  if (!emailOrName) return 'Yuva Sriram';
+  if (!emailOrName.includes('@')) {
+    const trimmed = emailOrName.replace(/[0-9._-]/g, ' ').trim();
+    if (trimmed) {
+      return trimmed.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    }
+    return emailOrName;
+  }
+  const prefix = emailOrName.split('@')[0].replace(/[0-9._-]/g, ' ').trim();
+  if (!prefix) return 'Yuva Sriram';
+  return prefix.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+
+/**
+ * Resolves active sender name from session or account details
+ */
+export function getSenderDisplayName(providedName = '') {
+  if (providedName && providedName.trim() && !providedName.includes('[Your Name]')) {
+    return providedName.trim();
+  }
+  try {
+    const storedName = typeof localStorage !== 'undefined' ? localStorage.getItem('userName') : '';
+    if (storedName && storedName.trim() && !storedName.includes('[Your Name]')) {
+      return storedName.trim();
+    }
+    const storedEmail = typeof localStorage !== 'undefined' ? (localStorage.getItem('userEmail') || '') : '';
+    if (storedEmail) {
+      return formatDisplayName(storedEmail);
+    }
+  } catch (_) {}
+  return 'Yuva Sriram';
+}
+
+/**
+ * Determines appropriate recipient greeting (warm and human)
  */
 export function determineGreeting(recipient = '', recipientType = 'unknown') {
   if (recipientType === 'friend') {
@@ -344,22 +381,38 @@ export function determineGreeting(recipient = '', recipientType = 'unknown') {
   if (recipientType === 'manager') {
     return 'Dear Manager,';
   }
+  if (recipientType === 'client') {
+    return 'Dear Client,';
+  }
 
   if (recipient && recipient.includes('@')) {
     const localPart = recipient.split('@')[0];
     const cleanName = localPart.replace(/[0-9._-]/g, ' ').trim();
-    if (cleanName.length > 2 && !cleanName.includes('info') && !cleanName.includes('support') && !cleanName.includes('contact')) {
-      const formatted = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-      return `Dear ${formatted},`;
+    if (cleanName.length > 2 && !cleanName.includes('info') && !cleanName.includes('support') && !cleanName.includes('contact') && !cleanName.includes('admin')) {
+      const formatted = cleanName.split(/\s+/)[0];
+      const capitalized = formatted.charAt(0).toUpperCase() + formatted.slice(1).toLowerCase();
+      return `Dear ${capitalized},`;
     }
   }
 
-  return 'Dear Sir/Madam,';
+  return 'Hello,';
+}
+
+/**
+ * Cleans input text from minor trailing typos (like "d" or ".") and conversational prefixes
+ */
+export function cleanUserInput(raw = '') {
+  let text = (raw || '').trim();
+  // Strip trailing single stray letter typos like " d" or " s" at the end of sentence
+  text = text.replace(/\s+[a-zA-Z]$/, '').trim();
+  // Remove conversational leading prompt phrasing
+  text = text.replace(/^(?:please\s+)?(?:send\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|saying\s+that\s+|saying\s+|about\s+)?|i\s+want\s+to\s+(?:send|write)\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|about\s+)?|write\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|about\s+)?)/i, '').trim();
+  return text;
 }
 
 /**
  * Intelligent Professional Email Generator
- * Assembles human-crafted, grammatically flawless, fact-grounded emails tailored strictly to user intent
+ * Assembles human-crafted, grammatically polished, fact-grounded emails tailored strictly to user intent
  */
 export function generateIntelligentEmail({
   instruction = '',
@@ -371,7 +424,8 @@ export function generateIntelligentEmail({
   customPriority = null,
   senderName = ''
 }) {
-  const input = instruction.trim() || userSubject.trim();
+  const rawInput = instruction.trim() || userSubject.trim();
+  const input = cleanUserInput(rawInput);
   const lower = input.toLowerCase();
   const facts = extractFactualDetails(input);
   
@@ -386,55 +440,62 @@ export function generateIntelligentEmail({
 
   // 2. Greeting & Sign-off
   const greeting = determineGreeting(recipient, facts.recipientType);
-  const myName = senderName || '[Your Name]';
+  const myName = getSenderDisplayName(senderName);
   const closing = tone.includes('Casual') || tone.includes('Friendly') 
-    ? `Best,\n${myName}` 
-    : `Best regards,\n${myName}`;
+    ? `Best regards,\n${myName}` 
+    : `Warm regards,\n${myName}`;
 
   let finalSubject = userSubject.trim();
   let bodyContent = '';
 
-  // 3. Category-Specific Structural Generation (Fact Grounded)
+  // 3. Category-Specific Structural Generation (Fact Grounded & Human Written)
   switch (category.id) {
     case 'leave_request': {
-      const durText = facts.duration ? `for ${facts.duration}` : '';
-      let reasonText = 'personal reasons';
-      if (lower.includes('sick') || lower.includes('fever') || lower.includes('illness') || lower.includes('unwell')) {
-        reasonText = 'illness';
+      const durText = facts.duration || 'a few days';
+      let reasonDetail = 'personal matters';
+      if (lower.includes('fever')) {
+        reasonDetail = 'a high fever and acute weakness';
+      } else if (lower.includes('sick') || lower.includes('illness') || lower.includes('unwell')) {
+        reasonDetail = 'an unexpected illness';
+      } else if (lower.includes('doctor') || lower.includes('hospital')) {
+        reasonDetail = 'a medical appointment and required treatment';
+      } else if (lower.includes('vacation') || lower.includes('trip') || lower.includes('holiday')) {
+        reasonDetail = 'personal family vacation';
       }
 
       if (!finalSubject) {
-        finalSubject = facts.duration 
-          ? `Leave Request for ${facts.duration.charAt(0).toUpperCase() + facts.duration.slice(1)} Due to ${reasonText.charAt(0).toUpperCase() + reasonText.slice(1)}`
-          : `Request for Leave Due to ${reasonText.charAt(0).toUpperCase() + reasonText.slice(1)}`;
+        finalSubject = `Sick Leave Application – ${durText.charAt(0).toUpperCase() + durText.slice(1)}`;
       }
 
       bodyContent = `${greeting}
 
-I am writing to formally request leave from work ${durText ? durText + ' ' : ''}due to ${reasonText}.
+I am writing to inform you that I am currently unwell with ${reasonDetail} and will need to take sick leave for ${durText} to consult a physician and rest.
 
-During my absence, I will ensure that any urgent responsibilities are handed over appropriately and will make every effort to remain reachable by email should any critical matter arise.
+I have made sure my current responsibilities and pending deliverables are organized, and I will do my best to check urgent emails periodically if an emergency arises.
 
-I kindly request you to approve my leave request, and I will keep you informed regarding my resumption of duties.
-
-Thank you for your understanding and support.
+I expect to resume work once my recovery concludes and will keep you posted on my progress. Thank you very much for your understanding and support.
 
 ${closing}`;
       break;
     }
 
     case 'emergency': {
+      let emergDetail = input.replace(/^emergency\s*(?:leave)?\s*(?:today)?[:\s-]*/i, '').trim();
+      if (!emergDetail) emergDetail = 'an urgent family emergency that requires my immediate presence';
+
       if (!finalSubject) {
-        finalSubject = `Urgent: Emergency Notification & Immediate Absence`;
+        finalSubject = `Urgent: Emergency Leave Notice – Today`;
       }
 
       bodyContent = `${greeting}
 
-I am writing to urgently inform you of an unforeseen emergency: ${input}.
+I am writing to urgently let you know that an unforeseen emergency has occurred today: ${emergDetail}.
 
-Due to these urgent circumstances, I need to attend to this matter immediately and will be temporarily unavailable. I am taking all possible measures to minimize any disruption to ongoing priorities and will provide an update as soon as the situation is under control.
+Due to these urgent circumstances, I need to leave immediately to attend to the situation. I have briefed my team on immediate priorities to ensure coverage during my absence.
 
-Thank you for your prompt understanding and cooperation during this time.
+Should any critical matter require my urgent attention, please feel free to reach me on my mobile phone. I will provide an update as soon as the situation is under control.
+
+Thank you very much for your prompt understanding and cooperation.
 
 ${closing}`;
       break;
@@ -443,22 +504,22 @@ ${closing}`;
     case 'job_application': {
       const role = facts.jobRole || 'the open position';
       if (!finalSubject) {
-        finalSubject = `Application for ${role.charAt(0).toUpperCase() + role.slice(1)} Position${hasAttachment ? ' – Resume Attached' : ''}`;
+        finalSubject = `Application for ${role.charAt(0).toUpperCase() + role.slice(1)} Position – ${myName}`;
       }
 
       const attachmentClause = hasAttachment 
-        ? 'I have attached my resume and credentials for your review.' 
-        : 'I would welcome the opportunity to submit my detailed resume and portfolio for your consideration.';
+        ? 'I have attached my resume and supporting credentials for your review.' 
+        : 'I would be delighted to share my detailed resume and portfolio upon your request.';
 
       bodyContent = `${greeting}
 
-I am writing to express my strong interest in applying for the ${role} at your organization.
+I am writing to express my strong interest in the ${role} opportunity at your organization.
 
-With a solid background in this field and a commitment to professional excellence, I am confident in my ability to deliver meaningful results and contribute effectively to your team's ongoing initiatives.
+With a dedicated background in this field, strong technical expertise, and a track record of driving results, I am confident in my ability to make a meaningful and immediate contribution to your team's objectives.
 
 ${attachmentClause}
 
-I would greatly appreciate the chance to discuss how my qualifications align with your requirements in an interview. Thank you very much for your time and consideration.
+I would welcome the opportunity to discuss how my experience and qualifications align with your requirements in an interview. Thank you very much for your time and consideration.
 
 ${closing}`;
       break;
@@ -466,73 +527,76 @@ ${closing}`;
 
     case 'resume_submission': {
       if (!finalSubject) {
-        finalSubject = `Submission of Resume – ${myName}`;
+        finalSubject = `Resume & Profile Submission – ${myName}`;
       }
 
       const attachmentLine = hasAttachment
-        ? 'Please find my resume attached to this email for your reference and review.'
-        : 'I am pleased to provide my background details and will gladly forward my full resume upon request.';
+        ? 'Please find my updated resume attached to this email for your reference.'
+        : 'I have prepared my updated resume and would be glad to share it for your review.';
 
       bodyContent = `${greeting}
 
-I am writing to share my professional profile and resume for your consideration regarding potential opportunities.
+I hope you are having a productive week.
 
-${attachmentLine}
+I am reaching out to submit my professional resume and profile for prospective career opportunities with your team.
 
-Should you require any supplementary details, portfolio links, or references, please feel free to let me know. I look forward to the possibility of connecting further.
+${attachmentLine} It highlights my core skills, recent milestones, and experience delivering impactful projects. I would be thrilled to connect and discuss how my skill set can benefit your upcoming initiatives.
 
-Thank you for your time and attention.
+Thank you for your time, and I look forward to hearing from you.
 
 ${closing}`;
       break;
     }
 
     case 'complaint': {
+      let compDetail = input.replace(/^complaint[:\s-]*/i, '').trim();
       if (!finalSubject) {
-        finalSubject = `Formal Complaint Regarding: ${input.slice(0, 50)}`;
+        finalSubject = `Formal Concern Regarding: ${compDetail.slice(0, 45)}`;
       }
 
       bodyContent = `${greeting}
 
-I am writing to formally register a complaint regarding an issue I recently experienced: ${input}.
+I am writing to bring an important concern to your attention regarding ${compDetail}.
 
-This situation has caused significant inconvenience and falls below the expected standard of service. I kindly request your immediate attention to investigate this matter and provide an appropriate resolution, including any warranted compensation or corrective action.
+Unfortunately, this has caused considerable inconvenience and falls short of the expected standard of service. I kindly request your assistance in investigating this matter and providing an appropriate resolution or corrective action at your earliest convenience.
 
-I would appreciate a prompt response detailing the steps being taken to resolve this problem.
-
-Thank you for your prompt attention to this matter.
+I appreciate your prompt attention to this issue and look forward to your response.
 
 ${closing}`;
       break;
     }
 
     case 'meeting': {
+      let meetDetail = input.replace(/^reschedule\s*(?:our)?\s*meeting[:\s-]*/i, '').trim();
       if (!finalSubject) {
-        finalSubject = `Request to Reschedule Meeting: ${input.slice(0, 45)}`;
+        finalSubject = `Meeting Schedule Update: ${meetDetail.slice(0, 40)}`;
       }
 
       bodyContent = `${greeting}
 
-I am writing regarding our scheduled meeting. ${input}.
+I hope you are doing well.
 
-Could you please let me know if this adjusted timing is convenient for you, or propose an alternative slot that fits your calendar?
+Regarding our scheduled discussion: ${meetDetail}.
 
-Thank you for your flexibility and understanding.
+Please let me know if this proposed timing works with your calendar, or feel free to suggest another time slot that fits your availability. I appreciate your flexibility and look forward to speaking soon.
 
 ${closing}`;
       break;
     }
 
     case 'follow_up': {
+      let followTopic = input.replace(/^follow\s*up\s*(?:on)?[:\s-]*/i, '').trim();
       if (!finalSubject) {
-        finalSubject = `Follow-up: ${input.slice(0, 45)}`;
+        finalSubject = `Following Up: ${followTopic.slice(0, 40)}`;
       }
 
       bodyContent = `${greeting}
 
-I am writing to briefly follow up on our previous communication regarding ${input}.
+I hope you're having a great week.
 
-Could you please share an update on the current status, or let me know if any additional information is required from my end to move things forward?
+I am writing to briefly check in regarding ${followTopic}.
+
+Could you please let me know if you have had an opportunity to review this, or if any additional details are needed from my end to help move things forward? I am happy to hop on a quick call whenever convenient.
 
 Thank you for your time and assistance.
 
@@ -541,49 +605,54 @@ ${closing}`;
     }
 
     case 'payment_invoice': {
+      let payDetail = input.replace(/^invoice\s*(?:and)?\s*payment[:\s-]*/i, '').trim();
       if (!finalSubject) {
-        finalSubject = `Invoice & Payment Request: ${input.slice(0, 45)}`;
+        finalSubject = `Invoice & Payment Request: ${payDetail.slice(0, 40)}`;
       }
 
       bodyContent = `${greeting}
 
-I am writing to formally submit the invoice and request payment regarding ${input}.
+I hope this email finds you well.
 
-Please arrange for the payment to be processed by the indicated due date. Kindly confirm receipt of this message or let me know if any further billing clarification is needed.
+I am writing to share the invoice details regarding ${payDetail}.
 
-Thank you for your cooperation and prompt payment.
+Please review the attached billing statement and arrange for processing in accordance with our agreed timeline. Kindly confirm receipt and let me know if your finance team requires any additional purchase order details or documentation.
+
+Thank you very much for your prompt cooperation and continued partnership.
 
 ${closing}`;
       break;
     }
 
     case 'security_account': {
+      let secDetail = input.replace(/^security\s*(?:alert)?[:\s-]*/i, '').trim();
       if (!finalSubject) {
-        finalSubject = `Urgent: Potential Security Alert Regarding Account`;
+        finalSubject = `Urgent: Security Notification Regarding Account`;
       }
 
       bodyContent = `${greeting}
 
-I am writing to immediately report a potential security issue: ${input}.
+I am writing to urgently report a potential security issue regarding ${secDetail}.
 
-To safeguard sensitive information and ensure account integrity, I request your urgent assistance in reviewing recent activity and verifying account security. Please advise on any immediate protective measures required.
+To ensure account integrity and safeguard data, I request your prompt assistance in reviewing recent activity on this account and confirming its security status.
 
-Thank you for your urgent attention to this critical matter.
+Please advise on any immediate action or security steps required. Thank you for your prompt attention to this matter.
 
 ${closing}`;
       break;
     }
 
     case 'thank_you': {
+      let thankDetail = input.replace(/^thank\s*you\s*(?:for)?[:\s-]*/i, '').trim();
       if (!finalSubject) {
-        finalSubject = `Thank You for Your Assistance`;
+        finalSubject = `Heartfelt Thanks & Appreciation`;
       }
 
       bodyContent = `${greeting}
 
-I wanted to take a moment to express my sincere appreciation: ${input}.
+I wanted to take a moment to express my sincere appreciation for your support with ${thankDetail}.
 
-Your assistance and support have been immensely valuable, and I truly appreciate the time and effort you contributed.
+Your assistance made a significant difference, and I truly value the time, effort, and guidance you provided. Working with you has been an absolute pleasure.
 
 Thank you once again!
 
@@ -592,30 +661,36 @@ ${closing}`;
     }
 
     case 'personal_casual': {
+      let note = input.replace(/^quick\s*note[:\s-]*/i, '').trim();
       if (!finalSubject) {
-        finalSubject = `Quick Note: ${input.slice(0, 35)}`;
+        finalSubject = `Quick Note: ${note.slice(0, 35)}`;
       }
 
       bodyContent = `${greeting}
 
-Hope you are doing well! Just wanted to send a quick note to let you know: ${input}.
+Hope you're doing great!
 
-Catch you shortly!
+Just wanted to send you a quick update: ${note}.
+
+Let's catch up soon when you have a free moment.
 
 ${closing}`;
       break;
     }
 
     default: {
+      let cleanGeneral = input.replace(/^(?:regarding|about)[:\s-]*/i, '').trim();
       if (!finalSubject) {
-        finalSubject = `Regarding: ${input.slice(0, 50)}`;
+        finalSubject = `Regarding: ${cleanGeneral.slice(0, 45)}`;
       }
 
       bodyContent = `${greeting}
 
-I am writing to communicate regarding ${input}.
+I hope you are doing well.
 
-Please let me know if you require any additional information or have questions regarding this matter. I remain available to assist.
+I am reaching out to communicate regarding ${cleanGeneral}.
+
+Please let me know if you need any additional information or have questions regarding this. I am happy to provide further details at your convenience.
 
 Thank you for your time and consideration.
 

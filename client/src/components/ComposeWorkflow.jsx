@@ -46,8 +46,8 @@ export function ComposeWorkflow({
   // Authoritative form state values (with initialData fallback for backwards compatibility)
   const instruction = composeState.instruction !== undefined ? composeState.instruction : (initialData.instruction || '');
   const recipient = composeState.recipient !== undefined ? composeState.recipient : (initialData.recipient || '');
-  const cc = composeState.cc || '';
-  const bcc = composeState.bcc || '';
+  const cc = composeState.cc !== undefined ? composeState.cc : (initialData.cc || '');
+  const bcc = composeState.bcc !== undefined ? composeState.bcc : (initialData.bcc || '');
   const subject = composeState.subject || '';
   const body = composeState.body || '';
   const selectedFile = composeState.selectedFile || null;
@@ -64,7 +64,7 @@ export function ComposeWorkflow({
   const sentResult = composeState.sentResult || null;
 
   const [aiLoading, setAiLoading] = useState(false);
-  const [showCcBcc, setShowCcBcc] = useState(false);
+  const [showCcBcc, setShowCcBcc] = useState(Boolean(composeState.cc || composeState.bcc || initialData.cc || initialData.bcc));
   const [isEditing, setIsEditing] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [draftToast, setDraftToast] = useState('');
@@ -770,32 +770,68 @@ export function ComposeWorkflow({
             </div>
 
             <div className="p-6 space-y-4 text-xs">
-              {/* Recipient Rows */}
+              {/* Recipient Rows with CC & BCC */}
               <div className="space-y-2 pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-500 font-bold w-12 shrink-0">To:</span>
-                  {isEditing ? (
-                    <input
-                      type="email"
-                      value={recipient}
-                      onChange={(e) => updateState({ recipient: e.target.value })}
-                      placeholder="recipient@example.com"
-                      className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-cyan-300 font-mono font-bold"
-                    />
-                  ) : (
-                    <span className="text-cyan-300 font-mono font-bold">{recipient}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-slate-500 font-bold w-12 shrink-0">To:</span>
+                    {isEditing ? (
+                      <input
+                        type="email"
+                        value={recipient}
+                        onChange={(e) => updateState({ recipient: e.target.value })}
+                        placeholder="recipient@example.com"
+                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-cyan-300 font-mono font-bold"
+                      />
+                    ) : (
+                      <span className="text-cyan-300 font-mono font-bold truncate">{recipient}</span>
+                    )}
+                  </div>
+                  {!isEditing && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCcBcc(!showCcBcc)}
+                      className="text-[11px] font-bold text-purple-400 hover:text-purple-300 shrink-0 transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      {showCcBcc || cc || bcc ? (showCcBcc ? 'Hide CC/BCC' : 'Edit CC/BCC') : '+ Add CC/BCC'}
+                    </button>
                   )}
                 </div>
-                {cc && (
-                  <div className="flex items-center gap-2">
+
+                {/* CC (Carbon Copy) */}
+                {(isEditing || showCcBcc || cc) && (
+                  <div className="flex items-center gap-2 animate-fadeIn">
                     <span className="text-slate-500 font-bold w-12 shrink-0">CC:</span>
-                    <span className="text-slate-300 font-mono">{cc}</span>
+                    {isEditing || showCcBcc ? (
+                      <input
+                        type="text"
+                        value={cc}
+                        onChange={(e) => updateState({ cc: e.target.value })}
+                        placeholder="team@example.com, lead@example.com"
+                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-slate-200 font-mono"
+                      />
+                    ) : (
+                      <span className="text-slate-300 font-mono">{cc}</span>
+                    )}
                   </div>
                 )}
-                {bcc && (
-                  <div className="flex items-center gap-2">
+
+                {/* BCC (Blind Carbon Copy) */}
+                {(isEditing || showCcBcc || bcc) && (
+                  <div className="flex items-center gap-2 animate-fadeIn">
                     <span className="text-slate-500 font-bold w-12 shrink-0">BCC:</span>
-                    <span className="text-slate-300 font-mono">{bcc}</span>
+                    {isEditing || showCcBcc ? (
+                      <input
+                        type="text"
+                        value={bcc}
+                        onChange={(e) => updateState({ bcc: e.target.value })}
+                        placeholder="archive@example.com, records@example.com"
+                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-slate-200 font-mono"
+                      />
+                    ) : (
+                      <span className="text-slate-300 font-mono">{bcc}</span>
+                    )}
                   </div>
                 )}
               </div>

@@ -301,6 +301,8 @@ export default function App() {
       ...prev,
       instruction: data.instruction !== undefined ? data.instruction : prev.instruction,
       recipient: data.recipient !== undefined ? data.recipient : prev.recipient,
+      cc: data.cc !== undefined ? data.cc : prev.cc,
+      bcc: data.bcc !== undefined ? data.bcc : prev.bcc,
       subject: data.subject !== undefined ? data.subject : prev.subject,
       body: data.body !== undefined ? data.body : prev.body,
       selectedFile: data.selectedFile !== undefined ? data.selectedFile : prev.selectedFile,
