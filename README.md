@@ -1,4 +1,4 @@
-﻿# 🚀 Scribe-AI — Intelligent Email Automation Platform
+# 🚀 Scribe-AI — Intelligent Email Automation Platform
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel%20Production-10B981?style=for-the-badge&logo=vercel&logoColor=white)](https://scribe-ai-self.vercel.app)
 [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/yuvasriram2909/Scribe-AI)
@@ -62,6 +62,9 @@ An enterprise-grade, full-stack email automation system that uses **Google Gemin
 
 - **📜 Reverse-Chronological Sent History**:
   Real-time email history sorted strictly from most recent to oldest with status pills, snippet previews, and full details.
+
+- **👋 Personalized Dynamic Hero Greeting**:
+  Emoji-free, time-aware greeting dynamically adapting to local system hours (morning, afternoon, evening, night) and personalized with the authenticated user's display name or username.
 
 ---
 
