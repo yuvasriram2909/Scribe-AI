@@ -833,6 +833,9 @@ export default function App() {
               onViewHistory={() => setActiveTab('history')}
               onNavigateToSettings={() => setActiveTab('settings')}
               onUpdateComposeState={handleUpdateComposeState}
+              currentUserName={currentUserName}
+              currentUserEmail={currentUserEmail}
+              theme={theme}
             />
           )}
           {activeTab === 'compose' && (

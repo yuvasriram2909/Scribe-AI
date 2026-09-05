@@ -56,20 +56,45 @@ const STATUS_FILTERS = [
 ];
 
 /**
- * Calculates dynamic greeting based on the user's local device time
+ * Calculates dynamic greeting prefix based on the user's local device time:
+ * - 05:00 to 11:59: "Good morning"
+ * - 12:00 to 16:59: "Good afternoon"
+ * - 17:00 to 21:59: "Good evening"
+ * - 22:00 to 04:59: "Good night"
  */
-export function getTimeBasedGreeting(date = new Date()) {
+export function getTimeGreetingPrefix(date = new Date()) {
   const hour = date.getHours();
   if (hour >= 5 && hour < 12) {
-    return { title: 'Good morning!', icon: '☀️' };
+    return 'Good morning';
   }
   if (hour >= 12 && hour < 17) {
-    return { title: 'Good afternoon!', icon: '🌤️' };
+    return 'Good afternoon';
   }
-  if (hour >= 17 && hour < 21) {
-    return { title: 'Good evening!', icon: '🌆' };
+  if (hour >= 17 && hour < 22) {
+    return 'Good evening';
   }
-  return { title: 'Good night!', icon: '🌙' };
+  return 'Good night';
+}
+
+/**
+ * Formats the greeting cleanly with the user's name without emojis or symbol graphics:
+ * e.g., "Good morning, Yuva!" or "Good afternoon, yuvasriram2909!"
+ * Falls back to "Good afternoon!" (or current time greeting) when name is unavailable.
+ */
+export function formatHeroGreeting(userName, date = new Date()) {
+  const prefix = getTimeGreetingPrefix(date);
+  const cleanName = userName && typeof userName === 'string' ? userName.trim() : '';
+  if (cleanName) {
+    return `${prefix}, ${cleanName}!`;
+  }
+  return `${prefix}!`;
+}
+
+export function getTimeBasedGreeting(date = new Date(), userName = '') {
+  return {
+    title: formatHeroGreeting(userName, date),
+    prefix: getTimeGreetingPrefix(date)
+  };
 }
 
 export function formatRelativeTime(dateStr) {
@@ -96,17 +121,47 @@ export function Dashboard({
   onViewNotifications,
   composeState = {},
   onUpdateComposeState,
-  theme = 'dark'
+  theme = 'dark',
+  currentUserName: propUserName,
+  currentUserEmail: propUserEmail
 }) {
-  const [greetingObj, setGreetingObj] = useState(() => getTimeBasedGreeting());
+  const [authUserName, setAuthUserName] = useState(() => {
+    return propUserName || localStorage.getItem('userName') || (localStorage.getItem('userEmail') ? localStorage.getItem('userEmail').split('@')[0] : '');
+  });
+  const [currentDate, setCurrentDate] = useState(() => new Date());
 
   useEffect(() => {
-    // Update greeting every 60s across time boundaries
+    if (propUserName) {
+      setAuthUserName(propUserName);
+    } else if (propUserEmail) {
+      setAuthUserName(propUserEmail.split('@')[0]);
+    }
+  }, [propUserName, propUserEmail]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const u = session.user;
+        const name = 
+          u.user_metadata?.full_name || 
+          u.user_metadata?.name || 
+          (u.email ? u.email.split('@')[0] : '');
+        if (name) {
+          setAuthUserName(name);
+        }
+      }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // Update dynamic time greeting every 60s across time boundaries
     const interval = setInterval(() => {
-      setGreetingObj(getTimeBasedGreeting());
+      setCurrentDate(new Date());
     }, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  const heroGreeting = formatHeroGreeting(authUserName, currentDate);
 
   const [stats, setStats] = useState({
     sent: 0,
@@ -696,7 +751,7 @@ export function Dashboard({
               <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight ${
                 theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'
               }`}>
-                {greetingObj.title} <span className="inline-block">{greetingObj.icon}</span>
+                {heroGreeting}
               </h1>
               <h2 className={`text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight mt-1 ${
                 theme === 'dark' ? 'text-[#ECE8E1]' : 'text-amber-800'
