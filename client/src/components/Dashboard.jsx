@@ -96,8 +96,7 @@ export function Dashboard({
   onViewNotifications,
   composeState = {},
   onUpdateComposeState,
-  theme = 'dark',
-  toggleTheme
+  theme = 'dark'
 }) {
   const [greetingObj, setGreetingObj] = useState(() => getTimeBasedGreeting());
 

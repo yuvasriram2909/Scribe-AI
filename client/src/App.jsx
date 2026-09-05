@@ -15,7 +15,7 @@ import {
   Sparkles, Mail, Bell, LayoutDashboard, History, Settings, 
   Send, ShieldCheck, PlusCircle, Menu, X, LogOut, User,
   Users, Layout, Trash2, CheckCircle, ChevronDown, Rocket, Crown, ExternalLink,
-  Sun, Moon, Search, Calendar, BarChart2
+  Search, Calendar, BarChart2
 } from 'lucide-react';
 
 import { LoginPage } from './components/LoginPage';
@@ -34,25 +34,21 @@ import { apiFetch } from './utils/api';
 import { supabase, subscribeToNotificationChanges, signOutUser } from './utils/supabaseClient';
 
 export default function App() {
-  const [theme, setTheme] = useState(() => localStorage.getItem('scribe_theme') || 'dark');
+  // Lock theme permanently to dark mode
+  const theme = 'dark';
   const [currentUserEmail, setCurrentUserEmail] = useState(() => localStorage.getItem('userEmail') || '');
   const [currentUserName, setCurrentUserName] = useState(() => localStorage.getItem('userName') || '');
 
-  // Synchronize theme class with documentElement and localStorage
+  // Synchronize and permanently enforce dark theme on documentElement and storage
   useEffect(() => {
-    localStorage.setItem('scribe_theme', theme);
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light');
-    } else {
-      document.documentElement.classList.add('light');
-      document.documentElement.classList.remove('dark');
+    localStorage.setItem('scribe_theme', 'dark');
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+    if (document.body) {
+      document.body.classList.add('dark');
+      document.body.classList.remove('light');
     }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
-  };
+  }, []);
 
   const [currentRoute, setCurrentRoute] = useState(() => window.location.pathname);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -712,28 +708,6 @@ export default function App() {
               <span>Gmail Connected</span>
             </div>
 
-            {/* Dark / Light Mode Toggle Button with Micro-Scale */}
-            <button
-              onClick={toggleTheme}
-              className={`p-2 sm:px-3 sm:py-1.5 rounded-full border flex items-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-xs ${
-                theme === 'dark'
-                  ? 'bg-stone-800/80 border-amber-500/30 text-amber-400 hover:bg-stone-700/80 hover:border-amber-500/50'
-                  : 'bg-amber-100/70 border-amber-300 text-amber-800 hover:bg-amber-200/70'
-              }`}
-              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            >
-              {theme === 'dark' ? (
-                <>
-                  <Sun className="w-4 h-4 text-amber-400" />
-                  <span className="text-xs font-semibold text-stone-200 hidden sm:inline">Light</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-4 h-4 text-amber-700" />
-                  <span className="text-xs font-semibold text-stone-800 hidden sm:inline">Dark</span>
-                </>
-              )}
-            </button>
 
             {/* Notification Bell with Bell-Hover Shake Animation */}
             <button
@@ -832,7 +806,6 @@ export default function App() {
               composeState={composeState}
               onUpdateComposeState={handleUpdateComposeState}
               theme={theme}
-              toggleTheme={toggleTheme}
             />
           )}
 

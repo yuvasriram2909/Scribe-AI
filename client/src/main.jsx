@@ -3,6 +3,17 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 
+// Permanently enforce dark mode on root document and storage
+try {
+  localStorage.setItem('scribe_theme', 'dark');
+  document.documentElement.classList.add('dark');
+  document.documentElement.classList.remove('light');
+  if (document.body) {
+    document.body.classList.add('dark');
+    document.body.classList.remove('light');
+  }
+} catch (_) {}
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
