@@ -174,10 +174,22 @@ async function getAuthUser(req: Request, supabase: any) {
         const { data: connections } = await supabase.from("gmail_connections").select("*").eq("user_id", supaUser.id);
         const { data: legacyAccounts } = await supabase.from("GmailAccount").select("*").eq("userId", supaUser.id);
 
+        const email = (supaUser.email || profile?.email || targetEmail || "").toLowerCase();
+        const name = profile?.full_name || supaUser.user_metadata?.full_name || supaUser.user_metadata?.name || email.split("@")[0] || "User";
+
+        // Ensure User table row exists for foreign key compatibility
+        try {
+          await supabase.from("User").upsert({
+            id: supaUser.id,
+            email,
+            name,
+          }, { onConflict: "id" });
+        } catch (_) {}
+
         return {
           id: supaUser.id,
-          email: (supaUser.email || profile?.email || targetEmail || "").toLowerCase(),
-          name: profile?.full_name || supaUser.user_metadata?.full_name || supaUser.user_metadata?.name || (supaUser.email || "").split("@")[0] || "User",
+          email,
+          name,
           profile: profile || null,
           gmailAccounts: connections && connections.length > 0 ? connections : legacyAccounts || [],
           gmailConnections: connections || [],
@@ -202,14 +214,24 @@ async function getAuthUser(req: Request, supabase: any) {
     } catch (_) {}
   }
 
-  // 2. Check auth.users by targetEmail or targetId
+  // 2. Check profiles by targetEmail
   if (targetEmail) {
     try {
       const cleanEmail = targetEmail.trim().toLowerCase();
-      const { data: profile } = await supabase.from("profiles").select("*").eq("email", cleanEmail).maybeSingle();
+      const { data: profile } = await supabase.from("profiles").select("*").ilike("email", cleanEmail).maybeSingle();
       if (profile) {
         const { data: connections } = await supabase.from("gmail_connections").select("*").eq("user_id", profile.id);
         const { data: legacyAccounts } = await supabase.from("GmailAccount").select("*").eq("userId", profile.id);
+        
+        // Ensure User table row exists
+        try {
+          await supabase.from("User").upsert({
+            id: profile.id,
+            email: cleanEmail,
+            name: profile.full_name || cleanEmail.split("@")[0],
+          }, { onConflict: "id" });
+        } catch (_) {}
+
         return {
           id: profile.id,
           email: cleanEmail,
@@ -223,7 +245,7 @@ async function getAuthUser(req: Request, supabase: any) {
     } catch (_) {}
   }
 
-  // 3. Fallback: legacy User table
+  // 3. Check legacy User table
   let user: any = null;
   if (targetId) {
     const { data } = await supabase.from("User").select("*").eq("id", targetId).maybeSingle();
@@ -232,8 +254,32 @@ async function getAuthUser(req: Request, supabase: any) {
 
   if (!user && targetEmail) {
     const cleanEmail = targetEmail.trim().toLowerCase();
-    const { data } = await supabase.from("User").select("*").eq("email", cleanEmail).maybeSingle();
+    const { data } = await supabase.from("User").select("*").ilike("email", cleanEmail).maybeSingle();
     if (data) user = data;
+  }
+
+  // 4. Auto-provision new user if valid email provided but not yet registered
+  if (!user && targetEmail) {
+    const cleanEmail = targetEmail.trim().toLowerCase();
+    if (cleanEmail.includes("@") && cleanEmail.includes(".")) {
+      try {
+        const newUserId = crypto.randomUUID();
+        const prefix = cleanEmail.split("@")[0].replace(/[0-9._-]/g, " ").trim();
+        const formattedName = prefix ? prefix.split(/\s+/).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ") : "User";
+
+        const { data: newUser } = await supabase.from("User").upsert({
+          id: newUserId,
+          email: cleanEmail,
+          name: formattedName,
+        }, { onConflict: "email" }).select().maybeSingle();
+
+        if (newUser) {
+          user = newUser;
+        }
+      } catch (err) {
+        console.warn("User auto-provisioning error:", err);
+      }
+    }
   }
 
   if (user) {
@@ -1006,7 +1052,7 @@ function generateNaturalEmailContent(params: {
     }
   }
 
-  const myName = senderName && !senderName.includes("[Your Name]") ? senderName : "Yuva Sriram";
+  const myName = senderName && !senderName.includes("[Your Name]") ? senderName : "Sender";
   const closing = `Warm regards,\n${myName}`;
 
   let outSubject = subject ? subject.trim() : "";
@@ -2275,7 +2321,9 @@ serve(async (req: Request) => {
           senderName = prefix.split(/\s+/).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
         }
       }
-      if (!senderName || senderName.includes("[Your Name]")) senderName = "Yuva Sriram";
+      if (!senderName || senderName.includes("[Your Name]")) {
+        senderName = user?.name || (user?.email ? user.email.split("@")[0] : "User");
+      }
 
       // 1. Generate via Situation Pattern Engine
       const sitObj = situation 
@@ -2425,18 +2473,23 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       const importanceQuery = url.searchParams.get("importance");
       const dateRangeQuery = url.searchParams.get("dateRange");
 
-      // Query both canonical emails and legacy Email
-      const { data: canonicalEmails } = await supabase
-        .from("emails")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      // Query both canonical emails and legacy Email with strict user isolation
+      const userEmail = (user.email || "").toLowerCase().trim();
+      let canonicalQuery = supabase.from("emails").select("*");
+      if (userEmail) {
+        canonicalQuery = canonicalQuery.or(`user_id.eq.${user.id},sender_email.ilike.${userEmail},recipient_email.ilike.${userEmail}`);
+      } else {
+        canonicalQuery = canonicalQuery.eq("user_id", user.id);
+      }
+      const { data: canonicalEmails } = await canonicalQuery.order("created_at", { ascending: false });
 
-      const { data: legacyEmails } = await supabase
-        .from("Email")
-        .select("*, attachments:Attachment(*)")
-        .eq("userId", user.id)
-        .order("createdAt", { ascending: false });
+      let legacyQuery = supabase.from("Email").select("*, attachments:Attachment(*)");
+      if (userEmail) {
+        legacyQuery = legacyQuery.or(`userId.eq.${user.id},sender.ilike.${userEmail},recipient.ilike.${userEmail}`);
+      } else {
+        legacyQuery = legacyQuery.eq("userId", user.id);
+      }
+      const { data: legacyEmails } = await legacyQuery.order("createdAt", { ascending: false });
 
       // Merge and deduplicate by id and gmail_message_id
       const seenIds = new Set<string>();
@@ -2846,16 +2899,23 @@ HUMAN-WRITTEN WRITING GUIDELINES:
         syncUserGmail(user, syncAccount, supabase).catch((e) => console.warn("Background sync error:", e));
       }
 
-      // Fetch emails from BOTH canonical emails and legacy Email tables
-      const { data: canonicalEmails } = await supabase
-        .from("emails")
-        .select("*")
-        .eq("user_id", user.id);
+      // Fetch emails from BOTH canonical emails and legacy Email tables with strict user isolation
+      const userEmail = (user.email || "").toLowerCase().trim();
+      let canonicalQuery = supabase.from("emails").select("*");
+      if (userEmail) {
+        canonicalQuery = canonicalQuery.or(`user_id.eq.${user.id},sender_email.ilike.${userEmail},recipient_email.ilike.${userEmail}`);
+      } else {
+        canonicalQuery = canonicalQuery.eq("user_id", user.id);
+      }
+      const { data: canonicalEmails } = await canonicalQuery;
 
-      const { data: legacyEmails } = await supabase
-        .from("Email")
-        .select("*")
-        .eq("userId", user.id);
+      let legacyQuery = supabase.from("Email").select("*");
+      if (userEmail) {
+        legacyQuery = legacyQuery.or(`userId.eq.${user.id},sender.ilike.${userEmail},recipient.ilike.${userEmail}`);
+      } else {
+        legacyQuery = legacyQuery.eq("userId", user.id);
+      }
+      const { data: legacyEmails } = await legacyQuery;
 
       // Merge and deduplicate by id and gmail_message_id
       const seenIds = new Set<string>();

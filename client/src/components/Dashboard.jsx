@@ -72,6 +72,23 @@ export function getTimeBasedGreeting(date = new Date()) {
   return { title: 'Good night!', icon: '🌙' };
 }
 
+export function formatRelativeTime(dateStr) {
+  if (!dateStr) return 'Just now';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'Recently';
+  const now = Date.now();
+  const diffSec = Math.floor((now - d.getTime()) / 1000);
+  if (diffSec < 60) return 'Just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}h ago`;
+  const diffDays = Math.floor(diffHour / 24);
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 export function Dashboard({ 
   onStartCompose, 
   onViewHistory, 
@@ -517,7 +534,7 @@ export function Dashboard({
 
   const currentUserName = localStorage.getItem('userName') || '';
   const currentUserEmail = localStorage.getItem('userEmail') || '';
-  const displayName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'Yuva');
+  const displayName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'User');
   const [dotsMenuOpen, setDotsMenuOpen] = useState(false);
 
   return (
@@ -595,7 +612,7 @@ export function Dashboard({
                 </span>
               </div>
               <p className={`text-xs mt-0.5 font-mono ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
-                Connected account: {connectionStatus.connectedEmail || localStorage.getItem('userEmail') || 'yuvasriram2909@gmail.com'}
+                Connected account: {connectionStatus.connectedEmail || localStorage.getItem('userEmail') || 'Not Connected'}
               </p>
             </div>
           </div>
@@ -919,7 +936,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.sent || 645)}
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.sent ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
               Active dispatch
@@ -944,7 +961,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.received || 455)}
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.received ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
               Inbox activity
@@ -969,7 +986,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.drafts || 151)}
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.drafts ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
               Saved drafts
@@ -994,7 +1011,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.scheduled || 0)}
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.scheduled ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
               Queue ready
@@ -1019,7 +1036,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.emergency || 498)}
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.emergency ?? 0)}
             </div>
             <div className="text-[11px] font-medium mt-0.5 text-rose-400">
               High priority
@@ -1044,7 +1061,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.spam || 174)}
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.spam ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
               Filtered messages
@@ -1069,7 +1086,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.pendingReview || 12)}
+              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.pendingReview ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
               Awaiting confirmation
@@ -1109,7 +1126,7 @@ export function Dashboard({
 
           <div className="space-y-3">
             {recentEmails.length > 0 ? (
-              recentEmails.slice(0, 3).map((em, idx) => (
+              recentEmails.slice(0, 4).map((em, idx) => (
                 <div
                   key={em.id || idx}
                   onClick={() => setDetailModalEmail(em)}
@@ -1128,80 +1145,53 @@ export function Dashboard({
                       </svg>
                     </div>
                     <div className="min-w-0">
-                      <h4 className={`text-xs font-bold truncate group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-                        {em.subject || 'Meeting Schedule for Next Week'}
-                      </h4>
-                      <p className={`text-[11px] truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
-                        {em.body ? em.body.slice(0, 50) + '...' : "Hi Team, Let's meet next week to discuss..."}
+                      <div className="flex items-center gap-2">
+                        <h4 className={`text-xs font-bold truncate group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                          {em.subject || '(No Subject)'}
+                        </h4>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold ${
+                          em.direction === 'sent' || em.isSent
+                            ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                            : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                        }`}>
+                          {em.status || (em.isSent ? 'Sent' : 'Received')}
+                        </span>
+                      </div>
+                      <p className={`text-[11px] truncate mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+                        {em.snippet || (em.body ? (em.body.slice(0, 70) + (em.body.length > 70 ? '...' : '')) : (em.instruction || '(No preview content)'))}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
-                      {idx === 0 ? '2 hours ago' : idx === 1 ? '5 hours ago' : '1 day ago'}
+                      {formatRelativeTime(em.sentAt || em.createdAt || em.receivedAt)}
                     </span>
                     <ChevronRight className="w-4 h-4 text-amber-500 recent-row-arrow opacity-0 -translate-x-2 transition-all duration-200 shrink-0" />
                   </div>
                 </div>
               ))
             ) : (
-              <>
-                <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 recent-email-row group cursor-pointer ${
-                  theme === 'dark' ? 'bg-[#0E1015] border-stone-800' : 'bg-stone-50 border-stone-200'
-                }`}>
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0 recent-mail-icon transition-transform duration-200 shadow-xs">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
-                        <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
-                        <path fill="#EA4335" d="M22 6c0-.42-.14-.8-.37-1.12L12 11 2.37 4.88C2.14 5.2 2 5.58 2 6v2.25l10 6.25 10-6.25V6z"/>
-                      </svg>
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className={`text-xs font-bold truncate group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-                        Meeting Schedule for Next Week
-                      </h4>
-                      <p className={`text-[11px] truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
-                        Hi Team, Let's meet next week to discuss...
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
-                      2 hours ago
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-amber-500 recent-row-arrow opacity-0 -translate-x-2 transition-all duration-200 shrink-0" />
-                  </div>
+              <div className={`p-8 rounded-2xl border text-center flex flex-col items-center justify-center gap-3 ${
+                theme === 'dark' ? 'bg-[#0E1015]/60 border-stone-800' : 'bg-stone-50 border-stone-200'
+              }`}>
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center shadow-sm">
+                  <Mail className="w-6 h-6 text-amber-500" />
                 </div>
-
-                <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 recent-email-row group cursor-pointer ${
-                  theme === 'dark' ? 'bg-[#0E1015] border-stone-800' : 'bg-stone-50 border-stone-200'
-                }`}>
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0 recent-mail-icon transition-transform duration-200 shadow-xs">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
-                        <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
-                        <path fill="#EA4335" d="M22 6c0-.42-.14-.8-.37-1.12L12 11 2.37 4.88C2.14 5.2 2 5.58 2 6v2.25l10 6.25 10-6.25V6z"/>
-                      </svg>
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className={`text-xs font-bold truncate group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-                        Project Update
-                      </h4>
-                      <p className={`text-[11px] truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
-                        The latest updates are attached. Please review.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
-                      5 hours ago
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-amber-500 recent-row-arrow opacity-0 -translate-x-2 transition-all duration-200 shrink-0" />
-                  </div>
+                <div>
+                  <h4 className={`text-xs font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                    No emails yet
+                  </h4>
+                  <p className={`text-[11px] mt-1 max-w-xs ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+                    Enter an instruction above or click compose to generate and send your first AI email.
+                  </p>
                 </div>
-              </>
+                <button
+                  onClick={() => onStartCompose()}
+                  className="mt-1 px-4 py-2 rounded-xl gold-btn text-stone-950 font-bold text-xs shadow-md cursor-pointer hover:scale-102 transition-all"
+                >
+                  + Compose First Email
+                </button>
+              </div>
             )}
           </div>
         </div>

@@ -591,7 +591,7 @@ BEGIN
       LOWER(COALESCE(tone, 'professional')) as tone,
       LOWER(COALESCE(importance, 'normal')) as importance
     FROM public.emails
-    WHERE user_id::text = p_user_id
+    WHERE user_id::text = p_user_id OR sender_email ILIKE p_user_id OR recipient_email ILIKE p_user_id
     UNION ALL
     SELECT 
       id::text as id,
@@ -603,7 +603,7 @@ BEGIN
       LOWER(COALESCE("tone", 'professional')) as tone,
       LOWER(COALESCE("priority", 'normal')) as importance
     FROM public."Email"
-    WHERE "userId"::text = p_user_id
+    WHERE ("userId"::text = p_user_id OR "sender" ILIKE p_user_id OR "recipient" ILIKE p_user_id)
       AND NOT EXISTS (
         SELECT 1 FROM public.emails e WHERE e.id::text = public."Email".id::text
       )

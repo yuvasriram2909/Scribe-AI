@@ -332,7 +332,7 @@ export function extractFactualDetails(input = '') {
  * Formats a clean human display name from email or username
  */
 export function formatDisplayName(emailOrName = '') {
-  if (!emailOrName) return 'Yuva Sriram';
+  if (!emailOrName) return 'User';
   if (!emailOrName.includes('@')) {
     const trimmed = emailOrName.replace(/[0-9._-]/g, ' ').trim();
     if (trimmed) {
@@ -341,7 +341,7 @@ export function formatDisplayName(emailOrName = '') {
     return emailOrName;
   }
   const prefix = emailOrName.split('@')[0].replace(/[0-9._-]/g, ' ').trim();
-  if (!prefix) return 'Yuva Sriram';
+  if (!prefix) return 'User';
   return prefix.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 }
 
@@ -362,7 +362,7 @@ export function getSenderDisplayName(providedName = '') {
       return formatDisplayName(storedEmail);
     }
   } catch (_) {}
-  return 'Yuva Sriram';
+  return 'User';
 }
 
 /**
