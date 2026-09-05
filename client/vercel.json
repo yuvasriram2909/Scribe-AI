@@ -1,15 +1,16 @@
 {
   "version": 2,
-  "framework": "vite",
-  "cleanUrls": true,
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api/$1"
+      "src": "/api/(.*)",
+      "dest": "https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api/$1"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
     }
   ]
 }
