@@ -380,7 +380,7 @@ export function ComposeWorkflow({
     <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn">
 
       {/* WORKFLOW STEP PROGRESS HEADER */}
-      <div className="glass-panel p-4 rounded-2xl border border-slate-800 flex items-center justify-between overflow-x-auto scrollbar-none gap-2 shadow-xl">
+      <div className="glass-panel p-4 rounded-2xl border border-[#2E2D2B] flex items-center justify-between overflow-x-auto scrollbar-none gap-2 shadow-xl">
         {[
           { num: 1, label: 'Instruction' },
           { num: 2, label: 'AI Intelligence' },
@@ -390,14 +390,14 @@ export function ComposeWorkflow({
         ].map((s) => (
           <div key={s.num} className="flex items-center gap-2 shrink-0">
             <div className={`w-7 h-7 rounded-full text-xs font-extrabold flex items-center justify-center transition-all ${
-              step >= s.num ? 'bg-gradient-to-tr from-purple-600 to-blue-600 text-white shadow-md shadow-purple-600/30' : 'bg-slate-800 text-slate-400'
+              step >= s.num ? 'bg-[#D4A373] text-[#121211] shadow-md shadow-[#D4A373]/20' : 'bg-[#22211F] text-[#99958F]'
             }`}>
-              {step > s.num ? <Check className="w-4 h-4 text-white" /> : s.num}
+              {step > s.num ? <Check className="w-4 h-4 text-[#121211]" /> : s.num}
             </div>
-            <span className={`text-xs font-semibold ${step >= s.num ? 'text-white' : 'text-slate-500'}`}>
+            <span className={`text-xs font-semibold ${step >= s.num ? 'text-[#F5F3EF]' : 'text-[#99958F]'}`}>
               {s.label}
             </span>
-            {s.num < 5 && <div className="w-6 sm:w-10 h-0.5 bg-slate-800 mx-1" />}
+            {s.num < 5 && <div className="w-6 sm:w-10 h-0.5 bg-[#2E2D2B] mx-1" />}
           </div>
         ))}
       </div>
@@ -435,13 +435,13 @@ export function ComposeWorkflow({
 
       {/* STEP 1: INSTRUCTION & RECIPIENTS FORM */}
       {step === 1 && (
-        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6 shadow-2xl">
-          <div className="border-b border-slate-800 pb-4">
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <Sparkles className="w-6 h-6 text-cyan-400" />
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#2E2D2B] space-y-6 shadow-2xl">
+          <div className="border-b border-[#2E2D2B] pb-4">
+            <h2 className="text-2xl font-bold text-[#F5F3EF] flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-[#D4A373]" />
               AI Intelligent Email Compose
             </h2>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-[#99958F] mt-1">
               Enter your communication request. Scribe AI will automatically classify intent, set tone and urgency, and compose a fact-grounded email.
             </p>
           </div>
@@ -449,7 +449,7 @@ export function ComposeWorkflow({
           <form onSubmit={handleGenerateEmail} className="space-y-6">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300 block">
+                <label className="text-xs font-semibold text-[#ECE8E1] block">
                   Recipient Email (To) <span className="text-rose-400">*</span>
                 </label>
 
@@ -457,7 +457,7 @@ export function ComposeWorkflow({
                   <button
                     type="button"
                     onClick={() => setShowCcBcc(true)}
-                    className="text-xs font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors cursor-pointer"
+                    className="text-xs font-bold text-[#D4A373] hover:text-[#c59362] flex items-center gap-1 transition-colors cursor-pointer"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
                     + Add CC / BCC
@@ -471,14 +471,14 @@ export function ComposeWorkflow({
                 placeholder="manager@example.com, client@example.com, hr@company.com"
                 value={recipient}
                 onChange={(e) => updateState({ recipient: e.target.value, errorMessage: '' })}
-                className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
+                className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-[#F5F3EF] placeholder-[#99958F]"
               />
 
               {showCcBcc && (
-                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3 animate-fadeIn">
+                <div className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-3 animate-fadeIn">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                      <Users className="w-4 h-4 text-purple-400" /> Extra Email Deliveries (CC & BCC)
+                    <span className="text-xs font-bold text-[#ECE8E1] flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-[#D4A373]" /> Extra Email Deliveries (CC & BCC)
                     </span>
                     <button
                       type="button"
@@ -486,7 +486,7 @@ export function ComposeWorkflow({
                         setShowCcBcc(false);
                         updateState({ cc: '', bcc: '' });
                       }}
-                      className="text-[10px] text-slate-400 hover:text-rose-400 cursor-pointer"
+                      className="text-[10px] text-[#99958F] hover:text-rose-400 cursor-pointer"
                     >
                       Hide CC/BCC
                     </button>
@@ -494,7 +494,7 @@ export function ComposeWorkflow({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                      <label className="text-[11px] font-semibold text-[#ECE8E1] block mb-1">
                         CC (Carbon Copy)
                       </label>
                       <input
@@ -502,12 +502,12 @@ export function ComposeWorkflow({
                         placeholder="lead@company.com, team@firm.com"
                         value={cc}
                         onChange={(e) => updateState({ cc: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                        className="w-full px-3 py-2 rounded-xl glass-input text-xs text-[#F5F3EF]"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                      <label className="text-[11px] font-semibold text-[#ECE8E1] block mb-1">
                         BCC (Blind Carbon Copy)
                       </label>
                       <input
@@ -515,7 +515,7 @@ export function ComposeWorkflow({
                         placeholder="archive@company.com, audit@firm.com"
                         value={bcc}
                         onChange={(e) => updateState({ bcc: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                        className="w-full px-3 py-2 rounded-xl glass-input text-xs text-[#F5F3EF]"
                       />
                     </div>
                   </div>
@@ -525,8 +525,8 @@ export function ComposeWorkflow({
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold text-slate-300 block">
-                  Subject / Topic <span className="text-[11px] font-normal text-slate-500">(Optional — AI automatically generates based on intent)</span>
+                <label className="text-xs font-bold text-[#ECE8E1] block">
+                  Subject / Topic <span className="text-[11px] font-normal text-[#99958F]">(Optional — AI automatically generates based on intent)</span>
                 </label>
               </div>
               <input
@@ -534,12 +534,12 @@ export function ComposeWorkflow({
                 placeholder="e.g. Leave Request for 3 Days Due to Illness, or Complaint regarding delayed delivery"
                 value={subject}
                 onChange={(e) => updateState({ subject: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-2xl glass-input text-xs text-white placeholder-slate-500"
+                className="w-full px-4 py-2.5 rounded-2xl glass-input text-xs text-[#F5F3EF] placeholder-[#99958F]"
               />
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">
+              <label className="text-xs font-bold text-[#ECE8E1] block mb-1">
                 What do you want to communicate? / Instruction <span className="text-rose-400">*</span>
               </label>
               <textarea
@@ -547,28 +547,28 @@ export function ComposeWorkflow({
                 placeholder='Example: "I need sick leave for 3 days due to illness" or "My father had an accident and I need to leave immediately."'
                 value={instruction}
                 onChange={(e) => updateState({ instruction: e.target.value, errorMessage: '' })}
-                className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-white leading-relaxed placeholder-slate-500"
+                className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-[#F5F3EF] leading-relaxed placeholder-[#99958F]"
               />
             </div>
 
             {/* Optional Attachment */}
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1 flex items-center gap-1.5">
-                <Paperclip className="w-4 h-4 text-purple-400" /> Attach Document or Resume (Optional)
+              <label className="text-xs font-semibold text-[#ECE8E1] block mb-1 flex items-center gap-1.5">
+                <Paperclip className="w-4 h-4 text-[#D4A373]" /> Attach Document or Resume (Optional)
               </label>
               <input
                 type="file"
                 onChange={(e) => updateState({ selectedFile: e.target.files[0] || null })}
-                className="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-800 file:text-purple-300 hover:file:bg-slate-700 file:cursor-pointer"
+                className="block w-full text-xs text-[#99958F] file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#22211F] file:text-[#D4A373] hover:file:bg-[#2A2926] file:cursor-pointer"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#2E2D2B]">
               {onCancel && (
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#ECE8E1] font-bold text-xs border border-[#2E2D2B] cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -577,9 +577,9 @@ export function ComposeWorkflow({
               <button
                 type="submit"
                 disabled={aiLoading}
-                className="px-8 py-3 rounded-xl gold-btn light-sweep text-stone-950 font-bold text-xs flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
+                className="px-8 py-3 rounded-xl gold-btn light-sweep text-[#121211] font-bold text-xs flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
               >
-                <Sparkles className="w-4 h-4 text-stone-950 btn-icon-spin transition-transform" />
+                <Sparkles className="w-4 h-4 text-[#121211] btn-icon-spin transition-transform" />
                 <span>{aiLoading ? 'Analyzing & Generating...' : 'Generate Intelligent Email'}</span>
                 <span className="btn-arrow-slide transition-transform duration-200">✦</span>
               </button>
@@ -590,14 +590,14 @@ export function ComposeWorkflow({
 
       {/* STEP 2: AI PROCESSING ANIMATION */}
       {step === 2 && (
-        <div className="glass-panel p-12 rounded-3xl border border-slate-800 text-center space-y-4 animate-pulse shadow-2xl">
-          <div className="w-16 h-16 mx-auto rounded-2xl gradient-btn flex items-center justify-center shadow-lg shadow-purple-600/40">
-            <Sparkles className="w-8 h-8 text-white animate-spin" />
+        <div className="glass-panel p-12 rounded-3xl border border-[#2E2D2B] text-center space-y-4 animate-pulse shadow-2xl">
+          <div className="w-16 h-16 mx-auto rounded-2xl gold-btn flex items-center justify-center shadow-lg shadow-[#D4A373]/20">
+            <Sparkles className="w-8 h-8 text-[#121211] animate-spin" />
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-xl font-extrabold text-white">Scribe AI Engine Analyzing Request...</h3>
-            <div className="text-slate-400 text-xs max-w-md mx-auto space-y-1">
+            <h3 className="text-xl font-extrabold text-[#F5F3EF]">Scribe AI Engine Analyzing Request...</h3>
+            <div className="text-[#99958F] text-xs max-w-md mx-auto space-y-1">
               <p>• Classifying email intent across 20 categories...</p>
               <p>• Determining optimal tone & recipient relationship...</p>
               <p>• Detecting importance & urgency level...</p>
@@ -609,7 +609,7 @@ export function ComposeWorkflow({
 
       {/* STEP 3: UPGRADED 5-FACET AI ANALYSIS & GMAIL PREVIEW */}
       {step === 3 && (
-        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6 shadow-2xl">
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#2E2D2B] space-y-6 shadow-2xl">
           
           {draftToast && (
             <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 text-xs font-semibold flex items-center justify-between shadow-lg animate-fadeIn">
@@ -624,14 +624,14 @@ export function ComposeWorkflow({
           )}
 
           {/* UPGRADED 5-FACET AI EMAIL ANALYSIS CARD */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-[#0E1424]/90 backdrop-blur-xl border border-purple-500/20 space-y-5 shadow-2xl animate-fadeIn">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="p-5 sm:p-6 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-5 shadow-2xl animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-[#2E2D2B] pb-3">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-cyan-400" />
-                <h3 className="text-xs font-extrabold text-white tracking-wider uppercase">AI EMAIL INTELLIGENCE ANALYSIS</h3>
+                <Sparkles className="w-5 h-5 text-[#D4A373]" />
+                <h3 className="text-xs font-extrabold text-[#F5F3EF] tracking-wider uppercase">AI EMAIL INTELLIGENCE ANALYSIS</h3>
               </div>
 
-              <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-purple-950/70 text-purple-300 border border-purple-500/30">
+              <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-[#22211F] text-[#D4A373] border border-[#2E2D2B]">
                 {situationSource === 'manual' ? 'Status: User Configured' : 'Status: AI Classified'}
               </span>
             </div>
@@ -640,37 +640,37 @@ export function ComposeWorkflow({
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
               
               {/* 1. Email Type */}
-              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              <div className="p-3 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-1">
+                <span className="text-[10px] font-bold text-[#99958F] uppercase tracking-wider block">
                   📧 Email Type
                 </span>
-                <div className="text-xs font-extrabold text-white truncate" title={emailType}>
+                <div className="text-xs font-extrabold text-[#F5F3EF] truncate" title={emailType}>
                   {emailType || 'Professional'}
                 </div>
               </div>
 
               {/* 2. Detected Situation */}
-              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              <div className="p-3 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-1">
+                <span className="text-[10px] font-bold text-[#99958F] uppercase tracking-wider block">
                   🎯 Situation
                 </span>
-                <div className="text-xs font-extrabold text-cyan-300 truncate" title={situation}>
+                <div className="text-xs font-extrabold text-[#D4A373] truncate" title={situation}>
                   {situation || 'Official'}
                 </div>
               </div>
 
               {/* 3. Priority / Importance */}
-              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              <div className="p-3 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-1">
+                <span className="text-[10px] font-bold text-[#99958F] uppercase tracking-wider block">
                   🔥 Priority
                 </span>
                 <div className="text-xs font-extrabold">
                   {priority === 'CRITICAL' ? (
                     <span className="text-rose-400 flex items-center gap-1 font-bold">🚨 CRITICAL</span>
                   ) : priority === 'HIGH' || priority === 'High' ? (
-                    <span className="text-amber-400 flex items-center gap-1 font-bold">🔥 HIGH</span>
+                    <span className="text-[#D4A373] flex items-center gap-1 font-bold">🔥 HIGH</span>
                   ) : priority === 'MEDIUM' || priority === 'Medium' ? (
-                    <span className="text-cyan-400 flex items-center gap-1 font-bold">⚡ MEDIUM</span>
+                    <span className="text-[#ECE8E1] flex items-center gap-1 font-bold">⚡ MEDIUM</span>
                   ) : (
                     <span className="text-emerald-400 flex items-center gap-1 font-bold">🟢 LOW</span>
                   )}
@@ -678,21 +678,21 @@ export function ComposeWorkflow({
               </div>
 
               {/* 4. Tone */}
-              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              <div className="p-3 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-1">
+                <span className="text-[10px] font-bold text-[#99958F] uppercase tracking-wider block">
                   💬 Tone
                 </span>
-                <div className="text-xs font-extrabold text-purple-300 truncate" title={tone}>
+                <div className="text-xs font-extrabold text-[#ECE8E1] truncate" title={tone}>
                   {tone}
                 </div>
               </div>
 
               {/* 5. Urgency */}
-              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1 col-span-2 sm:col-span-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              <div className="p-3 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-1 col-span-2 sm:col-span-1">
+                <span className="text-[10px] font-bold text-[#99958F] uppercase tracking-wider block">
                   ⏱ Urgency
                 </span>
-                <div className="text-xs font-extrabold text-pink-300 truncate" title={urgency}>
+                <div className="text-xs font-extrabold text-[#D4A373] truncate" title={urgency}>
                   {urgency || 'Normal response'}
                 </div>
               </div>
@@ -700,8 +700,8 @@ export function ComposeWorkflow({
             </div>
 
             {/* Change Situation, Tone, & Priority Overrides */}
-            <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-              <span className="text-slate-400 font-semibold text-[11px]">
+            <div className="pt-3 border-t border-[#2E2D2B] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <span className="text-[#99958F] font-semibold text-[11px]">
                 Want to adjust parameters? Change below to automatically regenerate:
               </span>
               <div className="flex items-center gap-2 flex-wrap">
@@ -709,7 +709,7 @@ export function ComposeWorkflow({
                 <select
                   value={EMAIL_CATEGORIES.find(c => c.name === emailType || c.name === detectedCategory)?.id || ''}
                   onChange={(e) => handleManualSituationChange(e.target.value)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 text-[11px] font-bold text-cyan-300 border border-slate-700 cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl bg-[#22211F] text-[11px] font-bold text-[#D4A373] border border-[#2E2D2B] cursor-pointer"
                 >
                   <option value="" disabled>Change Category (20 Types) ▼</option>
                   {EMAIL_CATEGORIES.map(c => (
@@ -723,7 +723,7 @@ export function ComposeWorkflow({
                 <select
                   value={AVAILABLE_TONES.find(t => tone.includes(t)) || ''}
                   onChange={(e) => handleManualToneChange(e.target.value)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 text-[11px] font-bold text-purple-300 border border-slate-700 cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl bg-[#22211F] text-[11px] font-bold text-[#ECE8E1] border border-[#2E2D2B] cursor-pointer"
                 >
                   <option value="" disabled>Change Tone ▼</option>
                   {AVAILABLE_TONES.map(t => (
@@ -737,7 +737,7 @@ export function ComposeWorkflow({
                 <select
                   value={priority.toUpperCase()}
                   onChange={(e) => handleManualPriorityChange(e.target.value)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 text-[11px] font-bold text-amber-300 border border-slate-700 cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl bg-[#22211F] text-[11px] font-bold text-[#D4A373] border border-[#2E2D2B] cursor-pointer"
                 >
                   <option value="LOW">🟢 Low</option>
                   <option value="MEDIUM">⚡ Medium</option>
@@ -749,19 +749,19 @@ export function ComposeWorkflow({
           </div>
 
           {/* GMAIL-STYLE EMAIL PREVIEW CARD */}
-          <div className="rounded-2xl border border-slate-800 bg-[#0E1322] overflow-hidden shadow-xl">
+          <div className="rounded-2xl border border-[#2E2D2B] bg-[#161514] overflow-hidden shadow-xl">
             {/* Header Toolbar */}
-            <div className="bg-slate-900/80 px-6 py-3 border-b border-slate-800 flex items-center justify-between">
+            <div className="bg-[#1A1918] px-6 py-3 border-b border-[#2E2D2B] flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-purple-400" />
-                <span className="text-xs font-bold text-white tracking-wider">EMAIL PREVIEW</span>
+                <Mail className="w-4 h-4 text-[#D4A373]" />
+                <span className="text-xs font-bold text-[#F5F3EF] tracking-wider">EMAIL PREVIEW</span>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsEditing(!isEditing)}
                   className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                    isEditing ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
+                    isEditing ? 'bg-[#D4A373] text-[#121211]' : 'bg-[#22211F] text-[#ECE8E1] border border-[#2E2D2B] hover:bg-[#2A2926]'
                   }`}
                 >
                   <Edit3 className="w-3.5 h-3.5" />
@@ -772,27 +772,27 @@ export function ComposeWorkflow({
 
             <div className="p-6 space-y-4 text-xs">
               {/* Recipient Rows with CC & BCC */}
-              <div className="space-y-2 pb-3 border-b border-slate-800">
+              <div className="space-y-2 pb-3 border-b border-[#2E2D2B]">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-slate-500 font-bold w-12 shrink-0">To:</span>
+                    <span className="text-[#99958F] font-bold w-12 shrink-0">To:</span>
                     {isEditing ? (
                       <input
                         type="email"
                         value={recipient}
                         onChange={(e) => updateState({ recipient: e.target.value })}
                         placeholder="recipient@example.com"
-                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-cyan-300 font-mono font-bold"
+                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-[#D4A373] font-mono font-bold"
                       />
                     ) : (
-                      <span className="text-cyan-300 font-mono font-bold truncate">{recipient}</span>
+                      <span className="text-[#D4A373] font-mono font-bold truncate">{recipient}</span>
                     )}
                   </div>
                   {!isEditing && (
                     <button
                       type="button"
                       onClick={() => setShowCcBcc(!showCcBcc)}
-                      className="text-[11px] font-bold text-purple-400 hover:text-purple-300 shrink-0 transition-colors cursor-pointer flex items-center gap-1"
+                      className="text-[11px] font-bold text-[#D4A373] hover:text-[#c59362] shrink-0 transition-colors cursor-pointer flex items-center gap-1"
                     >
                       <UserPlus className="w-3.5 h-3.5" />
                       {showCcBcc || cc || bcc ? (showCcBcc ? 'Hide CC/BCC' : 'Edit CC/BCC') : '+ Add CC/BCC'}
@@ -803,17 +803,17 @@ export function ComposeWorkflow({
                 {/* CC (Carbon Copy) */}
                 {(isEditing || showCcBcc || cc) && (
                   <div className="flex items-center gap-2 animate-fadeIn">
-                    <span className="text-slate-500 font-bold w-12 shrink-0">CC:</span>
+                    <span className="text-[#99958F] font-bold w-12 shrink-0">CC:</span>
                     {isEditing || showCcBcc ? (
                       <input
                         type="text"
                         value={cc}
                         onChange={(e) => updateState({ cc: e.target.value })}
                         placeholder="team@example.com, lead@example.com"
-                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-slate-200 font-mono"
+                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-[#ECE8E1] font-mono"
                       />
                     ) : (
-                      <span className="text-slate-300 font-mono">{cc}</span>
+                      <span className="text-[#ECE8E1] font-mono">{cc}</span>
                     )}
                   </div>
                 )}
@@ -821,17 +821,17 @@ export function ComposeWorkflow({
                 {/* BCC (Blind Carbon Copy) */}
                 {(isEditing || showCcBcc || bcc) && (
                   <div className="flex items-center gap-2 animate-fadeIn">
-                    <span className="text-slate-500 font-bold w-12 shrink-0">BCC:</span>
+                    <span className="text-[#99958F] font-bold w-12 shrink-0">BCC:</span>
                     {isEditing || showCcBcc ? (
                       <input
                         type="text"
                         value={bcc}
                         onChange={(e) => updateState({ bcc: e.target.value })}
                         placeholder="archive@example.com, records@example.com"
-                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-slate-200 font-mono"
+                        className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-[#ECE8E1] font-mono"
                       />
                     ) : (
-                      <span className="text-slate-300 font-mono">{bcc}</span>
+                      <span className="text-[#ECE8E1] font-mono">{bcc}</span>
                     )}
                   </div>
                 )}
@@ -839,7 +839,7 @@ export function ComposeWorkflow({
 
               {/* Subject Line */}
               <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                <label className="text-[10px] font-bold text-[#99958F] uppercase tracking-wider block mb-1">
                   Subject Line
                 </label>
                 {isEditing ? (
@@ -847,10 +847,10 @@ export function ComposeWorkflow({
                     type="text"
                     value={subject}
                     onChange={(e) => updateState({ subject: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg glass-input text-xs text-white font-bold"
+                    className="w-full px-3 py-2 rounded-lg glass-input text-xs text-[#F5F3EF] font-bold"
                   />
                 ) : (
-                  <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-white font-bold text-sm">
+                  <div className="p-3 rounded-xl bg-[#1A1918] border border-[#2E2D2B] text-[#F5F3EF] font-bold text-sm">
                     {subject}
                   </div>
                 )}
@@ -858,7 +858,7 @@ export function ComposeWorkflow({
 
               {/* Body Content */}
               <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                <label className="text-[10px] font-bold text-[#99958F] uppercase tracking-wider block mb-1">
                   Email Body
                 </label>
                 {isEditing ? (
@@ -866,10 +866,10 @@ export function ComposeWorkflow({
                     rows={12}
                     value={body}
                     onChange={(e) => updateState({ body: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg glass-input text-xs text-white leading-relaxed font-sans"
+                    className="w-full px-3 py-2 rounded-lg glass-input text-xs text-[#F5F3EF] leading-relaxed font-sans"
                   />
                 ) : (
-                  <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-200 whitespace-pre-wrap leading-relaxed font-sans text-xs">
+                  <div className="p-4 rounded-xl bg-[#1A1918] border border-[#2E2D2B] text-[#ECE8E1] whitespace-pre-wrap leading-relaxed font-sans text-xs">
                     {body}
                   </div>
                 )}
@@ -877,12 +877,12 @@ export function ComposeWorkflow({
 
               {/* Attached file tag */}
               {selectedFile && (
-                <div className="p-3 rounded-xl bg-purple-950/60 border border-purple-500/30 text-purple-300 flex items-center justify-between">
+                <div className="p-3 rounded-xl bg-[#22211F] border border-[#2E2D2B] text-[#ECE8E1] flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Paperclip className="w-4 h-4 text-purple-400" />
+                    <Paperclip className="w-4 h-4 text-[#D4A373]" />
                     <span>Attached: <strong>{selectedFile.name}</strong> ({(selectedFile.size / 1024).toFixed(1)} KB)</span>
                   </div>
-                  <button onClick={() => updateState({ selectedFile: null })} className="text-slate-400 hover:text-rose-400">
+                  <button onClick={() => updateState({ selectedFile: null })} className="text-[#99958F] hover:text-rose-400">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -894,7 +894,7 @@ export function ComposeWorkflow({
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
             <button
               onClick={() => updateState({ step: 1 })}
-              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#ECE8E1] border border-[#2E2D2B] text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to Instruction
@@ -904,27 +904,27 @@ export function ComposeWorkflow({
               <button
                 type="button"
                 onClick={handleSaveDraft}
-                className="px-4 py-2.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/60 text-purple-300 border border-purple-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                className="px-4 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#ECE8E1] border border-[#2E2D2B] text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
               >
-                <FileText className="w-4 h-4 text-purple-400" />
+                <FileText className="w-4 h-4 text-[#D4A373]" />
                 <span>Save Draft</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowScheduleModal(true)}
-                className="px-4 py-2.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/60 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                className="px-4 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#D4A373] border border-[#2E2D2B] text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
               >
-                <Clock className="w-4 h-4 text-amber-400" />
+                <Clock className="w-4 h-4 text-[#D4A373]" />
                 <span>Schedule Send</span>
               </button>
 
               <button
                 onClick={handleStartSending}
                 disabled={aiLoading}
-                className="px-6 py-2.5 rounded-xl gold-btn light-sweep text-stone-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer group"
+                className="px-6 py-2.5 rounded-xl gold-btn light-sweep text-[#121211] font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer group"
               >
-                <ShieldCheck className="w-4 h-4 text-stone-950 btn-icon-spin transition-transform" />
+                <ShieldCheck className="w-4 h-4 text-[#121211] btn-icon-spin transition-transform" />
                 <span>Confirm & Send Email</span>
                 <span className="btn-arrow-slide transition-transform duration-200">✈</span>
               </button>
@@ -936,42 +936,42 @@ export function ComposeWorkflow({
       {/* SCHEDULE MODAL */}
       {showScheduleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="glass-panel max-w-md w-full p-6 rounded-3xl border border-slate-700 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="glass-panel max-w-md w-full p-6 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#2E2D2B] pb-3">
               <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold text-white">Schedule Email Dispatch</h3>
+                <Clock className="w-5 h-5 text-[#D4A373]" />
+                <h3 className="text-base font-bold text-[#F5F3EF]">Schedule Email Dispatch</h3>
               </div>
-              <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-white p-1 cursor-pointer">
+              <button onClick={() => setShowScheduleModal(false)} className="text-[#99958F] hover:text-[#F5F3EF] p-1 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="space-y-3">
-              <label className="block text-xs font-semibold text-slate-300">
+              <label className="block text-xs font-semibold text-[#ECE8E1]">
                 Choose Scheduled Date & Time:
               </label>
               <input
                 type="datetime-local"
                 value={scheduleTime}
                 onChange={(e) => setScheduleTime(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-800 text-white text-xs border border-slate-700 focus:outline-none focus:border-amber-500"
+                className="w-full px-4 py-2.5 rounded-xl bg-[#121211] text-[#F5F3EF] text-xs border border-[#2E2D2B] focus:outline-none focus:border-[#D4A373]"
               />
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-[#99958F]">
                 Your email will be queued in Supabase as "Scheduled" and will appear on the dashboard queue.
               </p>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#2E2D2B]">
               <button
                 onClick={() => setShowScheduleModal(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#99958F] text-xs font-bold border border-[#2E2D2B] cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmSchedule}
-                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold cursor-pointer shadow-lg shadow-amber-500/20"
+                className="px-5 py-2 rounded-xl gold-btn text-[#121211] text-xs font-bold cursor-pointer shadow-lg shadow-[#D4A373]/20"
               >
                 Save Schedule
               </button>
@@ -983,63 +983,63 @@ export function ComposeWorkflow({
       {/* STEP 4: CONFIRMATION SECURITY MODAL */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="glass-panel max-w-lg w-full p-6 sm:p-8 rounded-3xl border border-slate-700 space-y-6 shadow-2xl">
-            <div className="flex items-center gap-3 text-white border-b border-slate-800 pb-4">
-              <div className="w-10 h-10 rounded-xl bg-purple-950/60 border border-purple-500/30 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-6 h-6 text-purple-400" />
+          <div className="glass-panel max-w-lg w-full p-6 sm:p-8 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] space-y-6 shadow-2xl">
+            <div className="flex items-center gap-3 text-[#F5F3EF] border-b border-[#2E2D2B] pb-4">
+              <div className="w-10 h-10 rounded-xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-6 h-6 text-[#D4A373]" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">Final Security Confirmation</h3>
-                <p className="text-xs text-slate-400">Please review before sending via Gmail API</p>
+                <h3 className="text-lg font-bold text-[#F5F3EF]">Final Security Confirmation</h3>
+                <p className="text-xs text-[#99958F]">Please review before sending via Gmail API</p>
               </div>
             </div>
 
-            <div className="space-y-3 text-xs bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+            <div className="space-y-3 text-xs bg-[#161514] p-4 rounded-2xl border border-[#2E2D2B]">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Email Type:</span>
-                <span className="font-bold text-white">{emailType}</span>
+                <span className="text-[#99958F]">Email Type:</span>
+                <span className="font-bold text-[#F5F3EF]">{emailType}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Priority:</span>
-                <span className="font-bold text-white">{priority}</span>
+                <span className="text-[#99958F]">Priority:</span>
+                <span className="font-bold text-[#F5F3EF]">{priority}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Recipient (To):</span>
-                <span className="font-mono font-bold text-cyan-300">{recipient}</span>
+                <span className="text-[#99958F]">Recipient (To):</span>
+                <span className="font-mono font-bold text-[#D4A373]">{recipient}</span>
               </div>
               {cc && (
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">CC:</span>
-                  <span className="font-mono text-slate-300">{cc}</span>
+                  <span className="text-[#99958F]">CC:</span>
+                  <span className="font-mono text-[#ECE8E1]">{cc}</span>
                 </div>
               )}
               {bcc && (
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">BCC:</span>
-                  <span className="font-mono text-slate-300">{bcc}</span>
+                  <span className="text-[#99958F]">BCC:</span>
+                  <span className="font-mono text-[#ECE8E1]">{bcc}</span>
                 </div>
               )}
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Subject:</span>
-                <span className="font-bold text-white truncate max-w-[200px]">{subject}</span>
+                <span className="text-[#99958F]">Subject:</span>
+                <span className="font-bold text-[#F5F3EF] truncate max-w-[200px]">{subject}</span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-amber-950/60 border border-amber-500/30 text-amber-300 text-[11px] flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="p-3 rounded-xl bg-[#22211F] border border-[#D4A373]/30 text-[#D4A373] text-[11px] flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-[#D4A373] shrink-0" />
               <span>Clicking "Authorize & Send Now" will transmit this message directly to the recipient via your Gmail API credentials.</span>
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 onClick={() => setShowConfirmModal(false)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#99958F] text-xs font-bold border border-[#2E2D2B] cursor-pointer"
               >
                 Cancel / Edit
               </button>
               <button
                 onClick={handleFinalConfirmedSend}
-                className="px-6 py-2.5 rounded-xl gradient-btn text-white font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] transition-transform cursor-pointer"
+                className="px-6 py-2.5 rounded-xl gold-btn text-[#121211] font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] transition-transform cursor-pointer"
               >
                 <Send className="w-4 h-4" />
                 Authorize & Send Now
@@ -1051,14 +1051,14 @@ export function ComposeWorkflow({
 
       {/* STEP 5: SENDING PROGRESS ANIMATION */}
       {step === 5 && (
-        <div className="glass-panel p-12 rounded-3xl border border-slate-800 text-center space-y-4 animate-pulse shadow-2xl">
-          <div className="w-16 h-16 mx-auto rounded-2xl gradient-btn flex items-center justify-center shadow-lg shadow-purple-600/40">
-            <Send className="w-8 h-8 text-white animate-bounce" />
+        <div className="glass-panel p-12 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] text-center space-y-4 animate-pulse shadow-2xl">
+          <div className="w-16 h-16 mx-auto rounded-2xl gold-btn flex items-center justify-center shadow-lg shadow-[#D4A373]/20">
+            <Send className="w-8 h-8 text-[#121211] animate-bounce" />
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-xl font-bold text-white">Transmitting Email via Gmail API...</h3>
-            <p className="text-slate-400 text-xs max-w-md mx-auto">
+            <h3 className="text-xl font-bold text-[#F5F3EF]">Transmitting Email via Gmail API...</h3>
+            <p className="text-[#99958F] text-xs max-w-md mx-auto">
               Authenticating Google OAuth credentials, encoding MIME headers, and completing email delivery.
             </p>
           </div>
@@ -1067,31 +1067,31 @@ export function ComposeWorkflow({
 
       {/* STEP 6: SENT SUCCESS SCREEN */}
       {step === 6 && (
-        <div className="glass-panel p-8 sm:p-12 rounded-3xl border border-emerald-500/30 text-center space-y-6 animate-fadeIn shadow-2xl">
+        <div className="glass-panel p-8 sm:p-12 rounded-3xl border border-emerald-500/30 bg-[#1A1918] text-center space-y-6 animate-fadeIn shadow-2xl">
           <div className="w-20 h-20 mx-auto rounded-2xl bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-center shadow-lg shadow-emerald-900/30">
             <Check className="w-10 h-10 text-emerald-400" />
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-2xl font-extrabold text-white">Email Sent Successfully!</h3>
-            <p className="text-slate-400 text-xs max-w-md mx-auto">
-              Your email was successfully delivered to <strong className="text-cyan-300 font-mono">{recipient}</strong> and recorded in your account email history.
+            <h3 className="text-2xl font-extrabold text-[#F5F3EF]">Email Sent Successfully!</h3>
+            <p className="text-[#99958F] text-xs max-w-md mx-auto">
+              Your email was successfully delivered to <strong className="text-[#D4A373] font-mono">{recipient}</strong> and recorded in your account email history.
             </p>
           </div>
 
           {sentResult && (
-            <div className="max-w-md mx-auto p-4 rounded-2xl bg-slate-900/60 border border-slate-800 text-xs text-left space-y-2 font-mono">
+            <div className="max-w-md mx-auto p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] text-xs text-left space-y-2 font-mono">
               <div className="flex justify-between">
-                <span className="text-slate-500">Status:</span>
+                <span className="text-[#99958F]">Status:</span>
                 <span className="text-emerald-400 font-bold">✓ Sent</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Email Type:</span>
-                <span className="text-purple-300 font-bold">{emailType}</span>
+                <span className="text-[#99958F]">Email Type:</span>
+                <span className="text-[#ECE8E1] font-bold">{emailType}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Gmail Message ID:</span>
-                <span className="text-slate-300 truncate max-w-[200px]">{sentResult.gmailMessageId || 'N/A'}</span>
+                <span className="text-[#99958F]">Gmail Message ID:</span>
+                <span className="text-[#ECE8E1] truncate max-w-[200px]">{sentResult.gmailMessageId || 'N/A'}</span>
               </div>
             </div>
           )}
@@ -1115,7 +1115,7 @@ export function ComposeWorkflow({
                   });
                 }
               }}
-              className="px-6 py-3 rounded-xl gradient-btn text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-[1.02] cursor-pointer"
+              className="px-6 py-3 rounded-xl gold-btn text-[#121211] font-bold text-xs flex items-center gap-2 shadow-lg shadow-[#D4A373]/20 hover:scale-[1.02] cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
               Compose Another Email
@@ -1127,7 +1127,7 @@ export function ComposeWorkflow({
                   if (onResetCompose) onResetCompose();
                   onComplete();
                 }}
-                className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-bold text-xs cursor-pointer"
+                className="px-6 py-3 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#F5F3EF] border border-[#2E2D2B] font-bold text-xs cursor-pointer"
               >
                 Go to Dashboard
               </button>

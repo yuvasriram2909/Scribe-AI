@@ -253,54 +253,54 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#080C14] text-slate-100 font-sans selection:bg-purple-600 selection:text-white flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#121211] text-[#F5F3EF] font-sans selection:bg-[#D4A373] selection:text-[#121211] flex flex-col relative overflow-hidden">
       
       {/* Dynamic Cosmic Gradient Mesh & Background Lights */}
       <div 
         className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-1000 opacity-70"
         style={{
-          background: `radial-gradient(700px circle at ${ambientPos.x}% ${ambientPos.y}%, rgba(139, 92, 246, 0.12), transparent 80%)`
+          background: `radial-gradient(700px circle at ${ambientPos.x}% ${ambientPos.y}%, rgba(212, 163, 115, 0.12), transparent 80%)`
         }}
       />
-      <div className="fixed -top-40 -right-40 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl pointer-events-none -z-10 animate-pulseGlow" />
-      <div className="fixed -bottom-40 -left-40 w-96 h-96 bg-cyan-600/15 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="fixed -top-40 -right-40 w-96 h-96 bg-[#D4A373]/10 rounded-full blur-3xl pointer-events-none -z-10 animate-pulseGlow" />
+      <div className="fixed -bottom-40 -left-40 w-96 h-96 bg-[#D4A373]/5 rounded-full blur-3xl pointer-events-none -z-10" />
 
       {/* Public Header Navigation Bar */}
-      <header className="border-b border-slate-800/80 bg-[#0B0F19]/80 backdrop-blur-xl sticky top-0 z-50 shadow-xl transition-all duration-300">
+      <header className="border-b border-[#2E2D2B] bg-[#121211]/80 backdrop-blur-xl sticky top-0 z-50 shadow-xl transition-all duration-300">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div 
             className="flex items-center gap-3 cursor-pointer group" 
             onClick={() => window.location.pathname = '/'}
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-cyan-400 p-[1px] shadow-lg shadow-purple-500/20 group-hover:scale-105 group-hover:rotate-3 transition-transform duration-300">
-              <div className="w-full h-full bg-[#0D121F] rounded-[11px] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-cyan-300 animate-pulse" />
+            <div className="w-10 h-10 rounded-xl bg-[#2E2D2B] p-[1px] shadow-lg shadow-black/30 group-hover:scale-105 transition-transform duration-300">
+              <div className="w-full h-full bg-[#1A1918] rounded-[11px] flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-[#D4A373] animate-pulse" />
               </div>
             </div>
-            <span className="text-xl font-extrabold text-white tracking-tight">
-              Scribe <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">AI</span>
+            <span className="text-xl font-extrabold text-[#F5F3EF] tracking-tight">
+              Scribe <span className="text-[#D4A373]">AI</span>
             </span>
           </div>
 
           <nav className="flex items-center gap-4 sm:gap-6">
             <button
               onClick={onNavigateToPrivacy}
-              className="text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer py-1 relative group"
+              className="text-xs font-bold text-[#99958F] hover:text-[#F5F3EF] transition-colors cursor-pointer py-1 relative group"
             >
               <span>Privacy Policy</span>
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-400 to-cyan-400 transition-all duration-200 group-hover:w-full" />
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#D4A373] transition-all duration-200 group-hover:w-full" />
             </button>
             <button
               onClick={onNavigateToTerms}
-              className="text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer py-1 relative group"
+              className="text-xs font-bold text-[#99958F] hover:text-[#F5F3EF] transition-colors cursor-pointer py-1 relative group"
             >
               <span>Terms of Service</span>
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-400 to-cyan-400 transition-all duration-200 group-hover:w-full" />
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#D4A373] transition-all duration-200 group-hover:w-full" />
             </button>
             
             <InteractiveButton
               onClick={onNavigateToLogin}
-              className="px-5 py-2.5 rounded-xl gradient-btn text-white font-bold text-xs inline-flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:shadow-purple-600/50"
+              className="px-5 py-2.5 rounded-xl gold-btn text-[#121211] font-bold text-xs inline-flex items-center gap-2 shadow-lg shadow-[#D4A373]/20"
             >
               <span>Sign In / Launch App</span>
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
@@ -322,10 +322,10 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
 
           {/* Heading with Entrance Motion */}
           <div className="animate-hero-title space-y-2">
-            <h1 className="text-4xl sm:text-6xl font-extrabold text-white tracking-tight leading-tight">
-              Scribe <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">AI</span>
+            <h1 className="text-4xl sm:text-6xl font-extrabold text-[#F5F3EF] tracking-tight leading-tight">
+              Scribe <span className="text-[#D4A373]">AI</span>
             </h1>
-            <p className="text-xs sm:text-sm font-semibold tracking-wider text-purple-300 uppercase">
+            <p className="text-xs sm:text-sm font-semibold tracking-wider text-[#D4A373] uppercase">
               AI-Powered Gmail Automation Platform
             </p>
           </div>
@@ -336,12 +336,12 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               lift={true}
               tilt={true}
               glow={true}
-              className="p-6 sm:p-8 rounded-3xl bg-[#0E1424]/90 border border-purple-500/20 text-slate-200 space-y-3 text-center backdrop-blur-xl"
+              className="p-6 sm:p-8 rounded-3xl bg-[#1A1918] border border-[#2E2D2B] text-[#ECE8E1] space-y-3 text-center backdrop-blur-xl"
             >
-              <p className="text-lg sm:text-xl font-extrabold text-white leading-relaxed">
+              <p className="text-lg sm:text-xl font-extrabold text-[#F5F3EF] leading-relaxed">
                 Scribe AI helps users compose and send emails through their own Gmail account using Google OAuth.
               </p>
-              <p className="text-sm sm:text-base text-cyan-300 font-semibold leading-relaxed">
+              <p className="text-sm sm:text-base text-[#D4A373] font-semibold leading-relaxed">
                 Users connect their Gmail account securely with Google OAuth and approve emails before sending.
               </p>
             </InteractiveCard>
@@ -351,7 +351,7 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
           <div className="animate-hero-cta flex items-center justify-center gap-4 pt-2">
             <InteractiveButton
               onClick={onNavigateToLogin}
-              className="px-8 py-4 rounded-2xl gradient-btn text-white font-extrabold text-sm inline-flex items-center gap-2.5 shadow-xl shadow-purple-600/40 hover:shadow-purple-600/60 group"
+              className="px-8 py-4 rounded-2xl gold-btn text-[#121211] font-extrabold text-sm inline-flex items-center gap-2.5 shadow-xl shadow-[#D4A373]/20 group"
             >
               <span>Get Started with Scribe AI</span>
               <ArrowRight className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
@@ -367,15 +367,15 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               lift={true} 
               tilt={true} 
               glow={true}
-              className="p-6 rounded-3xl bg-[#0E1424]/80 backdrop-blur-xl border border-slate-800 space-y-4 h-full group"
+              className="p-6 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-4 h-full group"
             >
-              <div className="w-11 h-11 rounded-2xl bg-purple-950/70 border border-purple-500/30 flex items-center justify-center text-purple-300 group-hover:scale-110 group-hover:bg-purple-900/80 transition-all duration-300 shadow-md shadow-purple-950/40">
+              <div className="w-11 h-11 rounded-2xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center text-[#D4A373] group-hover:scale-110 transition-all duration-300 shadow-md">
                 <Mail className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-white group-hover:text-purple-300 transition-colors duration-200">
+              <h3 className="text-lg font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors duration-200">
                 Smart Intent Detection
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-[#99958F] leading-relaxed">
                 Convert short natural prompts into structured, professional emails tailored for leave requests, official follow-ups, emergencies, and formal business communication.
               </p>
             </InteractiveCard>
@@ -386,15 +386,15 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               lift={true} 
               tilt={true} 
               glow={true}
-              className="p-6 rounded-3xl bg-[#0E1424]/80 backdrop-blur-xl border border-slate-800 space-y-4 h-full group"
+              className="p-6 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-4 h-full group"
             >
-              <div className="w-11 h-11 rounded-2xl bg-emerald-950/70 border border-emerald-500/30 flex items-center justify-center text-emerald-300 group-hover:scale-110 group-hover:bg-emerald-900/80 transition-all duration-300 shadow-md shadow-emerald-950/40">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-950/70 border border-emerald-500/30 flex items-center justify-center text-emerald-300 group-hover:scale-110 transition-all duration-300 shadow-md shadow-emerald-950/40">
                 <Shield className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-white group-hover:text-emerald-300 transition-colors duration-200">
+              <h3 className="text-lg font-bold text-[#F5F3EF] group-hover:text-emerald-300 transition-colors duration-200">
                 100% Authentic Gmail API
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-[#99958F] leading-relaxed">
                 Emails are sent directly from your authentic Gmail account using official Google OAuth 2.0 API scope permissions.
               </p>
             </InteractiveCard>
@@ -405,15 +405,15 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               lift={true} 
               tilt={true} 
               glow={true}
-              className="p-6 rounded-3xl bg-[#0E1424]/80 backdrop-blur-xl border border-slate-800 space-y-4 h-full group"
+              className="p-6 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-4 h-full group"
             >
-              <div className="w-11 h-11 rounded-2xl bg-cyan-950/70 border border-cyan-500/30 flex items-center justify-center text-cyan-300 group-hover:scale-110 group-hover:bg-cyan-900/80 transition-all duration-300 shadow-md shadow-cyan-950/40">
+              <div className="w-11 h-11 rounded-2xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center text-[#D4A373] group-hover:scale-110 transition-all duration-300 shadow-md">
                 <Lock className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-white group-hover:text-cyan-300 transition-colors duration-200">
+              <h3 className="text-lg font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors duration-200">
                 Explicit User Approval
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-[#99958F] leading-relaxed">
                 No email is ever sent automatically without your explicit review and confirmation click. Complete control over recipients, subject, and content.
               </p>
             </InteractiveCard>
@@ -423,9 +423,9 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
 
         {/* How It Works Flow with Staggered Scroll Reveal */}
         <ScrollReveal delay={100}>
-          <div className="p-8 rounded-3xl bg-[#0E1424]/90 backdrop-blur-xl border border-purple-500/20 space-y-6 shadow-2xl">
-            <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-purple-400" />
+          <div className="p-8 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-6 shadow-2xl">
+            <h2 className="text-xl font-extrabold text-[#F5F3EF] flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-[#D4A373]" />
               <span>How Scribe AI Works with Google OAuth</span>
             </h2>
 
@@ -436,13 +436,13 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
                   lift={true}
                   tilt={true}
                   glow={true}
-                  className="p-4 rounded-2xl bg-[#131B30]/90 border border-slate-800 space-y-2 h-full group"
+                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group"
                 >
-                  <span className="font-extrabold text-purple-400 text-sm group-hover:translate-x-1 inline-block transition-transform duration-200">
+                  <span className="font-extrabold text-[#D4A373] text-sm group-hover:translate-x-1 inline-block transition-transform duration-200">
                     Step 1
                   </span>
-                  <p className="font-bold text-white group-hover:text-purple-300 transition-colors">Connect Gmail</p>
-                  <p className="text-slate-400">Authenticate securely via official Google OAuth 2.0 consent screen.</p>
+                  <p className="font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors">Connect Gmail</p>
+                  <p className="text-[#99958F]">Authenticate securely via official Google OAuth 2.0 consent screen.</p>
                 </InteractiveCard>
               </ScrollReveal>
 
@@ -451,13 +451,13 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
                   lift={true}
                   tilt={true}
                   glow={true}
-                  className="p-4 rounded-2xl bg-[#131B30]/90 border border-slate-800 space-y-2 h-full group"
+                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group"
                 >
-                  <span className="font-extrabold text-cyan-400 text-sm group-hover:translate-x-1 inline-block transition-transform duration-200">
+                  <span className="font-extrabold text-[#D4A373] text-sm group-hover:translate-x-1 inline-block transition-transform duration-200">
                     Step 2
                   </span>
-                  <p className="font-bold text-white group-hover:text-cyan-300 transition-colors">Describe Instruction</p>
-                  <p className="text-slate-400">Enter a short sentence describing what email you want to write.</p>
+                  <p className="font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors">Describe Instruction</p>
+                  <p className="text-[#99958F]">Enter a short sentence describing what email you want to write.</p>
                 </InteractiveCard>
               </ScrollReveal>
 
@@ -466,13 +466,13 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
                   lift={true}
                   tilt={true}
                   glow={true}
-                  className="p-4 rounded-2xl bg-[#131B30]/90 border border-slate-800 space-y-2 h-full group"
+                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group"
                 >
-                  <span className="font-extrabold text-pink-400 text-sm group-hover:translate-x-1 inline-block transition-transform duration-200">
+                  <span className="font-extrabold text-[#D4A373] text-sm group-hover:translate-x-1 inline-block transition-transform duration-200">
                     Step 3
                   </span>
-                  <p className="font-bold text-white group-hover:text-pink-300 transition-colors">AI Analysis & Review</p>
-                  <p className="text-slate-400">Scribe AI detects intent, formats email, and presents instant preview.</p>
+                  <p className="font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors">AI Analysis & Review</p>
+                  <p className="text-[#99958F]">Scribe AI detects intent, formats email, and presents instant preview.</p>
                 </InteractiveCard>
               </ScrollReveal>
 
@@ -481,13 +481,13 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
                   lift={true}
                   tilt={true}
                   glow={true}
-                  className="p-4 rounded-2xl bg-[#131B30]/90 border border-slate-800 space-y-2 h-full group"
+                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group"
                 >
                   <span className="font-extrabold text-emerald-400 text-sm group-hover:translate-x-1 inline-block transition-transform duration-200">
                     Step 4
                   </span>
-                  <p className="font-bold text-white group-hover:text-emerald-300 transition-colors">Confirm & Dispatch</p>
-                  <p className="text-slate-400">Click Authorize & Send to dispatch directly from your Gmail account.</p>
+                  <p className="font-bold text-[#F5F3EF] group-hover:text-emerald-300 transition-colors">Confirm & Dispatch</p>
+                  <p className="text-[#99958F]">Click Authorize & Send to dispatch directly from your Gmail account.</p>
                 </InteractiveCard>
               </ScrollReveal>
 
@@ -498,27 +498,27 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
       </main>
 
       {/* Public Footer */}
-      <footer className="border-t border-slate-800/80 bg-[#0B0F19]/80 py-8 relative z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+      <footer className="border-t border-[#2E2D2B] bg-[#121211]/80 py-8 relative z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#99958F]">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-white">Scribe AI</span>
+            <span className="font-bold text-[#F5F3EF]">Scribe AI</span>
             <span>© {new Date().getFullYear()} Scribe AI. All rights reserved.</span>
           </div>
 
           <div className="flex items-center gap-6">
             <button 
               onClick={onNavigateToPrivacy} 
-              className="hover:text-white transition-colors cursor-pointer font-semibold relative group py-1"
+              className="hover:text-[#F5F3EF] transition-colors cursor-pointer font-semibold relative group py-1"
             >
               <span>Privacy Policy</span>
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-400 to-cyan-400 transition-all duration-200 group-hover:w-full" />
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#D4A373] transition-all duration-200 group-hover:w-full" />
             </button>
             <button 
               onClick={onNavigateToTerms} 
-              className="hover:text-white transition-colors cursor-pointer font-semibold relative group py-1"
+              className="hover:text-[#F5F3EF] transition-colors cursor-pointer font-semibold relative group py-1"
             >
               <span>Terms of Service</span>
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-400 to-cyan-400 transition-all duration-200 group-hover:w-full" />
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#D4A373] transition-all duration-200 group-hover:w-full" />
             </button>
           </div>
         </div>

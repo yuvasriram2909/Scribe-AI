@@ -44,13 +44,13 @@ export function TemplatesLibrary({ onSelectTemplate }) {
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Top Header */}
-      <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl">
+      <div className="glass-panel p-6 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] space-y-4 shadow-xl">
         <div>
-          <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-            <Layout className="w-5 h-5 text-purple-400" />
+          <h2 className="text-xl font-extrabold text-[#F5F3EF] flex items-center gap-2">
+            <Layout className="w-5 h-5 text-[#D4A373]" />
             Canned Email Templates Library
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-[#99958F] mt-1">
             19 predefined professional scenarios. Select any template to auto-populate email instructions.
           </p>
         </div>
@@ -63,8 +63,8 @@ export function TemplatesLibrary({ onSelectTemplate }) {
               onClick={() => setSelectedCategory(cat)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat
-                  ? 'gradient-btn text-white shadow-md'
-                  : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
+                  ? 'gold-btn text-[#121211] shadow-md'
+                  : 'bg-[#22211F] text-[#99958F] border border-[#2E2D2B] hover:bg-[#2A2926]'
               }`}
             >
               {cat}
@@ -76,28 +76,28 @@ export function TemplatesLibrary({ onSelectTemplate }) {
       {/* Templates Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map(t => (
-          <div key={t.id} className="glass-card p-5 rounded-2xl border border-slate-800 space-y-3 flex flex-col justify-between hover:scale-[1.01] transition-all shadow-lg">
+          <div key={t.id} className="glass-card p-5 rounded-2xl border border-[#2E2D2B] bg-[#161514] space-y-3 flex flex-col justify-between hover:scale-[1.01] transition-all shadow-lg">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-950/60 text-purple-300 border border-purple-500/30">
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#22211F] text-[#D4A373] border border-[#2E2D2B]">
                   {t.situation}
                 </span>
-                <span className="text-[10px] font-semibold text-slate-500">Tone: {t.tone}</span>
+                <span className="text-[10px] font-semibold text-[#99958F]">Tone: {t.tone}</span>
               </div>
 
-              <h3 className="text-sm font-extrabold text-white">
+              <h3 className="text-sm font-extrabold text-[#F5F3EF]">
                 {t.title}
               </h3>
 
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 font-mono leading-relaxed line-clamp-3">
+              <div className="p-3 rounded-xl bg-[#121211] border border-[#2E2D2B] text-xs text-[#ECE8E1] font-mono leading-relaxed line-clamp-3">
                 "{t.defaultInstruction}"
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-800 flex items-center justify-end">
+            <div className="pt-3 border-t border-[#2E2D2B] flex items-center justify-end">
               <button
                 onClick={() => onSelectTemplate && onSelectTemplate(t.defaultInstruction)}
-                className="px-4 py-2 rounded-xl gradient-btn text-white text-xs font-bold flex items-center gap-1.5 shadow-md hover:scale-105 transition-transform cursor-pointer"
+                className="px-4 py-2 rounded-xl gold-btn text-[#121211] text-xs font-bold flex items-center gap-1.5 shadow-md hover:scale-105 transition-transform cursor-pointer"
               >
                 <span>Use Template</span>
                 <ArrowRight className="w-3.5 h-3.5" />

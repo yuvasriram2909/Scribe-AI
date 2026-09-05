@@ -582,11 +582,11 @@ export function Dashboard({
       )}
 
       {/* ============================================================
-          1. GMAIL CONNECTED STATUS BAR (Matching Reference Screenshot Top Card)
+          1. GMAIL CONNECTED STATUS BAR (Warm Cashmere Minimalist)
       ============================================================ */}
       <div className={`p-4 sm:p-5 rounded-2xl border gmail-card-interactive group transition-all ${
         theme === 'dark' 
-          ? 'bg-[#12141A] border-amber-500/15 shadow-md' 
+          ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md' 
           : 'bg-white border-amber-900/10 shadow-xs'
       }`}>
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -602,7 +602,7 @@ export function Dashboard({
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
                   Gmail Connected
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 inline-flex items-center gap-1">
@@ -610,24 +610,24 @@ export function Dashboard({
                   OAuth Active
                 </span>
               </div>
-              <p className={`text-xs mt-0.5 font-mono ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+              <p className={`text-xs mt-0.5 font-mono ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
                 Connected account: {connectionStatus.connectedEmail || localStorage.getItem('userEmail') || 'Not Connected'}
               </p>
             </div>
           </div>
 
-          {/* 3 Action Buttons Side-by-Side (Matching Reference Screenshot) */}
+          {/* 3 Action Buttons Side-by-Side */}
           <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
             <button
               onClick={handleManualSync}
               disabled={isSyncing}
-              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 hover:border-amber-500/40 hover:shadow-md cursor-pointer shadow-xs disabled:opacity-50 group ${
+              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 hover:border-[#D4A373]/40 hover:shadow-md cursor-pointer shadow-xs disabled:opacity-50 group ${
                 theme === 'dark'
-                  ? 'bg-stone-800/80 hover:bg-stone-700 border-stone-700 text-stone-200'
+                  ? 'bg-[#22211F] hover:bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]'
                   : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
               }`}
             >
-              <RefreshCw className={`w-3.5 h-3.5 transition-transform duration-500 ${isSyncing ? 'animate-spin text-amber-500' : 'text-stone-400 group-hover:text-amber-500 group-hover:rotate-180'}`} />
+              <RefreshCw className={`w-3.5 h-3.5 transition-transform duration-500 ${isSyncing ? 'animate-spin text-[#D4A373]' : 'text-[#99958F] group-hover:text-[#D4A373] group-hover:rotate-180'}`} />
               <span>{isSyncing ? 'Syncing...' : 'Sync Gmail'}</span>
             </button>
 
@@ -641,13 +641,13 @@ export function Dashboard({
 
             <button
               onClick={onNavigateToSettings}
-              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 hover:border-amber-500/40 hover:shadow-md cursor-pointer shadow-xs ${
+              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 hover:border-[#D4A373]/40 hover:shadow-md cursor-pointer shadow-xs ${
                 theme === 'dark'
-                  ? 'bg-stone-800/80 hover:bg-stone-700 border-stone-700 text-stone-200'
+                  ? 'bg-[#22211F] hover:bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]'
                   : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
               }`}
             >
-              <Settings className="w-3.5 h-3.5 text-stone-400 group-hover:text-amber-500 transition-colors" />
+              <Settings className="w-3.5 h-3.5 text-[#99958F] group-hover:text-[#D4A373] transition-colors" />
               <span>Settings</span>
             </button>
           </div>
@@ -658,53 +658,53 @@ export function Dashboard({
       {syncToast && (
         <div className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-md animate-fadeIn ${
           theme === 'dark'
-            ? 'bg-amber-950/70 border-amber-500/30 text-amber-200'
+            ? 'bg-[#22211F] border-[#D4A373]/30 text-[#ECE8E1]'
             : 'bg-amber-50 border-amber-200 text-amber-900'
         }`}>
           <div className="flex items-center gap-2">
-            <RefreshCw className="w-4 h-4 text-amber-500 shrink-0" />
+            <RefreshCw className="w-4 h-4 text-[#D4A373] shrink-0" />
             <span>{syncToast}</span>
           </div>
-          <button onClick={() => setSyncToast('')} className="text-stone-400 hover:text-white p-1 cursor-pointer">
+          <button onClick={() => setSyncToast('')} className="text-[#99958F] hover:text-[#F5F3EF] p-1 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {/* ============================================================
-          2. UNIFIED HERO CARD: AI SMART SENDER & QUICK COMPOSE (Matching Reference Screenshot Row 2)
+          2. UNIFIED HERO CARD: AI SMART SENDER & QUICK COMPOSE
       ============================================================ */}
       <div className={`relative overflow-hidden rounded-3xl p-6 sm:p-8 border hero-card-interactive transition-all ${
         theme === 'dark'
-          ? 'bg-gradient-to-br from-[#16140E] via-[#12141A] to-[#0D0E12] border-amber-500/25 shadow-2xl'
+          ? 'bg-gradient-to-br from-[#1A1918] via-[#161514] to-[#121211] border-[#2E2D2B] shadow-2xl'
           : 'bg-gradient-to-br from-[#FFFDF8] via-[#FAF3E3] to-[#F5E9CC] border-amber-300/80 shadow-sm'
       }`}>
-        {/* Subtle Ambient Cosmic Gold Glows */}
-        <div className="absolute top-0 right-1/4 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -z-0"></div>
+        {/* Subtle Ambient Warm Cashmere Glows */}
+        <div className="absolute top-0 right-1/4 w-80 h-80 bg-[#D4A373]/10 rounded-full blur-3xl pointer-events-none -z-0"></div>
 
         <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           {/* Left Column: Heading, Subtitle & Fast Compose Form */}
           <div className="flex-1 max-w-3xl space-y-4">
             {/* Pill Tag */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400 text-[11px] font-extrabold tracking-wider uppercase">
-              <Sparkles className="w-3 h-3 text-amber-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#D4A373]/30 bg-[#D4A373]/10 text-[#D4A373] text-[11px] font-extrabold tracking-wider uppercase">
+              <Sparkles className="w-3 h-3 text-[#D4A373] animate-pulse" />
               <span>AI SMART SENDER | REAL-TIME ENGINE</span>
             </div>
 
             {/* Headline & Description */}
             <div>
               <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight ${
-                theme === 'dark' ? 'text-white' : 'text-stone-900'
+                theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'
               }`}>
                 {greetingObj.title} <span className="inline-block">{greetingObj.icon}</span>
               </h1>
               <h2 className={`text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight mt-1 ${
-                theme === 'dark' ? 'text-amber-300' : 'text-amber-800'
+                theme === 'dark' ? 'text-[#ECE8E1]' : 'text-amber-800'
               }`}>
                 What do you want to send today?
               </h2>
               <p className={`text-xs sm:text-sm mt-2 leading-relaxed max-w-2xl ${
-                theme === 'dark' ? 'text-stone-400' : 'text-stone-600'
+                theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'
               }`}>
                 Manage your emails intelligently. Enter a short instruction — AI classifies, generates, previews, and dispatches via Gmail.
               </p>
@@ -716,14 +716,14 @@ export function Dashboard({
                 {/* Instruction Input */}
                 <div className="flex-1">
                   <label className={`text-[11px] font-bold block mb-1.5 flex items-center gap-1 ${
-                    theme === 'dark' ? 'text-amber-400' : 'text-amber-800'
+                    theme === 'dark' ? 'text-[#D4A373]' : 'text-amber-800'
                   }`}>
-                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <Sparkles className="w-3 h-3 text-[#D4A373]" />
                     <span>What do you want to send?</span>
                   </label>
                   <div className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl border input-interactive group ${
                     theme === 'dark'
-                      ? 'bg-[#141620] border-stone-700/80'
+                      ? 'bg-[#121211] border-[#2E2D2B]'
                       : 'bg-[#FAF8F5] border-amber-900/15'
                   }`}>
                     <input
@@ -735,8 +735,8 @@ export function Dashboard({
                         setQuickError('');
                         if (onUpdateComposeState) onUpdateComposeState({ instruction: e.target.value });
                       }}
-                      className={`w-full text-xs bg-transparent outline-none placeholder:text-stone-400 ${
-                        theme === 'dark' ? 'text-white' : 'text-stone-900'
+                      className={`w-full text-xs bg-transparent outline-none placeholder:text-[#99958F] ${
+                        theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'
                       }`}
                     />
                   </div>
@@ -746,15 +746,15 @@ export function Dashboard({
                 <div className="w-full sm:w-80">
                   <div className="flex items-center justify-between mb-1.5">
                     <label className={`text-[11px] font-bold flex items-center gap-1 ${
-                      theme === 'dark' ? 'text-amber-400' : 'text-amber-800'
+                      theme === 'dark' ? 'text-[#D4A373]' : 'text-amber-800'
                     }`}>
-                      <Users className="w-3 h-3 text-amber-500" />
+                      <Users className="w-3 h-3 text-[#D4A373]" />
                       <span>Recipient Email</span>
                     </label>
                     <button
                       type="button"
                       onClick={() => setShowQuickCcBcc(!showQuickCcBcc)}
-                      className="text-[11px] font-bold text-amber-500 hover:text-amber-400 transition-colors cursor-pointer hover:underline"
+                      className="text-[11px] font-bold text-[#D4A373] hover:text-[#ECE8E1] transition-colors cursor-pointer hover:underline"
                     >
                       {showQuickCcBcc ? 'Hide CC/BCC' : '+ Add CC/BCC'}
                     </button>
@@ -762,7 +762,7 @@ export function Dashboard({
                   <div className="flex items-center gap-2">
                     <div className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-2xl border input-interactive group ${
                       theme === 'dark'
-                        ? 'bg-[#141620] border-stone-700/80'
+                        ? 'bg-[#121211] border-[#2E2D2B]'
                         : 'bg-[#FAF8F5] border-amber-900/15'
                     }`}>
                       <input
@@ -774,8 +774,8 @@ export function Dashboard({
                           setQuickError('');
                           if (onUpdateComposeState) onUpdateComposeState({ recipient: e.target.value });
                         }}
-                        className={`w-full text-xs bg-transparent outline-none placeholder:text-stone-400 ${
-                          theme === 'dark' ? 'text-white' : 'text-stone-900'
+                        className={`w-full text-xs bg-transparent outline-none placeholder:text-[#99958F] ${
+                          theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'
                         }`}
                       />
                     </div>
@@ -785,7 +785,7 @@ export function Dashboard({
                       type="submit"
                       className="gold-btn light-sweep px-5 py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer shrink-0 group"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-stone-950 btn-icon-spin transition-transform" />
+                      <Sparkles className="w-3.5 h-3.5 text-[#121211] btn-icon-spin transition-transform" />
                       <span className="hidden sm:inline">Generate Email</span>
                       <span className="sm:hidden">Generate</span>
                       <span className="btn-arrow-slide transition-transform duration-200">→</span>
@@ -797,10 +797,10 @@ export function Dashboard({
               {/* Expandable CC/BCC */}
               {showQuickCcBcc && (
                 <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl border animate-fadeIn ${
-                  theme === 'dark' ? 'bg-[#0E1015] border-stone-800' : 'bg-stone-50 border-amber-900/10'
+                  theme === 'dark' ? 'bg-[#161514] border-[#2E2D2B]' : 'bg-stone-50 border-amber-900/10'
                 }`}>
                   <div className="space-y-1">
-                    <label className={`text-[10px] font-bold block ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+                    <label className={`text-[10px] font-bold block ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
                       CC (Carbon Copy)
                     </label>
                     <input
@@ -813,13 +813,13 @@ export function Dashboard({
                       }}
                       className={`w-full px-3 py-2 rounded-xl text-xs outline-none border input-interactive ${
                         theme === 'dark'
-                          ? 'bg-[#141620] border-stone-700 text-white'
+                          ? 'bg-[#121211] border-[#2E2D2B] text-[#F5F3EF]'
                           : 'bg-white border-stone-200 text-stone-900'
                       }`}
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className={`text-[10px] font-bold block ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+                    <label className={`text-[10px] font-bold block ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
                       BCC (Blind Carbon Copy)
                     </label>
                     <input
@@ -832,7 +832,7 @@ export function Dashboard({
                       }}
                       className={`w-full px-3 py-2 rounded-xl text-xs outline-none border input-interactive ${
                         theme === 'dark'
-                          ? 'bg-[#141620] border-stone-700 text-white'
+                          ? 'bg-[#121211] border-[#2E2D2B] text-[#F5F3EF]'
                           : 'bg-white border-stone-200 text-stone-900'
                       }`}
                     />
@@ -850,7 +850,7 @@ export function Dashboard({
 
               {/* Suggestions Row */}
               <div className="flex items-center gap-2 flex-wrap text-xs pt-1">
-                <span className={`text-xs font-semibold ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
+                <span className={`text-xs font-semibold ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
                   Try:
                 </span>
                 <button
@@ -858,7 +858,7 @@ export function Dashboard({
                   onClick={() => handleQuickChip('I need sick leave for 3 days due to high fever.')}
                   className={`px-3 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
                     theme === 'dark'
-                      ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
+                      ? 'bg-[#22211F] hover:bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]'
                       : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
                   }`}
                 >
@@ -869,7 +869,7 @@ export function Dashboard({
                   onClick={() => handleQuickChip('Emergency leave today: My father had an accident and I need to leave immediately.')}
                   className={`px-3 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
                     theme === 'dark'
-                      ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
+                      ? 'bg-[#22211F] hover:bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]'
                       : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
                   }`}
                 >
@@ -880,7 +880,7 @@ export function Dashboard({
                   onClick={() => handleQuickChip('Please find attached my resume for the Senior Software Engineer position.')}
                   className={`px-3 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
                     theme === 'dark'
-                      ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 text-stone-300'
+                      ? 'bg-[#22211F] hover:bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]'
                       : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
                   }`}
                 >
@@ -890,22 +890,22 @@ export function Dashboard({
             </form>
           </div>
 
-          {/* Right Column: Floating AI Dispatch Ready Box (Matching Reference Screenshot) */}
+          {/* Right Column: Floating AI Dispatch Ready Box */}
           <div className="hidden lg:flex flex-col items-center justify-center shrink-0 w-60 pl-4">
             <div className={`w-full p-6 rounded-3xl border flex flex-col items-center justify-center text-center gap-3 relative overflow-hidden transition-all duration-300 group cursor-pointer ${
               theme === 'dark'
-                ? 'bg-gradient-to-b from-[#1E202B]/80 to-[#12141C]/90 border-amber-500/30 shadow-2xl hover:border-amber-400/50'
+                ? 'bg-gradient-to-b from-[#1A1918] to-[#161514] border-[#2E2D2B] shadow-2xl hover:border-[#D4A373]/40'
                 : 'bg-gradient-to-b from-white to-[#FDF8EE] border-amber-300 shadow-md hover:border-amber-400'
             }`}>
-              <div className="absolute inset-0 bg-amber-500/10 rounded-3xl blur-xl pointer-events-none group-hover:bg-amber-500/20 transition-all duration-300"></div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-stone-950 shadow-lg shadow-amber-500/30 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 relative z-10">
+              <div className="absolute inset-0 bg-[#D4A373]/10 rounded-3xl blur-xl pointer-events-none group-hover:bg-[#D4A373]/20 transition-all duration-300"></div>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#D4A373] to-[#ECE8E1] flex items-center justify-center text-[#121211] shadow-lg shadow-[#D4A373]/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 relative z-10">
                 <Mail className="w-7 h-7" />
               </div>
               <div className="relative z-10">
-                <span className="text-xs font-black tracking-wider uppercase text-amber-400 block">
+                <span className="text-xs font-black tracking-wider uppercase text-[#D4A373] block">
                   AI DISPATCH READY
                 </span>
-                <span className={`text-[10px] block mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+                <span className={`text-[10px] block mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
                   Real-time Gmail OAuth
                 </span>
               </div>
@@ -915,18 +915,18 @@ export function Dashboard({
       </div>
 
       {/* ============================================================
-          3. SEVEN STAT CARDS IN A SINGLE ROW (Matching Reference Screenshot Row 3)
+          3. SEVEN STAT CARDS IN A SINGLE ROW (Warm Cashmere Minimalist)
       ============================================================ */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         
         {/* Card 1: Emails Sent */}
         <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
             : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
-            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Emails Sent
             </span>
             <div className="w-7 h-7 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
@@ -934,10 +934,10 @@ export function Dashboard({
             </div>
           </div>
           <div>
-            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.sent ?? 0)}
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.sent ?? 0)}
             </div>
-            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Active dispatch
             </div>
           </div>
@@ -947,11 +947,11 @@ export function Dashboard({
         {/* Card 2: Emails Received */}
         <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
             : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
-            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Emails Received
             </span>
             <div className="w-7 h-7 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
@@ -959,10 +959,10 @@ export function Dashboard({
             </div>
           </div>
           <div>
-            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.received ?? 0)}
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.received ?? 0)}
             </div>
-            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Inbox activity
             </div>
           </div>
@@ -972,11 +972,11 @@ export function Dashboard({
         {/* Card 3: Drafts */}
         <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
             : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
-            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Drafts
             </span>
             <div className="w-7 h-7 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
@@ -984,10 +984,10 @@ export function Dashboard({
             </div>
           </div>
           <div>
-            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.drafts ?? 0)}
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.drafts ?? 0)}
             </div>
-            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Saved drafts
             </div>
           </div>
@@ -997,36 +997,36 @@ export function Dashboard({
         {/* Card 4: Scheduled */}
         <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
             : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
-            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Scheduled
             </span>
-            <div className="w-7 h-7 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+            <div className="w-7 h-7 rounded-xl bg-[#D4A373]/10 text-[#D4A373] border border-[#D4A373]/20 flex items-center justify-center stat-icon-box transition-all duration-200">
               <Clock className="w-3.5 h-3.5" />
             </div>
           </div>
           <div>
-            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.scheduled ?? 0)}
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.scheduled ?? 0)}
             </div>
-            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Queue ready
             </div>
           </div>
-          <StatCardWave color="#F59E0B" />
+          <StatCardWave color="#D4A373" />
         </div>
 
         {/* Card 5: Emergency */}
         <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
             : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
-            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Emergency
             </span>
             <div className="w-7 h-7 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
@@ -1034,8 +1034,8 @@ export function Dashboard({
             </div>
           </div>
           <div>
-            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.emergency ?? 0)}
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.emergency ?? 0)}
             </div>
             <div className="text-[11px] font-medium mt-0.5 text-rose-400">
               High priority
@@ -1047,11 +1047,11 @@ export function Dashboard({
         {/* Card 6: Spam */}
         <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
             : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
-            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Spam
             </span>
             <div className="w-7 h-7 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
@@ -1059,10 +1059,10 @@ export function Dashboard({
             </div>
           </div>
           <div>
-            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.spam ?? 0)}
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.spam ?? 0)}
             </div>
-            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Filtered messages
             </div>
           </div>
@@ -1072,11 +1072,11 @@ export function Dashboard({
         {/* Card 7: Pending Review */}
         <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
             : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
-            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-stone-300' : 'text-stone-700'}`}>
+            <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Pending Review
             </span>
             <div className="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
@@ -1084,10 +1084,10 @@ export function Dashboard({
             </div>
           </div>
           <div>
-            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-stone-400 animate-pulse">...</span> : (stats.pendingReview ?? 0)}
+            <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
+              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.pendingReview ?? 0)}
             </div>
-            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Awaiting confirmation
             </div>
           </div>
@@ -1104,19 +1104,19 @@ export function Dashboard({
         {/* Left Column: Recent Emails */}
         <div className={`p-6 rounded-3xl border transition-all ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
             : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-amber-500" />
-              <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              <Clock className="w-4 h-4 text-[#D4A373]" />
+              <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
                 Recent Emails
               </h3>
             </div>
             <button
               onClick={onViewHistory}
-              className="text-xs font-semibold text-amber-500 hover:text-amber-400 flex items-center gap-1 cursor-pointer group"
+              className="text-xs font-semibold text-[#D4A373] hover:text-[#ECE8E1] flex items-center gap-1 cursor-pointer group"
             >
               <span>View All</span>
               <span className="group-hover:translate-x-1 transition-transform duration-200">→</span>
@@ -1131,7 +1131,7 @@ export function Dashboard({
                   onClick={() => setDetailModalEmail(em)}
                   className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer recent-email-row group ${
                     theme === 'dark'
-                      ? 'bg-[#0E1015] border-stone-800'
+                      ? 'bg-[#161514] border-[#2E2D2B]'
                       : 'bg-stone-50 border-stone-200'
                   }`}
                 >
@@ -1145,7 +1145,7 @@ export function Dashboard({
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h4 className={`text-xs font-bold truncate group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                        <h4 className={`text-xs font-bold truncate group-hover:text-[#D4A373] transition-colors ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
                           {em.subject || '(No Subject)'}
                         </h4>
                         <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold ${
@@ -1156,37 +1156,37 @@ export function Dashboard({
                           {em.status || (em.isSent ? 'Sent' : 'Received')}
                         </span>
                       </div>
-                      <p className={`text-[11px] truncate mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+                      <p className={`text-[11px] truncate mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
                         {em.snippet || (em.body ? (em.body.slice(0, 70) + (em.body.length > 70 ? '...' : '')) : (em.instruction || '(No preview content)'))}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-stone-500' : 'text-stone-400'}`}>
+                    <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-400'}`}>
                       {formatRelativeTime(em.sentAt || em.createdAt || em.receivedAt)}
                     </span>
-                    <ChevronRight className="w-4 h-4 text-amber-500 recent-row-arrow opacity-0 -translate-x-2 transition-all duration-200 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-[#D4A373] recent-row-arrow opacity-0 -translate-x-2 transition-all duration-200 shrink-0" />
                   </div>
                 </div>
               ))
             ) : (
               <div className={`p-8 rounded-2xl border text-center flex flex-col items-center justify-center gap-3 ${
-                theme === 'dark' ? 'bg-[#0E1015]/60 border-stone-800' : 'bg-stone-50 border-stone-200'
+                theme === 'dark' ? 'bg-[#161514] border-[#2E2D2B]' : 'bg-stone-50 border-stone-200'
               }`}>
-                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center shadow-sm">
-                  <Mail className="w-6 h-6 text-amber-500" />
+                <div className="w-12 h-12 rounded-2xl bg-[#D4A373]/10 text-[#D4A373] border border-[#D4A373]/20 flex items-center justify-center shadow-sm">
+                  <Mail className="w-6 h-6 text-[#D4A373]" />
                 </div>
                 <div>
-                  <h4 className={`text-xs font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+                  <h4 className={`text-xs font-extrabold ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
                     No emails yet
                   </h4>
-                  <p className={`text-[11px] mt-1 max-w-xs ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+                  <p className={`text-[11px] mt-1 max-w-xs ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
                     Enter an instruction above or click compose to generate and send your first AI email.
                   </p>
                 </div>
                 <button
                   onClick={() => onStartCompose()}
-                  className="mt-1 px-4 py-2 rounded-xl gold-btn text-stone-950 font-bold text-xs shadow-md cursor-pointer hover:scale-102 transition-all"
+                  className="mt-1 px-4 py-2 rounded-xl gold-btn text-[#121211] font-bold text-xs shadow-md cursor-pointer hover:scale-102 transition-all"
                 >
                   + Compose First Email
                 </button>
@@ -1195,15 +1195,15 @@ export function Dashboard({
           </div>
         </div>
 
-        {/* Right Column: Quick Actions (Matching Mockup 4 Square Tiles With Interactive Lift) */}
+        {/* Right Column: Quick Actions */}
         <div className={`p-6 rounded-3xl border transition-all ${
           theme === 'dark'
-            ? 'bg-[#12141A] border-amber-500/15 shadow-md'
+            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
             : 'bg-white border-amber-900/10 shadow-xs'
         }`}>
           <div className="flex items-center gap-2 mb-4">
-            <Zap className="w-4 h-4 text-amber-500" />
-            <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+            <Zap className="w-4 h-4 text-[#D4A373]" />
+            <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
               Quick Actions
             </h3>
           </div>
@@ -1214,14 +1214,14 @@ export function Dashboard({
               onClick={() => onStartCompose()}
               className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer quick-action-tile group ${
                 theme === 'dark'
-                  ? 'bg-[#0E1015] border-stone-800'
+                  ? 'bg-[#161514] border-[#2E2D2B]'
                   : 'bg-amber-50/60 border-amber-200/80'
               }`}
             >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
+              <div className="w-10 h-10 rounded-xl bg-[#D4A373]/10 text-[#D4A373] border border-[#D4A373]/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
                 <Send className="w-4 h-4" />
               </div>
-              <span className={`text-xs font-bold group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              <span className={`text-xs font-bold group-hover:text-[#D4A373] transition-colors ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
                 Compose
               </span>
             </div>
@@ -1231,14 +1231,14 @@ export function Dashboard({
               onClick={() => onStartCompose({ step: 1 })}
               className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer quick-action-tile group ${
                 theme === 'dark'
-                  ? 'bg-[#0E1015] border-stone-800'
+                  ? 'bg-[#161514] border-[#2E2D2B]'
                   : 'bg-amber-50/60 border-amber-200/80'
               }`}
             >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
+              <div className="w-10 h-10 rounded-xl bg-[#D4A373]/10 text-[#D4A373] border border-[#D4A373]/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
                 <FileText className="w-4 h-4" />
               </div>
-              <span className={`text-xs font-bold group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              <span className={`text-xs font-bold group-hover:text-[#D4A373] transition-colors ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
                 Use Template
               </span>
             </div>
@@ -1248,14 +1248,14 @@ export function Dashboard({
               onClick={() => onStartCompose()}
               className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer quick-action-tile group ${
                 theme === 'dark'
-                  ? 'bg-[#0E1015] border-stone-800'
+                  ? 'bg-[#161514] border-[#2E2D2B]'
                   : 'bg-amber-50/60 border-amber-200/80'
               }`}
             >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
+              <div className="w-10 h-10 rounded-xl bg-[#D4A373]/10 text-[#D4A373] border border-[#D4A373]/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
                 <Calendar className="w-4 h-4" />
               </div>
-              <span className={`text-xs font-bold group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              <span className={`text-xs font-bold group-hover:text-[#D4A373] transition-colors ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
                 Schedule
               </span>
             </div>
@@ -1268,14 +1268,14 @@ export function Dashboard({
               }}
               className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 cursor-pointer quick-action-tile group ${
                 theme === 'dark'
-                  ? 'bg-[#0E1015] border-stone-800'
+                  ? 'bg-[#161514] border-[#2E2D2B]'
                   : 'bg-amber-50/60 border-amber-200/80'
               }`}
             >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
+              <div className="w-10 h-10 rounded-xl bg-[#D4A373]/10 text-[#D4A373] border border-[#D4A373]/20 flex items-center justify-center quick-tile-icon transition-all duration-200">
                 <BarChart3 className="w-4 h-4" />
               </div>
-              <span className={`text-xs font-bold group-hover:text-amber-500 transition-colors ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              <span className={`text-xs font-bold group-hover:text-[#D4A373] transition-colors ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
                 View Analytics
               </span>
             </div>
@@ -1288,23 +1288,23 @@ export function Dashboard({
           6. EMAIL PREFERENCES & CATEGORY ANALYTICS SECTION
       ============================================================ */}
       <div id="analytics-section" className={`p-6 rounded-3xl border space-y-4 transition-all ${
-        theme === 'dark' ? 'bg-[#12141A] border-amber-500/15 shadow-xl' : 'bg-white border-amber-900/10 shadow-xs'
+        theme === 'dark' ? 'bg-[#1A1918] border-[#2E2D2B] shadow-xl' : 'bg-white border-amber-900/10 shadow-xs'
       }`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4 border-stone-800/40">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4 border-[#2E2D2B]">
           <div>
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <h3 className={`text-base font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              <Sparkles className="w-4 h-4 text-[#D4A373]" />
+              <h3 className={`text-base font-extrabold ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
                 Email Preferences & Category Analytics
               </h3>
             </div>
-            <p className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+            <p className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Live AI-classified breakdown calculated directly from Supabase & Gmail
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold">
             <span className={`px-3 py-1 rounded-full border text-[11px] ${
-              theme === 'dark' ? 'bg-stone-800 border-stone-700 text-stone-300' : 'bg-stone-100 border-stone-200 text-stone-700'
+              theme === 'dark' ? 'bg-[#22211F] border-[#2E2D2B] text-[#ECE8E1]' : 'bg-stone-100 border-stone-200 text-stone-700'
             }`}>
               Total Tracked: {stats.total || (stats.sent + stats.received)}
             </span>
@@ -1314,18 +1314,18 @@ export function Dashboard({
         {/* 12 Preference Categories */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {[
-            { id: 'leave', label: 'Leave Request', icon: '📅', count: stats.categories?.leave || 0, color: 'from-amber-500 to-yellow-400' },
-            { id: 'jobApplication', label: 'Job Application', icon: '📄', count: stats.categories?.jobApplication || 0, color: 'from-amber-600 to-amber-400' },
-            { id: 'business', label: 'Business Proposal', icon: '🤝', count: stats.categories?.business || 0, color: 'from-yellow-600 to-amber-500' },
-            { id: 'emergency', label: 'Emergency', icon: '🚨', count: stats.categories?.emergency || 0, color: 'from-rose-500 to-amber-500' },
-            { id: 'personal', label: 'Personal / Casual', icon: '💬', count: stats.categories?.personal || 0, color: 'from-amber-500 to-orange-400' },
-            { id: 'official', label: 'Official / Professional', icon: '👔', count: stats.categories?.official || 0, color: 'from-amber-600 to-yellow-500' },
-            { id: 'complaint', label: 'Complaint', icon: '⚠️', count: stats.categories?.complaint || 0, color: 'from-orange-500 to-amber-500' },
-            { id: 'payment', label: 'Payment / Invoice', icon: '💳', count: stats.categories?.payment || 0, color: 'from-yellow-500 to-amber-600' },
-            { id: 'meeting', label: 'Meeting / Sync', icon: '🗓️', count: stats.categories?.meeting || 0, color: 'from-amber-400 to-yellow-500' },
-            { id: 'followUp', label: 'Follow-up', icon: '🔄', count: stats.categories?.followUp || 0, color: 'from-amber-500 to-yellow-600' },
-            { id: 'thankYou', label: 'Appreciation', icon: '🙏', count: stats.categories?.thankYou || 0, color: 'from-yellow-400 to-amber-500' },
-            { id: 'other', label: 'Other Inquiries', icon: '✉️', count: (stats.categories?.other || 0) + (stats.categories?.inquiry || 0) + (stats.categories?.announcement || 0), color: 'from-stone-500 to-amber-600' },
+            { id: 'leave', label: 'Leave Request', icon: '📅', count: stats.categories?.leave || 0, color: 'from-[#D4A373] to-[#ECE8E1]' },
+            { id: 'jobApplication', label: 'Job Application', icon: '📄', count: stats.categories?.jobApplication || 0, color: 'from-[#C59362] to-[#D4A373]' },
+            { id: 'business', label: 'Business Proposal', icon: '🤝', count: stats.categories?.business || 0, color: 'from-[#D4A373] to-[#C59362]' },
+            { id: 'emergency', label: 'Emergency', icon: '🚨', count: stats.categories?.emergency || 0, color: 'from-rose-500 to-[#D4A373]' },
+            { id: 'personal', label: 'Personal / Casual', icon: '💬', count: stats.categories?.personal || 0, color: 'from-[#D4A373] to-orange-400' },
+            { id: 'official', label: 'Official / Professional', icon: '👔', count: stats.categories?.official || 0, color: 'from-[#C59362] to-[#ECE8E1]' },
+            { id: 'complaint', label: 'Complaint', icon: '⚠️', count: stats.categories?.complaint || 0, color: 'from-orange-500 to-[#D4A373]' },
+            { id: 'payment', label: 'Payment / Invoice', icon: '💳', count: stats.categories?.payment || 0, color: 'from-[#ECE8E1] to-[#D4A373]' },
+            { id: 'meeting', label: 'Meeting / Sync', icon: '🗓️', count: stats.categories?.meeting || 0, color: 'from-[#D4A373] to-[#ECE8E1]' },
+            { id: 'followUp', label: 'Follow-up', icon: '🔄', count: stats.categories?.followUp || 0, color: 'from-[#D4A373] to-[#C59362]' },
+            { id: 'thankYou', label: 'Appreciation', icon: '🙏', count: stats.categories?.thankYou || 0, color: 'from-[#ECE8E1] to-[#D4A373]' },
+            { id: 'other', label: 'Other Inquiries', icon: '✉️', count: (stats.categories?.other || 0) + (stats.categories?.inquiry || 0) + (stats.categories?.announcement || 0), color: 'from-stone-500 to-[#D4A373]' },
           ].map((cat) => {
             const total = stats.total || (stats.sent + stats.received) || 1;
             const pct = Math.min(100, Math.round((cat.count / total) * 100));
@@ -1337,7 +1337,7 @@ export function Dashboard({
                 }}
                 className={`p-3.5 rounded-2xl border chip-interactive group cursor-pointer ${
                   theme === 'dark'
-                    ? 'bg-[#0E1015] border-stone-800'
+                    ? 'bg-[#161514] border-[#2E2D2B]'
                     : 'bg-stone-50 border-stone-200'
                 }`}
               >
@@ -1345,17 +1345,17 @@ export function Dashboard({
                   <span className="text-base chip-emoji inline-block transition-transform duration-200">{cat.icon}</span>
                   <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full transition-all duration-200 ${
                     cat.count > 0 
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 group-hover:scale-105' 
-                      : theme === 'dark' ? 'bg-stone-800 text-stone-500' : 'bg-stone-200 text-stone-600'
+                      ? 'bg-[#D4A373]/20 text-[#D4A373] border border-[#D4A373]/30 group-hover:scale-105' 
+                      : theme === 'dark' ? 'bg-[#22211F] text-[#99958F]' : 'bg-stone-200 text-stone-600'
                   }`}>
                     {loading ? '...' : cat.count}
                   </span>
                 </div>
-                <div className={`text-[11px] font-bold truncate transition-colors duration-200 ${theme === 'dark' ? 'text-stone-300 group-hover:text-white' : 'text-stone-800 group-hover:text-amber-900'}`}>
+                <div className={`text-[11px] font-bold truncate transition-colors duration-200 ${theme === 'dark' ? 'text-[#ECE8E1] group-hover:text-[#F5F3EF]' : 'text-stone-800 group-hover:text-amber-900'}`}>
                   {cat.label}
                 </div>
                 {/* Visual Progress Gauge */}
-                <div className={`w-full h-1.5 rounded-full overflow-hidden mt-2 ${theme === 'dark' ? 'bg-stone-800' : 'bg-stone-200'}`}>
+                <div className={`w-full h-1.5 rounded-full overflow-hidden mt-2 ${theme === 'dark' ? 'bg-[#22211F]' : 'bg-stone-200'}`}>
                   <div 
                     className={`h-full bg-gradient-to-r ${cat.color} rounded-full transition-all duration-500`}
                     style={{ width: `${cat.count > 0 ? Math.max(10, pct) : 0}%` }}
@@ -1370,34 +1370,34 @@ export function Dashboard({
       {/* Email Detail Modal */}
       {detailModalEmail && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-panel w-full max-w-2xl rounded-3xl p-6 sm:p-8 border border-slate-700 shadow-2xl space-y-5 animate-fadeIn">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="glass-panel w-full max-w-2xl rounded-3xl p-6 sm:p-8 border border-[#2E2D2B] shadow-2xl space-y-5 animate-fadeIn bg-[#1A1918]">
+            <div className="flex items-center justify-between border-b border-[#2E2D2B] pb-4">
               <div>
-                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Email Inspection</span>
-                <h3 className="text-lg font-extrabold text-white mt-0.5">{detailModalEmail.subject}</h3>
+                <span className="text-[10px] font-bold text-[#D4A373] uppercase tracking-wider">Email Inspection</span>
+                <h3 className="text-lg font-extrabold text-[#F5F3EF] mt-0.5">{detailModalEmail.subject}</h3>
               </div>
-              <button onClick={() => setDetailModalEmail(null)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800">
+              <button onClick={() => setDetailModalEmail(null)} className="p-2 rounded-xl text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#22211F]">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-800/50 p-3.5 rounded-2xl border border-slate-700/60">
-              <div><span className="text-slate-500">To:</span> <span className="font-mono text-slate-200">{detailModalEmail.recipient}</span></div>
-              <div><span className="text-slate-500">Status:</span> <span className="text-emerald-400 font-bold">{detailModalEmail.status}</span></div>
-              <div><span className="text-slate-500">Category:</span> <span className="text-purple-300">{detailModalEmail.category}</span></div>
-              <div><span className="text-slate-500">Date:</span> <span className="text-slate-300">{new Date(detailModalEmail.createdAt).toLocaleString()}</span></div>
+            <div className="grid grid-cols-2 gap-3 text-xs bg-[#161514] p-3.5 rounded-2xl border border-[#2E2D2B]">
+              <div><span className="text-[#99958F]">To:</span> <span className="font-mono text-[#ECE8E1]">{detailModalEmail.recipient}</span></div>
+              <div><span className="text-[#99958F]">Status:</span> <span className="text-emerald-400 font-bold">{detailModalEmail.status}</span></div>
+              <div><span className="text-[#99958F]">Category:</span> <span className="text-[#D4A373]">{detailModalEmail.category}</span></div>
+              <div><span className="text-[#99958F]">Date:</span> <span className="text-[#ECE8E1]">{new Date(detailModalEmail.createdAt).toLocaleString()}</span></div>
             </div>
 
-            <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 max-h-60 overflow-y-auto">
-              <pre className="text-xs text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">
+            <div className="bg-[#121211] p-4 rounded-2xl border border-[#2E2D2B] max-h-60 overflow-y-auto">
+              <pre className="text-xs text-[#F5F3EF] whitespace-pre-wrap font-sans leading-relaxed">
                 {detailModalEmail.body}
               </pre>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#2E2D2B]">
               <button
                 onClick={() => setDetailModalEmail(null)}
-                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2E2D2B] text-[#F5F3EF] text-xs font-bold cursor-pointer transition-colors"
               >
                 Close
               </button>

@@ -96,13 +96,13 @@ export function NotificationCenter() {
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Top Header */}
-      <div className="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+      <div className="glass-panel p-6 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
         <div>
-          <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-            <Bell className="w-5 h-5 text-purple-400" />
+          <h2 className="text-xl font-extrabold text-[#F5F3EF] flex items-center gap-2">
+            <Bell className="w-5 h-5 text-[#D4A373]" />
             Notifications Center
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-[#99958F] mt-1">
             Real-time status updates, security alerts, and dispatch receipts
           </p>
         </div>
@@ -111,18 +111,18 @@ export function NotificationCenter() {
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllRead}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              className="px-4 py-2 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#D4A373] border border-[#2E2D2B] text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
             >
-              <CheckCheck className="w-4 h-4 text-purple-400" />
+              <CheckCheck className="w-4 h-4 text-[#D4A373]" />
               Mark All Read ({unreadCount})
             </button>
           )}
 
-          <div className="flex rounded-xl bg-slate-800 p-1 border border-slate-700">
+          <div className="flex rounded-xl bg-[#22211F] p-1 border border-[#2E2D2B]">
             <button
               onClick={() => setViewMode('active')}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                viewMode === 'active' ? 'gradient-btn text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                viewMode === 'active' ? 'gold-btn text-[#121211] shadow-sm' : 'text-[#99958F] hover:text-[#F5F3EF]'
               }`}
             >
               Active ({activeCount})
@@ -130,7 +130,7 @@ export function NotificationCenter() {
             <button
               onClick={() => setViewMode('trash')}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                viewMode === 'trash' ? 'gradient-btn text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                viewMode === 'trash' ? 'gold-btn text-[#121211] shadow-sm' : 'text-[#99958F] hover:text-[#F5F3EF]'
               }`}
             >
               Trash ({trashedCount})
@@ -141,15 +141,15 @@ export function NotificationCenter() {
 
       {/* Notifications List */}
       {loading ? (
-        <div className="glass-panel p-12 text-center text-xs text-slate-400 rounded-3xl space-y-3 border border-slate-800">
-          <RefreshCw className="w-6 h-6 animate-spin text-purple-400 mx-auto" />
+        <div className="glass-panel p-12 text-center text-xs text-[#99958F] rounded-3xl space-y-3 border border-[#2E2D2B] bg-[#1A1918]">
+          <RefreshCw className="w-6 h-6 animate-spin text-[#D4A373] mx-auto" />
           <p className="font-semibold">Loading notifications...</p>
         </div>
       ) : filteredNotifs.length === 0 ? (
-        <div className="glass-panel p-12 text-center text-xs text-slate-400 rounded-3xl space-y-3 border border-slate-800 shadow-xl">
-          <Bell className="w-8 h-8 text-purple-400 mx-auto opacity-50" />
-          <p className="font-bold text-white">No notifications found</p>
-          <p className="text-slate-400">Your inbox is clean with zero unread alerts.</p>
+        <div className="glass-panel p-12 text-center text-xs text-[#99958F] rounded-3xl space-y-3 border border-[#2E2D2B] bg-[#1A1918] shadow-xl">
+          <Bell className="w-8 h-8 text-[#D4A373] mx-auto opacity-50" />
+          <p className="font-bold text-[#F5F3EF]">No notifications found</p>
+          <p className="text-[#99958F]">Your inbox is clean with zero unread alerts.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -157,18 +157,18 @@ export function NotificationCenter() {
             <div
               key={n.id}
               className={`glass-card p-5 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-                !n.read ? 'border-purple-500/40 bg-slate-800/80 shadow-lg shadow-purple-950/20' : 'border-slate-800 bg-[#0E1322]'
+                !n.read ? 'border-[#D4A373]/40 bg-[#1F1E1B] shadow-lg shadow-black/20' : 'border-[#2E2D2B] bg-[#161514]'
               }`}
             >
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-purple-950/60 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 mt-0.5">
+                <div className="w-9 h-9 rounded-xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center text-[#D4A373] shrink-0 mt-0.5">
                   <Bell className="w-4.5 h-4.5" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-white">
+                  <p className="text-xs font-bold text-[#F5F3EF]">
                     {n.message}
                   </p>
-                  <span className="text-[10px] text-slate-400 block font-medium">
+                  <span className="text-[10px] text-[#99958F] block font-medium">
                     {new Date(n.createdAt).toLocaleString()}
                   </span>
                 </div>
@@ -178,7 +178,7 @@ export function NotificationCenter() {
                 {viewMode === 'active' ? (
                   <button
                     onClick={() => handleMoveToTrash(n.id)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg text-[#99958F] hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                     title="Move to trash"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -186,9 +186,9 @@ export function NotificationCenter() {
                 ) : (
                   <button
                     onClick={() => handleRestore(n.id)}
-                    className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                    className="px-3 py-1 rounded-lg bg-[#22211F] hover:bg-[#2A2926] text-[#D4A373] border border-[#2E2D2B] text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
                   >
-                    <RotateCcw className="w-3.5 h-3.5 text-purple-400" />
+                    <RotateCcw className="w-3.5 h-3.5 text-[#D4A373]" />
                     Restore
                   </button>
                 )}

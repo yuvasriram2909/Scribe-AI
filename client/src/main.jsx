@@ -31,13 +31,13 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#080C14] text-white flex flex-col items-center justify-center p-6 text-center">
-          <div className="max-w-md p-8 rounded-3xl bg-[#0D121F] border border-slate-800 space-y-4 shadow-2xl">
+        <div className="min-h-screen bg-[#121211] text-[#F5F3EF] flex flex-col items-center justify-center p-6 text-center">
+          <div className="max-w-md p-8 rounded-3xl bg-[#1A1918] border border-[#2E2D2B] space-y-4 shadow-2xl">
             <div className="w-14 h-14 rounded-2xl bg-rose-950/60 border border-rose-500/30 text-rose-400 mx-auto flex items-center justify-center text-2xl font-bold">
               ⚠️
             </div>
-            <h2 className="text-xl font-extrabold text-white">Something went wrong</h2>
-            <p className="text-xs text-slate-400">
+            <h2 className="text-xl font-extrabold text-[#F5F3EF]">Something went wrong</h2>
+            <p className="text-xs text-[#99958F]">
               {this.state.error?.message || 'An unexpected rendering error occurred.'}
             </p>
             <div className="pt-2 flex items-center justify-center gap-3">
@@ -46,7 +46,7 @@ class ErrorBoundary extends React.Component {
                   this.setState({ hasError: false, error: null });
                   window.location.reload();
                 }}
-                className="px-6 py-2.5 rounded-xl gradient-btn text-white text-xs font-bold shadow-lg shadow-purple-600/30 cursor-pointer"
+                className="px-6 py-2.5 rounded-xl gold-btn text-[#121211] text-xs font-bold shadow-lg shadow-[#D4A373]/20 cursor-pointer"
               >
                 Reload Application
               </button>

@@ -387,31 +387,31 @@ export default function App() {
   const displayName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'User');
 
   return (
-    <div className={`min-h-screen flex flex-col md:flex-row font-sans selection:bg-amber-500 selection:text-stone-950 relative overflow-x-hidden transition-colors duration-200 ${
-      theme === 'dark' ? 'bg-[#08090C] text-stone-100' : 'bg-[#FAF8F5] text-stone-900'
+    <div className={`min-h-screen flex flex-col md:flex-row font-sans selection:bg-[#D4A373] selection:text-[#121211] relative overflow-x-hidden transition-colors duration-200 ${
+      theme === 'dark' ? 'bg-[#121211] text-[#F5F3EF]' : 'bg-[#FAF8F5] text-stone-900'
     }`}>
       
-      {/* Subtle Ambient Cosmic Gold Glows */}
+      {/* Subtle Ambient Warm Cashmere Glows */}
       {theme === 'dark' ? (
         <>
-          <div className="fixed top-0 left-1/4 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none -z-10" />
-          <div className="fixed bottom-10 right-10 w-96 h-96 bg-yellow-600/5 rounded-full blur-3xl pointer-events-none -z-10" />
+          <div className="fixed top-0 left-1/4 w-96 h-96 bg-[#D4A373]/5 rounded-full blur-3xl pointer-events-none -z-10" />
+          <div className="fixed bottom-10 right-10 w-96 h-96 bg-[#C59362]/5 rounded-full blur-3xl pointer-events-none -z-10" />
         </>
       ) : (
         <>
-          <div className="fixed top-0 left-1/4 w-96 h-96 bg-amber-200/20 rounded-full blur-3xl pointer-events-none -z-10" />
+          <div className="fixed top-0 left-1/4 w-96 h-96 bg-[#D4A373]/15 rounded-full blur-3xl pointer-events-none -z-10" />
           <div className="fixed bottom-10 right-10 w-96 h-96 bg-orange-100/30 rounded-full blur-3xl pointer-events-none -z-10" />
         </>
       )}
 
       {/* ============================================================
-          VERTICAL SIDEBAR NAVIGATION (Luxury Gold & Obsidian / Ivory)
+          VERTICAL SIDEBAR NAVIGATION (Warm Cashmere & Charcoal)
       ============================================================ */}
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-72 backdrop-blur-xl flex flex-col justify-between transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:z-auto shadow-2xl
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         ${theme === 'dark' 
-          ? 'bg-[#0D0E12] border-r border-[#1F222B] text-stone-200' 
+          ? 'bg-[#121211] border-r border-[#2E2D2B] text-[#F5F3EF]' 
           : 'bg-white border-r border-amber-900/10 text-stone-800'
         }
       `}>
@@ -421,16 +421,16 @@ export default function App() {
             className="flex items-center gap-3 cursor-pointer group px-2" 
             onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 p-[1px] shadow-lg shadow-amber-500/25 group-hover:scale-105 transition-transform shrink-0">
-              <div className={`w-full h-full ${theme === 'dark' ? 'bg-[#0E1015]' : 'bg-[#FFFDF9]'} rounded-[11px] flex items-center justify-center`}>
-                <Send className="w-5 h-5 text-amber-500 transform rotate-[-20deg]" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#D4A373] to-[#ECE8E1] p-[1px] shadow-lg shadow-[#D4A373]/20 group-hover:scale-105 transition-transform shrink-0">
+              <div className={`w-full h-full ${theme === 'dark' ? 'bg-[#1A1918]' : 'bg-[#FFFDF9]'} rounded-[11px] flex items-center justify-center`}>
+                <Send className="w-5 h-5 text-[#D4A373] transform rotate-[-20deg]" />
               </div>
             </div>
             <div>
-              <h1 className={`text-base font-extrabold tracking-tight leading-tight flex items-center gap-1 ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
-                AI Smart <span className="text-amber-500">Sender</span>
+              <h1 className={`text-base font-extrabold tracking-tight leading-tight flex items-center gap-1 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
+                AI Smart <span className="text-[#D4A373]">Sender</span>
               </h1>
-              <p className={`text-[11px] font-medium truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>
+              <p className={`text-[11px] font-medium truncate ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
                 AI-Powered Email Assistant
               </p>
             </div>
@@ -441,8 +441,8 @@ export default function App() {
             onClick={() => handleStartCompose()}
             className="w-full py-3 px-4 rounded-xl gold-btn light-sweep font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer group"
           >
-            <PlusCircle className="w-4 h-4 text-stone-950 btn-icon-spin transition-transform" />
-            <span className="text-stone-950">Compose New Email</span>
+            <PlusCircle className="w-4 h-4 text-[#121211] btn-icon-spin transition-transform" />
+            <span className="text-[#121211]">Compose New Email</span>
           </button>
 
           {/* Vertical Navigation Links with Premium Hover Transitions */}
@@ -453,15 +453,15 @@ export default function App() {
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'dashboard'
                   ? theme === 'dark'
-                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    ? 'bg-[#D4A373]/12 text-[#ECE8E1] font-bold border border-[#D4A373]/35 shadow-sm shadow-[#D4A373]/10'
                     : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
                   : theme === 'dark'
-                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    ? 'text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#1A1918]'
                     : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <LayoutDashboard className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'dashboard' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
+                <LayoutDashboard className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'dashboard' ? 'text-[#D4A373]' : 'text-[#99958F] group-hover:text-[#D4A373]'}`} />
                 <span>Dashboard</span>
               </div>
             </button>
@@ -471,15 +471,15 @@ export default function App() {
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'compose'
                   ? theme === 'dark'
-                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    ? 'bg-[#D4A373]/12 text-[#ECE8E1] font-bold border border-[#D4A373]/35 shadow-sm shadow-[#D4A373]/10'
                     : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
                   : theme === 'dark'
-                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    ? 'text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#1A1918]'
                     : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Send className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'compose' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
+                <Send className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'compose' ? 'text-[#D4A373]' : 'text-[#99958F] group-hover:text-[#D4A373]'}`} />
                 <span>Compose Email</span>
               </div>
             </button>
@@ -489,15 +489,15 @@ export default function App() {
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'history'
                   ? theme === 'dark'
-                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    ? 'bg-[#D4A373]/12 text-[#ECE8E1] font-bold border border-[#D4A373]/35 shadow-sm shadow-[#D4A373]/10'
                     : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
                   : theme === 'dark'
-                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    ? 'text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#1A1918]'
                     : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <History className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'history' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
+                <History className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'history' ? 'text-[#D4A373]' : 'text-[#99958F] group-hover:text-[#D4A373]'}`} />
                 <span>Email History</span>
               </div>
             </button>
@@ -507,15 +507,15 @@ export default function App() {
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'contacts'
                   ? theme === 'dark'
-                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    ? 'bg-[#D4A373]/12 text-[#ECE8E1] font-bold border border-[#D4A373]/35 shadow-sm shadow-[#D4A373]/10'
                     : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
                   : theme === 'dark'
-                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    ? 'text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#1A1918]'
                     : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Users className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'contacts' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
+                <Users className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'contacts' ? 'text-[#D4A373]' : 'text-[#99958F] group-hover:text-[#D4A373]'}`} />
                 <span>Contacts & Address Book</span>
               </div>
             </button>
@@ -525,15 +525,15 @@ export default function App() {
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'templates'
                   ? theme === 'dark'
-                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    ? 'bg-[#D4A373]/12 text-[#ECE8E1] font-bold border border-[#D4A373]/35 shadow-sm shadow-[#D4A373]/10'
                     : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
                   : theme === 'dark'
-                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    ? 'text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#1A1918]'
                     : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Layout className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'templates' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
+                <Layout className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'templates' ? 'text-[#D4A373]' : 'text-[#99958F] group-hover:text-[#D4A373]'}`} />
                 <span>Canned Templates</span>
               </div>
             </button>
@@ -543,19 +543,19 @@ export default function App() {
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'notifications'
                   ? theme === 'dark'
-                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    ? 'bg-[#D4A373]/12 text-[#ECE8E1] font-bold border border-[#D4A373]/35 shadow-sm shadow-[#D4A373]/10'
                     : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
                   : theme === 'dark'
-                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    ? 'text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#1A1918]'
                     : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Bell className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'notifications' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
+                <Bell className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'notifications' ? 'text-[#D4A373]' : 'text-[#99958F] group-hover:text-[#D4A373]'}`} />
                 <span>Notifications</span>
               </div>
               {unreadNotifCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-stone-950 text-[10px] font-extrabold shadow-sm">
+                <span className="px-2 py-0.5 rounded-full bg-[#D4A373] text-[#121211] text-[10px] font-extrabold shadow-sm">
                   {unreadNotifCount}
                 </span>
               )}
@@ -566,15 +566,15 @@ export default function App() {
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'settings'
                   ? theme === 'dark'
-                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    ? 'bg-[#D4A373]/12 text-[#ECE8E1] font-bold border border-[#D4A373]/35 shadow-sm shadow-[#D4A373]/10'
                     : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
                   : theme === 'dark'
-                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    ? 'text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#1A1918]'
                     : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Settings className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'settings' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
+                <Settings className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'settings' ? 'text-[#D4A373]' : 'text-[#99958F] group-hover:text-[#D4A373]'}`} />
                 <span>Settings</span>
               </div>
             </button>
@@ -584,42 +584,42 @@ export default function App() {
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'trash'
                   ? theme === 'dark'
-                    ? 'bg-amber-500/10 text-amber-300 font-bold border border-amber-500/40 shadow-sm shadow-amber-500/15'
+                    ? 'bg-[#D4A373]/12 text-[#ECE8E1] font-bold border border-[#D4A373]/35 shadow-sm shadow-[#D4A373]/10'
                     : 'bg-[#FFF9EE] text-amber-900 font-bold border border-amber-300 shadow-sm'
                   : theme === 'dark'
-                    ? 'text-stone-400 hover:text-white hover:bg-stone-800/40'
+                    ? 'text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#1A1918]'
                     : 'text-stone-600 hover:text-stone-900 hover:bg-amber-50/70'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Trash2 className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'trash' ? 'text-amber-500' : 'text-stone-400 group-hover:text-amber-400'}`} />
+                <Trash2 className={`w-4 h-4 nav-icon transition-all duration-200 ${activeTab === 'trash' ? 'text-[#D4A373]' : 'text-[#99958F] group-hover:text-[#D4A373]'}`} />
                 <span>Trash</span>
               </div>
             </button>
           </nav>
         </div>
 
-        {/* Sidebar Bottom: Upgrade to Premium Card (Matching Mockup) */}
+        {/* Sidebar Bottom: Upgrade to Premium Card */}
         <div className="p-4 space-y-3">
           <div className={`p-4 rounded-2xl border relative overflow-hidden group ${
             theme === 'dark' 
-              ? 'bg-gradient-to-b from-[#161822] to-[#0E1016] border-amber-500/20 shadow-xl' 
+              ? 'bg-gradient-to-b from-[#1A1918] to-[#161514] border-[#2E2D2B] shadow-xl' 
               : 'bg-gradient-to-b from-[#FFFDF8] to-[#FBF3DE] border-amber-300/80 shadow-md'
           }`}>
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-stone-950 shadow-md shadow-amber-500/30">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#D4A373] to-[#ECE8E1] flex items-center justify-center text-[#121211] shadow-md shadow-[#D4A373]/20">
                 <Crown className="w-4 h-4" />
               </div>
-              <h4 className={`text-xs font-extrabold ${theme === 'dark' ? 'text-white' : 'text-stone-900'}`}>
+              <h4 className={`text-xs font-extrabold ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
                 Upgrade to Premium
               </h4>
             </div>
             
-            <div className={`space-y-1 text-[11px] mb-3 leading-relaxed ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
-              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" /> <span>Unlock advanced features</span></div>
-              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" /> <span>Higher email limits</span></div>
-              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" /> <span>AI personalization</span></div>
-              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" /> <span>Priority support</span></div>
+            <div className={`space-y-1 text-[11px] mb-3 leading-relaxed ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
+              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-[#D4A373] shrink-0" /> <span>Unlock advanced features</span></div>
+              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-[#D4A373] shrink-0" /> <span>Higher email limits</span></div>
+              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-[#D4A373] shrink-0" /> <span>AI personalization</span></div>
+              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-[#D4A373] shrink-0" /> <span>Priority support</span></div>
             </div>
 
             <button
@@ -645,20 +645,20 @@ export default function App() {
           MAIN RIGHT CONTENT AREA
       ============================================================ */}
       <div className={`flex-1 flex flex-col min-w-0 min-h-screen ${
-        theme === 'dark' ? 'bg-[#08090C]' : 'bg-[#FAF8F5]'
+        theme === 'dark' ? 'bg-[#121211]' : 'bg-[#FAF8F5]'
       }`}>
         
         {/* Top Navigation Bar */}
         <header className={`sticky top-0 z-30 backdrop-blur-xl px-6 py-4 flex items-center justify-between shadow-sm transition-colors ${
           theme === 'dark'
-            ? 'bg-[#0D0E12]/90 border-b border-[#1F222B]'
+            ? 'bg-[#121211]/95 border-b border-[#2E2D2B]'
             : 'bg-white/90 border-b border-amber-900/10'
         }`}>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={`p-2 rounded-xl md:hidden border transition-transform active:scale-95 cursor-pointer ${
-                theme === 'dark' ? 'bg-stone-800/80 border-stone-700 text-stone-200' : 'bg-stone-100 border-stone-300 text-stone-800'
+                theme === 'dark' ? 'bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]' : 'bg-stone-100 border-stone-300 text-stone-800'
               }`}
             >
               <Menu className="w-5 h-5" />
@@ -666,39 +666,39 @@ export default function App() {
 
             <div>
               <h2 className={`text-xl font-extrabold tracking-tight flex items-center gap-2 ${
-                theme === 'dark' ? 'text-white' : 'text-stone-900'
+                theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'
               }`}>
                 <span>{getPageTitle()}</span>
-                {activeTab === 'dashboard' && <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />}
+                {activeTab === 'dashboard' && <Sparkles className="w-4 h-4 text-[#D4A373] animate-pulse" />}
               </h2>
               {activeTab === 'dashboard' && (
-                <p className={`text-xs ${theme === 'dark' ? 'text-stone-400' : 'text-stone-600'}`}>
-                  Welcome back, <span className="font-bold text-amber-500">{displayName}</span>! 👋
+                <p className={`text-xs ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
+                  Welcome back, <span className="font-bold text-[#D4A373]">{displayName}</span>! 👋
                 </p>
               )}
             </div>
           </div>
 
-          {/* Search bar in header (Matching Mockup with Interactive Glow) */}
+          {/* Search bar in header (Warm Cashmere Minimalist with Interactive Glow) */}
           <div className="hidden lg:flex items-center flex-1 max-w-md mx-8">
             <div className={`w-full flex items-center gap-2.5 px-4 py-2 rounded-full border input-interactive group ${
               theme === 'dark' 
-                ? 'bg-[#14161F] border-stone-800' 
+                ? 'bg-[#1A1918] border-[#2E2D2B]' 
                 : 'bg-[#F5F2EB] border-amber-900/10'
             }`}>
-              <Search className="w-4 h-4 text-stone-400 group-hover:text-amber-500 group-focus-within:text-amber-500 group-hover:scale-110 transition-all duration-200 shrink-0" />
+              <Search className="w-4 h-4 text-[#99958F] group-hover:text-[#D4A373] group-focus-within:text-[#D4A373] group-hover:scale-110 transition-all duration-200 shrink-0" />
               <input
                 type="text"
                 placeholder="Search emails, contacts, templates..."
-                className={`w-full text-xs bg-transparent outline-none placeholder:text-stone-400 ${
-                  theme === 'dark' ? 'text-white' : 'text-stone-900'
+                className={`w-full text-xs bg-transparent outline-none placeholder:text-[#99958F] ${
+                  theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'
                 }`}
               />
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Live Gmail Connection Status Pill (Matching Screenshot) */}
+            {/* Live Gmail Connection Status Pill */}
             <div className={`hidden sm:inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
               isGmailConnected
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-xs'
@@ -708,13 +708,12 @@ export default function App() {
               <span>Gmail Connected</span>
             </div>
 
-
             {/* Notification Bell with Bell-Hover Shake Animation */}
             <button
               onClick={() => setActiveTab('notifications')}
               className={`relative p-2.5 rounded-xl border transition-all duration-200 bell-hover hover:scale-105 active:scale-95 cursor-pointer ${
                 theme === 'dark'
-                  ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700 hover:border-amber-500/40 text-stone-300'
+                  ? 'bg-[#1A1918] hover:bg-[#22211F] border-[#2E2D2B] hover:border-[#D4A373]/40 text-[#F5F3EF]'
                   : 'bg-stone-100 hover:bg-stone-200 border-stone-200 hover:border-amber-400 text-stone-700'
               }`}
               title="Notifications"
@@ -729,51 +728,51 @@ export default function App() {
             <div className="relative">
               <div 
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className={`flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl border cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:border-amber-500/40 hover:shadow-md active:scale-[0.98] ${
+                className={`flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl border cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:border-[#D4A373]/40 hover:shadow-md active:scale-[0.98] ${
                   theme === 'dark'
-                    ? 'bg-stone-800/80 hover:bg-stone-700/80 border-stone-700'
+                    ? 'bg-[#1A1918] hover:bg-[#22211F] border-[#2E2D2B]'
                     : 'bg-white hover:bg-stone-50 border-amber-900/15 shadow-xs'
                 }`}
               >
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-stone-950 font-extrabold text-xs flex items-center justify-center shadow-sm">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#D4A373] to-[#ECE8E1] text-[#121211] font-extrabold text-xs flex items-center justify-center shadow-sm">
                   {displayName[0].toUpperCase()}
                 </div>
                 <div className="hidden sm:block text-left">
                   <span className={`text-xs font-bold block leading-tight ${
-                    theme === 'dark' ? 'text-white' : 'text-stone-900'
+                    theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'
                   }`}>
                     {displayName}
                   </span>
-                  <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
+                  <span className="text-[10px] text-[#D4A373] font-semibold flex items-center gap-1">
                     👑 Premium Plan
                   </span>
                 </div>
-                <ChevronDown className={`w-3.5 h-3.5 text-stone-400 transition-transform duration-200 ${userDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3.5 h-3.5 text-[#99958F] transition-transform duration-200 ${userDropdownOpen ? 'rotate-180' : ''}`} />
               </div>
 
               {/* User Dropdown Menu */}
               {userDropdownOpen && (
                 <div className={`absolute right-0 mt-2 w-56 rounded-2xl p-2 border shadow-2xl z-50 animate-fadeIn ${
-                  theme === 'dark' ? 'bg-[#12141A] border-stone-700 text-white' : 'bg-white border-stone-200 text-stone-900'
+                  theme === 'dark' ? 'bg-[#22211F] border-[#2E2D2B] text-[#F5F3EF]' : 'bg-white border-stone-200 text-stone-900'
                 }`}>
-                  <div className={`p-3 border-b mb-1 ${theme === 'dark' ? 'border-stone-800' : 'border-stone-100'}`}>
+                  <div className={`p-3 border-b mb-1 ${theme === 'dark' ? 'border-[#2E2D2B]' : 'border-stone-100'}`}>
                     <p className="text-xs font-bold truncate">{displayName}</p>
-                    <p className={`text-[11px] font-mono truncate ${theme === 'dark' ? 'text-stone-400' : 'text-stone-500'}`}>{currentUserEmail}</p>
+                    <p className={`text-[11px] font-mono truncate ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>{currentUserEmail}</p>
                   </div>
                   <button
                     onClick={() => { setActiveTab('settings'); setUserDropdownOpen(false); }}
                     className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
-                      theme === 'dark' ? 'text-stone-300 hover:text-white hover:bg-stone-800' : 'text-stone-700 hover:text-stone-900 hover:bg-stone-100'
+                      theme === 'dark' ? 'text-[#ECE8E1] hover:text-[#F5F3EF] hover:bg-[#1A1918]' : 'text-stone-700 hover:text-stone-900 hover:bg-stone-100'
                     }`}
                   >
-                    <Settings className="w-4 h-4 text-stone-400" />
+                    <Settings className="w-4 h-4 text-[#99958F]" />
                     <span>Account Settings</span>
                   </button>
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer mt-1 transition-colors"
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer mt-1 transition-colors"
                   >
-                    <LogOut className="w-4 h-4 text-rose-500" />
+                    <LogOut className="w-4 h-4 text-rose-400" />
                     <span>Sign Out</span>
                   </button>
                 </div>
@@ -784,12 +783,12 @@ export default function App() {
 
         {/* Global Toast Alert */}
         {toastMessage && (
-          <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs font-semibold shadow-lg flex items-center justify-between animate-fadeIn">
+          <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-[#D4A373]/20 border border-[#D4A373]/40 text-[#ECE8E1] text-xs font-semibold shadow-lg flex items-center justify-between animate-fadeIn">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span className={theme === 'dark' ? 'text-amber-200' : 'text-amber-900'}>{toastMessage}</span>
+              <Sparkles className="w-4 h-4 text-[#D4A373]" />
+              <span className={theme === 'dark' ? 'text-[#ECE8E1]' : 'text-amber-900'}>{toastMessage}</span>
             </div>
-            <button onClick={() => setToastMessage('')} className="text-stone-400 hover:text-white">
+            <button onClick={() => setToastMessage('')} className="text-[#99958F] hover:text-[#F5F3EF]">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -798,70 +797,69 @@ export default function App() {
         {/* View Content Container */}
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
           {activeTab === 'dashboard' && (
-            <Dashboard
+            <Dashboard 
               onStartCompose={handleStartCompose}
               onViewHistory={() => setActiveTab('history')}
-              onViewNotifications={() => setActiveTab('notifications')}
               onNavigateToSettings={() => setActiveTab('settings')}
-              composeState={composeState}
               onUpdateComposeState={handleUpdateComposeState}
-              theme={theme}
             />
           )}
-
           {activeTab === 'compose' && (
             <ComposeWorkflow
               composeState={composeState}
               onUpdateComposeState={handleUpdateComposeState}
               onResetCompose={handleResetCompose}
               initialData={composeInitialData}
-              onComplete={() => setActiveTab('dashboard')}
-              onCancel={() => {
-                handleResetCompose();
-                setActiveTab('dashboard');
-              }}
+              onComplete={() => setActiveTab('history')}
+              onCancel={() => setActiveTab('dashboard')}
               onNavigateToSettings={() => setActiveTab('settings')}
             />
           )}
-
           {activeTab === 'history' && (
-            <EmailHistory />
+            <EmailHistory 
+              onStartCompose={handleStartCompose}
+            />
           )}
-
+          {activeTab === 'contacts' && (
+            <ContactsManager 
+              onComposeTo={(contact) => {
+                handleStartCompose({ 
+                  recipient: contact.email,
+                  instruction: `Email to ${contact.name}`
+                });
+              }}
+            />
+          )}
+          {activeTab === 'templates' && (
+            <TemplatesLibrary 
+              onUseTemplate={(tpl) => {
+                handleStartCompose({
+                  subject: tpl.subject,
+                  body: tpl.body,
+                  emailType: tpl.category || 'Professional / Official',
+                  detectedCategory: tpl.category || 'Professional / Official',
+                  situation: tpl.category || '💼 Official / Professional',
+                  situationSource: 'manual'
+                });
+              }}
+            />
+          )}
           {activeTab === 'notifications' && (
             <NotificationCenter />
           )}
-
-          {activeTab === 'contacts' && (
-            <ContactsManager
-              onQuickCompose={(contact) => {
-                handleStartCompose({ recipient: contact.email });
-              }}
-            />
-          )}
-
-          {activeTab === 'templates' && (
-            <TemplatesLibrary
-              onSelectTemplate={(instruction) => {
-                handleStartCompose({ instruction });
-              }}
-            />
-          )}
-
           {activeTab === 'settings' && (
             <SettingsView />
           )}
-
           {activeTab === 'trash' && (
             <TrashView />
           )}
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-slate-800/80 py-4 px-6 text-xs text-slate-500 bg-[#0B0F19]/50">
+        <footer className="border-t border-[#2E2D2B] py-4 px-6 text-xs text-[#99958F] bg-[#121211]">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <span className="font-semibold text-slate-400">Scribe AI — Official Gmail Automation Platform</span>
-            <span className="flex items-center gap-1.5 text-slate-400 font-medium">
+            <span className="font-semibold text-[#F5F3EF]">Scribe AI — Official Gmail Automation Platform</span>
+            <span className="flex items-center gap-1.5 text-[#99958F] font-medium">
               <ShieldCheck className="w-4 h-4 text-emerald-400" /> Security Pipeline: Instruction → AI Categorization → Gmail Preview → User Confirmation → Send
             </span>
           </div>

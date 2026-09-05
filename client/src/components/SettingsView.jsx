@@ -50,19 +50,13 @@ export function SettingsView() {
   const [savingSig, setSavingSig] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('scribe_theme') || 'dark');
+  const currentTheme = 'dark';
 
-  const handleSetTheme = (newTheme) => {
-    setCurrentTheme(newTheme);
-    localStorage.setItem('scribe_theme', newTheme);
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light');
-    } else {
-      document.documentElement.classList.add('light');
-      document.documentElement.classList.remove('dark');
-    }
-  };
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+    localStorage.setItem('scribe_theme', 'dark');
+  }, []);
 
   const dynamicRedirectUri = `${activeApiBase.replace(/\/+$/, '')}/auth/google/callback`;
 
@@ -208,81 +202,48 @@ export function SettingsView() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn">
-      <div className="glass-panel p-6 rounded-3xl border border-slate-800 shadow-xl">
-        <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-          <Settings className="w-5 h-5 text-purple-400" />
+      <div className="glass-panel p-6 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] shadow-xl">
+        <h2 className="text-xl font-extrabold text-[#F5F3EF] flex items-center gap-2">
+          <Settings className="w-5 h-5 text-[#D4A373]" />
           Settings & Account Authorization
         </h2>
-        <p className="text-xs text-slate-400 mt-1">Configure Gmail sender authorization, theme appearance, backend endpoint, and email signature defaults</p>
+        <p className="text-xs text-[#99958F] mt-1">Configure Gmail sender authorization, theme appearance, backend endpoint, and email signature defaults</p>
       </div>
 
       {/* 0. Appearance & Theme Selection Card */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border shadow-xl space-y-4">
-        <div className="flex items-start justify-between border-b border-stone-800/40 pb-4">
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] shadow-xl space-y-4">
+        <div className="flex items-start justify-between border-b border-[#2E2D2B] pb-4">
           <div>
-            <h3 className="text-base font-extrabold flex items-center gap-2">
-              <Sun className="w-5 h-5 text-amber-500" />
-              Appearance & Color Theme
+            <h3 className="text-base font-extrabold text-[#F5F3EF] flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-[#D4A373]" />
+              Warm Cashmere & Charcoal Palette
             </h3>
-            <p className="text-xs opacity-75 mt-1">
-              Toggle between Luxury Obsidian Gold (Dark) and Elegant Warm Ivory (Light)
+            <p className="text-xs text-[#99958F] mt-1">
+              Editorial Minimalist design permanently locked to Dark Mode with rich soot and muted almond accents
             </p>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div
-            onClick={() => handleSetTheme('dark')}
-            className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${
-              currentTheme === 'dark'
-                ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-md'
-                : 'bg-stone-900/40 border-stone-800 text-stone-400 hover:border-amber-500/40'
-            }`}
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#08090C] border border-amber-500/30 flex items-center justify-center shrink-0">
-              <Moon className="w-5 h-5 text-amber-400" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-white">Luxury Gold Dark Mode</h4>
-              <p className="text-[11px] text-stone-400">Deep obsidian with glowing gold & amber accents</p>
-            </div>
-          </div>
-
-          <div
-            onClick={() => handleSetTheme('light')}
-            className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${
-              currentTheme === 'light'
-                ? 'bg-amber-100 border-amber-500 text-amber-900 shadow-md'
-                : 'bg-white border-stone-200 text-stone-600 hover:border-amber-400'
-            }`}
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#FAF8F5] border border-amber-400 flex items-center justify-center shrink-0">
-              <Sun className="w-5 h-5 text-amber-600" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-stone-900">Warm Ivory Light Mode</h4>
-              <p className="text-[11px] text-stone-500">Elegant pearl cream with warm gold accents</p>
-            </div>
-          </div>
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#22211F] text-[#D4A373] border border-[#2E2D2B]">
+            Locked Dark Mode ✓
+          </span>
         </div>
       </div>
 
       {/* 1. Official Google OAuth 2.0 Authorization Card */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-xl space-y-6">
-        <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] shadow-xl space-y-6">
+        <div className="flex items-start justify-between border-b border-[#2E2D2B] pb-4">
           <div>
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <Shield className="w-5 h-5 text-cyan-400" />
+            <h3 className="text-base font-extrabold text-[#F5F3EF] flex items-center gap-2">
+              <Shield className="w-5 h-5 text-[#D4A373]" />
               Official Google OAuth 2.0 Gmail Authorization
             </h3>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-[#99958F] mt-1">
               Authorize Scribe AI to send emails directly via Google OAuth 2.0 Gmail REST API
             </p>
           </div>
           <span className={`text-xs font-bold px-3 py-1 rounded-full ${
             authStatus.isConnected
               ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
-              : 'bg-amber-950/80 text-amber-300 border border-amber-500/40'
+              : 'bg-[#22211F] text-[#D4A373] border border-[#2E2D2B]'
           }`}>
             {authStatus.isConnected ? 'Gmail OAuth Active ✓' : 'Not Connected'}
           </span>
@@ -299,7 +260,7 @@ export function SettingsView() {
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
-                <span className="text-xs font-bold text-white">
+                <span className="text-xs font-bold text-[#F5F3EF]">
                   Connected account: <span className="text-emerald-300 font-mono">{authStatus.connectedEmail}</span>
                 </span>
               </div>
@@ -310,18 +271,18 @@ export function SettingsView() {
                 Disconnect Google
               </button>
             </div>
-            <p className="text-xs text-slate-400">
-              All AI-generated emails are dispatched directly from your authenticated Gmail address (<span className="font-semibold text-slate-200">{authStatus.connectedEmail}</span>) via the official Google OAuth 2.0 Gmail API.
+            <p className="text-xs text-[#99958F]">
+              All AI-generated emails are dispatched directly from your authenticated Gmail address (<span className="font-semibold text-[#ECE8E1]">{authStatus.connectedEmail}</span>) via the official Google OAuth 2.0 Gmail API.
             </p>
           </div>
         ) : (
-          <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="p-6 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-4 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
-              <h4 className="text-base font-extrabold text-white flex items-center justify-center sm:justify-start gap-2">
-                <Shield className="w-5 h-5 text-purple-400" />
+              <h4 className="text-base font-extrabold text-[#F5F3EF] flex items-center justify-center sm:justify-start gap-2">
+                <Shield className="w-5 h-5 text-[#D4A373]" />
                 Connect with Google
               </h4>
-              <p className="text-xs text-slate-400 mt-1 max-w-xl">
+              <p className="text-xs text-[#99958F] mt-1 max-w-xl">
                 Click the button to choose your Google account and grant 1-click Gmail sending permissions for genuine email dispatches.
               </p>
             </div>
@@ -329,7 +290,7 @@ export function SettingsView() {
             <button
               onClick={handleConnectClick}
               disabled={connectingGoogle}
-              className="px-6 py-3.5 rounded-2xl gradient-btn text-white font-extrabold text-xs inline-flex items-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-105 transition-transform cursor-pointer shrink-0 disabled:opacity-50"
+              className="px-6 py-3.5 rounded-2xl gold-btn text-[#121211] font-extrabold text-xs inline-flex items-center gap-2 shadow-lg shadow-[#D4A373]/20 hover:scale-105 transition-transform cursor-pointer shrink-0 disabled:opacity-50"
             >
               <ExternalLink className="w-4 h-4" />
               <span>{connectingGoogle ? 'Connecting Google...' : '⚡ Connect with Google'}</span>
@@ -339,62 +300,62 @@ export function SettingsView() {
       </div>
 
       {/* 2. User Signature Settings Card */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-xl space-y-6">
-        <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] shadow-xl space-y-6">
+        <div className="flex items-start justify-between border-b border-[#2E2D2B] pb-4">
           <div>
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-purple-400" />
+            <h3 className="text-base font-extrabold text-[#F5F3EF] flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-[#D4A373]" />
               Personal Email Signature
             </h3>
-            <p className="text-xs text-slate-400 mt-1">Automatically appended to all AI-drafted emails</p>
+            <p className="text-xs text-[#99958F] mt-1">Automatically appended to all AI-drafted emails</p>
           </div>
         </div>
 
         <form onSubmit={handleSaveSignature} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">Full Name</label>
+              <label className="text-xs font-bold text-[#ECE8E1] block mb-1">Full Name</label>
               <input
                 type="text"
                 placeholder="Alex Morgan"
                 value={signature.name}
                 onChange={(e) => setSignature({ ...signature, name: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white"
+                className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-[#F5F3EF]"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">Designation / Title</label>
+              <label className="text-xs font-bold text-[#ECE8E1] block mb-1">Designation / Title</label>
               <input
                 type="text"
                 placeholder="Product Lead / Senior Engineer"
                 value={signature.designation}
                 onChange={(e) => setSignature({ ...signature, designation: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white"
+                className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-[#F5F3EF]"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">Company / Organization</label>
+              <label className="text-xs font-bold text-[#ECE8E1] block mb-1">Company / Organization</label>
               <input
                 type="text"
                 placeholder="Acme Corp"
                 value={signature.company}
                 onChange={(e) => setSignature({ ...signature, company: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white"
+                className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-[#F5F3EF]"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">Phone Number</label>
+              <label className="text-xs font-bold text-[#ECE8E1] block mb-1">Phone Number</label>
               <input
                 type="text"
                 placeholder="+1 (555) 019-2834"
                 value={signature.phone}
                 onChange={(e) => setSignature({ ...signature, phone: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white"
+                className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-[#F5F3EF]"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+          <div className="flex items-center justify-between pt-2 border-t border-[#2E2D2B]">
             {saveSuccess && (
               <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 animate-fadeIn">
                 <CheckCircle className="w-4 h-4" /> Signature saved successfully!
@@ -403,7 +364,7 @@ export function SettingsView() {
             <button
               type="submit"
               disabled={savingSig}
-              className="ml-auto px-5 py-2 rounded-xl gradient-btn text-white text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
+              className="ml-auto px-5 py-2 rounded-xl gold-btn text-[#121211] text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
             >
               {savingSig ? 'Saving...' : 'Save Signature'}
             </button>

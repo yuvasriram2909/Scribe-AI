@@ -168,37 +168,37 @@ export function LoginPage({ onLoginSuccess }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#080C14] flex flex-col justify-center items-center p-4 selection:bg-purple-600 selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#121211] flex flex-col justify-center items-center p-4 selection:bg-[#D4A373] selection:text-[#121211] relative overflow-hidden">
       
-      {/* Ambient Animated Cosmic Glows */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl pointer-events-none animate-pulseGlow"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/15 rounded-full blur-3xl pointer-events-none"></div>
+      {/* Ambient Animated Warm Glows */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#D4A373]/10 rounded-full blur-3xl pointer-events-none animate-pulseGlow"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#D4A373]/5 rounded-full blur-3xl pointer-events-none"></div>
 
       <div className="w-full max-w-md space-y-6 relative z-10 animate-fadeIn">
         
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-cyan-400 p-[1px] mx-auto shadow-xl shadow-purple-500/25">
-            <div className="w-full h-full bg-[#0D121F] rounded-[15px] flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-cyan-300 animate-pulse" />
+          <div className="w-12 h-12 rounded-2xl bg-[#2E2D2B] p-[1px] mx-auto shadow-xl shadow-black/40">
+            <div className="w-full h-full bg-[#1A1918] rounded-[15px] flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-[#D4A373] animate-pulse" />
             </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Scribe <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">AI</span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#F5F3EF] tracking-tight">
+            Scribe <span className="text-[#D4A373]">AI</span>
           </h1>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-[#99958F]">
             Production Multi-User Gmail OAuth Platform
           </p>
         </div>
 
         {/* Main Glass Card */}
-        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-700/80 shadow-2xl space-y-6">
+        <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] shadow-2xl space-y-6">
           
-          <div className="text-center space-y-1 border-b border-slate-800 pb-4">
-            <h2 className="text-lg font-extrabold text-white">
+          <div className="text-center space-y-1 border-b border-[#2E2D2B] pb-4">
+            <h2 className="text-lg font-extrabold text-[#F5F3EF]">
               {isSignUpMode ? 'Create Your Account' : 'Welcome Back'}
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-[#99958F]">
               {isSignUpMode 
                 ? 'Register to draft and send intelligent emails via Gmail' 
                 : 'Sign in to access your email dashboard & contacts'}
@@ -210,7 +210,7 @@ export function LoginPage({ onLoginSuccess }) {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full py-3 px-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-white font-bold text-xs flex items-center justify-center gap-3 shadow-lg shadow-black/30 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
+            className="w-full py-3 px-4 rounded-2xl bg-[#22211F] hover:bg-[#2A2926] border border-[#2E2D2B] text-[#F5F3EF] font-bold text-xs flex items-center justify-center gap-3 shadow-lg shadow-black/30 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
           >
             {googleLoading ? (
               <span>Connecting Google...</span>
@@ -228,8 +228,8 @@ export function LoginPage({ onLoginSuccess }) {
           </button>
 
           <div className="relative flex items-center justify-center">
-            <div className="border-t border-slate-800 w-full"></div>
-            <span className="bg-[#0D1322] px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest absolute">
+            <div className="border-t border-[#2E2D2B] w-full"></div>
+            <span className="bg-[#1A1918] px-3 text-[10px] font-bold text-[#99958F] uppercase tracking-widest absolute">
               or use email
             </span>
           </div>
@@ -244,7 +244,7 @@ export function LoginPage({ onLoginSuccess }) {
                     setIsSignUpMode(true);
                     setError('');
                   }}
-                  className="text-xs text-purple-300 underline font-extrabold cursor-pointer block mx-auto mt-1"
+                  className="text-xs text-[#D4A373] underline font-extrabold cursor-pointer block mx-auto mt-1"
                 >
                   Click here to register your account now →
                 </button>
@@ -262,58 +262,58 @@ export function LoginPage({ onLoginSuccess }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignUpMode && (
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">
+                <label className="text-xs font-bold text-[#ECE8E1] block mb-1">
                   Full Name
                 </label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+                  <User className="w-4 h-4 text-[#99958F] absolute left-3.5 top-3.5" />
                   <input
                     type="text"
                     required={isSignUpMode}
                     placeholder="Alex Morgan"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-2xl glass-input text-xs text-white"
+                    className="w-full pl-10 pr-4 py-3 rounded-2xl glass-input text-xs text-[#F5F3EF]"
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">
+              <label className="text-xs font-bold text-[#ECE8E1] block mb-1">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+                <Mail className="w-4 h-4 text-[#99958F] absolute left-3.5 top-3.5" />
                 <input
                   type="email"
                   required
                   placeholder="alex@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-2xl glass-input text-xs text-white"
+                  className="w-full pl-10 pr-4 py-3 rounded-2xl glass-input text-xs text-[#F5F3EF]"
                 />
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">
+              <label className="text-xs font-bold text-[#ECE8E1] block mb-1">
                 Password
               </label>
               <div className="relative">
-                <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+                <KeyRound className="w-4 h-4 text-[#99958F] absolute left-3.5 top-3.5" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   placeholder="At least 6 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-3 rounded-2xl glass-input text-xs text-white"
+                  className="w-full pl-10 pr-10 py-3 rounded-2xl glass-input text-xs text-[#F5F3EF]"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 cursor-pointer"
+                  className="absolute right-3 top-3 text-[#99958F] hover:text-[#F5F3EF] cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -322,23 +322,23 @@ export function LoginPage({ onLoginSuccess }) {
 
             {isSignUpMode && (
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">
+                <label className="text-xs font-bold text-[#ECE8E1] block mb-1">
                   Confirm Password
                 </label>
                 <div className="relative">
-                  <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+                  <KeyRound className="w-4 h-4 text-[#99958F] absolute left-3.5 top-3.5" />
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     required={isSignUpMode}
                     placeholder="Repeat your password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-10 pr-10 py-3 rounded-2xl glass-input text-xs text-white"
+                    className="w-full pl-10 pr-10 py-3 rounded-2xl glass-input text-xs text-[#F5F3EF]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 cursor-pointer"
+                    className="absolute right-3 top-3 text-[#99958F] hover:text-[#F5F3EF] cursor-pointer"
                   >
                     {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -349,7 +349,7 @@ export function LoginPage({ onLoginSuccess }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 rounded-2xl gradient-btn text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 hover:scale-[1.01] active:scale-[0.99] transition-transform cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full py-3.5 px-4 rounded-2xl gold-btn text-[#121211] font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#D4A373]/20 hover:scale-[1.01] active:scale-[0.99] transition-transform cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span>Processing...</span>
@@ -367,7 +367,7 @@ export function LoginPage({ onLoginSuccess }) {
             </button>
           </form>
 
-          <div className="pt-2 text-center border-t border-slate-800">
+          <div className="pt-2 text-center border-t border-[#2E2D2B]">
             <button
               type="button"
               onClick={() => {
@@ -375,14 +375,14 @@ export function LoginPage({ onLoginSuccess }) {
                 setError('');
                 setSuccessMessage('');
               }}
-              className="text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors cursor-pointer"
+              className="text-xs font-bold text-[#D4A373] hover:text-[#c59362] transition-colors cursor-pointer"
             >
               {isSignUpMode ? 'Already have an account? Sign In' : 'Need an account? Register here'}
             </button>
           </div>
         </div>
 
-        <div className="text-center text-[11px] text-slate-500 flex items-center justify-center gap-1.5 font-medium">
+        <div className="text-center text-[11px] text-[#99958F] flex items-center justify-center gap-1.5 font-medium">
           <ShieldCheck className="w-4 h-4 text-emerald-400" />
           <span>PostgreSQL Multi-User Database & Google OAuth Protection</span>
         </div>
