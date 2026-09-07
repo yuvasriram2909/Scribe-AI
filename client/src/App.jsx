@@ -113,6 +113,7 @@ export default function App() {
 
   // Listen to Supabase Auth State & Session
   useEffect(() => {
+    // 1. Sync from Supabase Client Session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const supaUser = session.user;
@@ -137,10 +138,33 @@ export default function App() {
           }).catch((e) => console.warn('Sync session tokens notice:', e));
         }
 
-        // Trigger automatic Gmail sync on session restore
         apiFetch('/api/gmail/sync', { method: 'POST' }).catch(() => {});
       }
-    });
+    }).catch(() => {});
+
+    // 2. Validate & Sync with Backend /api/auth/me (ensures accurate name, email, and Gmail status)
+    apiFetch('/api/auth/me')
+      .then(r => r.json())
+      .then(data => {
+        if (data?.authenticated && data?.user) {
+          const u = data.user;
+          if (u.email) {
+            setCurrentUserEmail(u.email);
+            localStorage.setItem('userEmail', u.email);
+          }
+          if (u.name) {
+            setCurrentUserName(u.name);
+            localStorage.setItem('userName', u.name);
+          }
+          if (u.id) {
+            localStorage.setItem('userId', u.id);
+          }
+          if (typeof u.isConnected === 'boolean') {
+            setIsGmailConnected(u.isConnected);
+          }
+        }
+      })
+      .catch(() => {});
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
@@ -167,7 +191,6 @@ export default function App() {
         }
 
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-          // Trigger automatic Gmail sync on user login
           apiFetch('/api/gmail/sync', { method: 'POST' }).catch(() => {});
         }
       } else if (event === 'SIGNED_OUT') {
@@ -185,32 +208,39 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('gmail') === 'connected' || params.get('auth') === 'success') {
       const emailParam = params.get('email');
+      const nameParam = params.get('name');
       const userIdParam = params.get('user_id');
-      const authLinkParam = params.get('auth_link');
+      const tokenParam = params.get('token');
 
       if (emailParam) {
-        localStorage.setItem('userEmail', emailParam.toLowerCase().trim());
-        setCurrentUserEmail(emailParam.toLowerCase().trim());
+        const cleanEmail = emailParam.toLowerCase().trim();
+        localStorage.setItem('userEmail', cleanEmail);
+        setCurrentUserEmail(cleanEmail);
+      }
+      if (nameParam) {
+        localStorage.setItem('userName', nameParam);
+        setCurrentUserName(nameParam);
       }
       if (userIdParam) {
         localStorage.setItem('userId', userIdParam);
       }
-      if (authLinkParam) {
-        window.location.href = authLinkParam;
-        return;
+      if (tokenParam) {
+        localStorage.setItem('authToken', tokenParam);
       }
 
+      navigateTo('/app');
       setActiveTab('dashboard');
-      setToastMessage('✓ Gmail Connected Successfully!');
-      window.history.replaceState({}, '', window.location.pathname);
+      setToastMessage(`✓ Logged in as ${nameParam || emailParam || 'User'}! Gmail connected.`);
+      window.history.replaceState({}, '', '/app');
       setTimeout(() => setToastMessage(''), 5000);
       checkGmailConnection();
       // Auto-trigger sync immediately upon connecting Gmail
       apiFetch('/api/gmail/sync', { method: 'POST' }).catch(() => {});
     } else if (params.get('gmail') === 'missing_scopes') {
+      navigateTo('/app');
       setActiveTab('settings');
       setToastMessage('⚠️ Gmail sending permission was not granted. Please click "Connect with Google" and check the "Send email on your behalf" box.');
-      window.history.replaceState({}, '', window.location.pathname);
+      window.history.replaceState({}, '', '/app');
       setTimeout(() => setToastMessage(''), 8000);
     } else if (params.get('gmail') === 'cancelled') {
       setToastMessage('⚠️ Gmail connection cancelled.');
@@ -599,8 +629,35 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Sidebar Bottom: Upgrade to Premium Card */}
+        {/* Sidebar Bottom: Active Logged-In User Card & Upgrade Card */}
         <div className="p-4 space-y-3">
+          {/* Active Logged-In User Card */}
+          <div 
+            onClick={() => { setActiveTab('settings'); setMobileMenuOpen(false); }}
+            className={`p-3 rounded-2xl border flex items-center gap-3 transition-all duration-200 cursor-pointer group hover:border-[#D4A373]/40 ${
+              theme === 'dark' 
+                ? 'bg-[#1A1918] hover:bg-[#22211F] border-[#2E2D2B]' 
+                : 'bg-white hover:bg-stone-50 border-amber-900/10'
+            }`}
+            title="View Account Details & Settings"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#D4A373] to-[#ECE8E1] text-[#121211] font-extrabold text-sm flex items-center justify-center shadow-md shrink-0 group-hover:scale-105 transition-transform">
+              {displayName[0]?.toUpperCase() || 'U'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <p className={`text-xs font-extrabold truncate ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
+                  {displayName}
+                </p>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse shadow-xs shadow-emerald-400/50" title="Active Logged In" />
+              </div>
+              <p className={`text-[11px] truncate font-mono ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
+                {currentUserEmail || 'Signed In'}
+              </p>
+            </div>
+            <User className="w-4 h-4 text-[#99958F] group-hover:text-[#D4A373] transition-colors shrink-0" />
+          </div>
+
           <div className={`p-4 rounded-2xl border relative overflow-hidden group ${
             theme === 'dark' 
               ? 'bg-gradient-to-b from-[#1A1918] to-[#161514] border-[#2E2D2B] shadow-xl' 
@@ -882,7 +939,11 @@ export default function App() {
             <NotificationCenter />
           )}
           {activeTab === 'settings' && (
-            <SettingsView />
+            <SettingsView 
+              currentUserName={currentUserName}
+              currentUserEmail={currentUserEmail}
+              onLogout={handleLogout}
+            />
           )}
           {activeTab === 'trash' && (
             <TrashView />

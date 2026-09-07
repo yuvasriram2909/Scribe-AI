@@ -19,7 +19,18 @@ import {
 import { apiFetch, safeParseResponse, getApiBaseUrl, setCustomBackendUrl, DEFAULT_SUPABASE_EDGE_FUNCTION } from '../utils/api';
 import { signInWithGoogle } from '../utils/supabaseClient';
 
-export function SettingsView() {
+export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
+  // Current logged in user profile
+  const [userProfile, setUserProfile] = useState({
+    name: currentUserName || localStorage.getItem('userName') || '',
+    email: currentUserEmail || localStorage.getItem('userEmail') || '',
+    id: localStorage.getItem('userId') || '',
+    createdAt: '',
+    lastLoginAt: '',
+    connectedEmail: null,
+    isConnected: false
+  });
+
   // Gmail OAuth status
   const [authStatus, setAuthStatus] = useState({
     isConnected: false,
@@ -39,7 +50,7 @@ export function SettingsView() {
 
   // Signature Settings State
   const [signature, setSignature] = useState({
-    name: localStorage.getItem('userName') || '',
+    name: currentUserName || localStorage.getItem('userName') || '',
     designation: '',
     company: '',
     phone: '',
@@ -62,10 +73,31 @@ export function SettingsView() {
 
   useEffect(() => {
     fetchSettings();
-  }, []);
+  }, [currentUserName, currentUserEmail]);
 
   const fetchSettings = async () => {
     try {
+      // 0. Fetch Logged-in User Profile
+      try {
+        const meRes = await apiFetch('/api/auth/me');
+        const meData = await safeParseResponse(meRes);
+        if (meData?.authenticated && meData?.user) {
+          const u = meData.user;
+          setUserProfile({
+            name: u.name || currentUserName || localStorage.getItem('userName') || '',
+            email: u.email || currentUserEmail || localStorage.getItem('userEmail') || '',
+            id: u.id || localStorage.getItem('userId') || '',
+            createdAt: u.createdAt || '',
+            lastLoginAt: u.lastLoginAt || '',
+            connectedEmail: u.connectedEmail || null,
+            isConnected: !!u.isConnected
+          });
+          if (u.name && !signature.name) {
+            setSignature(prev => ({ ...prev, name: u.name }));
+          }
+        }
+      } catch (_) {}
+
       // 1. Fetch OAuth status
       const authRes = await apiFetch('/api/auth/status');
       const authData = await safeParseResponse(authRes);
@@ -208,6 +240,68 @@ export function SettingsView() {
           Settings & Account Authorization
         </h2>
         <p className="text-xs text-[#99958F] mt-1">Configure Gmail sender authorization, theme appearance, backend endpoint, and email signature defaults</p>
+      </div>
+
+      {/* Active Logged-In User Profile Card */}
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] shadow-xl space-y-6">
+        <div className="flex items-start justify-between border-b border-[#2E2D2B] pb-4 flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#D4A373] to-[#ECE8E1] text-[#121211] font-extrabold text-xl flex items-center justify-center shadow-lg shadow-[#D4A373]/20">
+              {(userProfile.name || userProfile.email || 'U')[0].toUpperCase()}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-extrabold text-[#F5F3EF]">
+                  {userProfile.name || (userProfile.email ? userProfile.email.split('@')[0] : 'Active User')}
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 inline-flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Logged In
+                </span>
+              </div>
+              <p className="text-xs font-mono text-[#D4A373] mt-0.5">
+                {userProfile.email || 'user@domain.com'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#22211F] text-[#ECE8E1] border border-[#2E2D2B] flex items-center gap-1">
+              👑 Pro / Premium Plan
+            </span>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="px-3.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Sign Out
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* User Account Details Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B]">
+            <span className="text-[11px] font-medium text-[#99958F] block">Primary Authenticated Email</span>
+            <span className="text-xs font-mono font-bold text-[#F5F3EF] truncate block mt-1">
+              {userProfile.email || 'Not available'}
+            </span>
+          </div>
+          <div className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B]">
+            <span className="text-[11px] font-medium text-[#99958F] block">Active User ID</span>
+            <span className="text-xs font-mono font-bold text-[#D4A373] truncate block mt-1" title={userProfile.id}>
+              {userProfile.id ? `${userProfile.id.slice(0, 18)}...` : 'System Verified'}
+            </span>
+          </div>
+          <div className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B]">
+            <span className="text-[11px] font-medium text-[#99958F] block">Connected Gmail Sender</span>
+            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1 mt-1 truncate">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate">{authStatus.connectedEmail || userProfile.connectedEmail || userProfile.email || 'Connected'}</span>
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* 0. Appearance & Theme Selection Card */}

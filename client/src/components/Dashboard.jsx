@@ -586,9 +586,9 @@ export function Dashboard({
     }
   };
 
-  const currentUserName = localStorage.getItem('userName') || '';
-  const currentUserEmail = localStorage.getItem('userEmail') || '';
-  const displayName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'User');
+  const currentUserName = propUserName || localStorage.getItem('userName') || '';
+  const currentUserEmail = propUserEmail || localStorage.getItem('userEmail') || '';
+  const displayName = authUserName || currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'User');
   const [dotsMenuOpen, setDotsMenuOpen] = useState(false);
 
   return (
@@ -664,9 +664,12 @@ export function Dashboard({
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   OAuth Active
                 </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#D4A373]/15 border border-[#D4A373]/30 text-[#D4A373] inline-flex items-center gap-1">
+                  👤 Active: {displayName}
+                </span>
               </div>
               <p className={`text-xs mt-0.5 font-mono ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
-                Connected account: {connectionStatus.connectedEmail || localStorage.getItem('userEmail') || 'Not Connected'}
+                Connected account: {connectionStatus.connectedEmail || currentUserEmail || 'Not Connected'}
               </p>
             </div>
           </div>
