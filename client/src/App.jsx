@@ -291,6 +291,16 @@ export default function App() {
     }
   }, [currentUserEmail]);
 
+  useEffect(() => {
+    const handleCountChange = (e) => {
+      if (typeof e?.detail?.unreadCount === 'number') {
+        setUnreadNotifCount(e.detail.unreadCount);
+      }
+    };
+    window.addEventListener('notifications-unread-count', handleCountChange);
+    return () => window.removeEventListener('notifications-unread-count', handleCountChange);
+  }, []);
+
   const fetchUnreadNotifs = async () => {
     try {
       const res = await apiFetch('/api/notifications');
@@ -793,9 +803,11 @@ export default function App() {
               title="Notifications"
             >
               <Bell className="w-4.5 h-4.5" />
-              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-extrabold shadow-sm">
-                {unreadNotifCount > 0 ? unreadNotifCount : '3'}
-              </span>
+              {unreadNotifCount > 0 && (
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-extrabold shadow-sm">
+                  {unreadNotifCount}
+                </span>
+              )}
             </button>
 
             {/* User Profile Pill & Dropdown with Hover Lift & Glow */}
@@ -936,7 +948,9 @@ export default function App() {
             />
           )}
           {activeTab === 'notifications' && (
-            <NotificationCenter />
+            <NotificationCenter 
+              onUnreadCountChange={(count) => setUnreadNotifCount(count)}
+            />
           )}
           {activeTab === 'settings' && (
             <SettingsView 

@@ -2723,30 +2723,70 @@ HUMAN-WRITTEN WRITING GUIDELINES:
 
     if (path === "/notifications" && method === "GET") {
       const user = await getAuthUser(req, supabase);
-      if (!user) return jsonResponse({ notifications: [], unreadCount: 0 });
+      if (!user) return jsonResponse({ notifications: [], unreadCount: 0, activeCount: 0, trashedCount: 0 });
+
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
+      const isTrashed = url.searchParams.get("trashed") === "true";
 
       const { data: notifications } = await supabase
         .from("Notification")
         .select("*")
-        .eq("userId", user.id)
-        .eq("isTrashed", false)
+        .in("userId", userIds)
+        .eq("isTrashed", isTrashed)
         .order("createdAt", { ascending: false });
 
-      const unreadCount = (notifications || []).filter((n: any) => !n.read).length;
-      return jsonResponse({ notifications: notifications || [], unreadCount });
+      const { data: allNotifs } = await supabase
+        .from("Notification")
+        .select("id, read, isTrashed")
+        .in("userId", userIds);
+
+      const unreadCount = (allNotifs || []).filter((n: any) => !n.read && !n.isTrashed).length;
+      const activeCount = (allNotifs || []).filter((n: any) => !n.isTrashed).length;
+      const trashedCount = (allNotifs || []).filter((n: any) => !!n.isTrashed).length;
+
+      return jsonResponse({
+        notifications: notifications || [],
+        unreadCount,
+        activeCount,
+        trashedCount,
+      });
     }
 
     if (path === "/notifications/read-all" && (method === "POST" || method === "PATCH")) {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
 
-      await supabase
-        .from("Notification")
-        .update({ read: true, updatedAt: new Date().toISOString() })
-        .eq("userId", user.id)
-        .eq("read", false);
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
-      return jsonResponse({ success: true, message: "All notifications marked as read." });
+      const { error: updateErr } = await supabase
+        .from("Notification")
+        .update({ read: true })
+        .in("userId", userIds);
+
+      if (updateErr) {
+        console.error("Failed to mark notifications read:", updateErr);
+      }
+
+      return jsonResponse({ success: true, unreadCount: 0, message: "All notifications marked as read." });
+    }
+
+    if (path.startsWith("/notifications/") && path.endsWith("/read") && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const id = path.split("/")[2];
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
+
+      const { error: singleErr } = await supabase
+        .from("Notification")
+        .update({ read: true })
+        .eq("id", id)
+        .in("userId", userIds);
+
+      if (singleErr) {
+        console.error("Failed to mark single notification read:", singleErr);
+      }
+
+      return jsonResponse({ success: true, message: "Notification marked as read." });
     }
 
     if (path === "/settings/signature" && method === "GET") {
@@ -3268,8 +3308,9 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
-      await supabase.from("Notification").update({ isTrashed: true, updatedAt: new Date().toISOString() }).eq("id", id).eq("userId", user.id);
+      await supabase.from("Notification").update({ isTrashed: true }).eq("id", id).in("userId", userIds);
       return jsonResponse({ success: true, message: "Notification moved to trash." });
     }
 
@@ -3277,8 +3318,9 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
-      await supabase.from("Notification").update({ isTrashed: false, updatedAt: new Date().toISOString() }).eq("id", id).eq("userId", user.id);
+      await supabase.from("Notification").update({ isTrashed: false }).eq("id", id).in("userId", userIds);
       return jsonResponse({ success: true, message: "Notification restored." });
     }
 
