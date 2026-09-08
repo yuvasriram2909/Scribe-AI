@@ -54,25 +54,25 @@ CREATE TABLE IF NOT EXISTS public.email_labels (
 CREATE INDEX IF NOT EXISTS email_labels_user_id_idx ON public.email_labels(user_id);
 
 -- 5. Standardize public.emails Table Columns
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS sender_email TEXT;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS sender_name TEXT;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS recipient_emails TEXT[];
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS cc_emails TEXT[];
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS bcc_emails TEXT[];
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS body_text TEXT;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS body_html TEXT;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS snippet TEXT;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS direction TEXT NOT NULL DEFAULT 'sent';
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT true;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS is_starred BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS is_important BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS is_spam BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS is_trash BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS labels TEXT[];
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS gmail_thread_id TEXT;
-ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS history_id TEXT;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS sender_email TEXT;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS sender_name TEXT;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS recipient_emails TEXT[];
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS cc_emails TEXT[];
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS bcc_emails TEXT[];
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS body_text TEXT;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS body_html TEXT;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS snippet TEXT;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS direction TEXT NOT NULL DEFAULT 'sent';
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS is_starred BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS is_important BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS is_spam BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS is_trash BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS labels TEXT[];
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS gmail_thread_id TEXT;
+ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS history_id TEXT;
 
 -- 6. Performance & Integrity Indexes on public.emails
 CREATE INDEX IF NOT EXISTS emails_user_id_created_at_idx ON public.emails(user_id, created_at DESC);
@@ -85,47 +85,47 @@ CREATE INDEX IF NOT EXISTS emails_user_id_gmail_thread_id_idx ON public.emails(u
 CREATE UNIQUE INDEX IF NOT EXISTS emails_user_id_gmail_message_id_unique ON public.emails(user_id, gmail_message_id) WHERE gmail_message_id IS NOT NULL;
 
 -- 7. Dual-Table Column Migrations for Legacy "Email" Table
-ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "sender_email" TEXT;
-ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "sender_name" TEXT;
-ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "body_text" TEXT;
-ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "body_html" TEXT;
-ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "snippet" TEXT;
-ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "isStarred" BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "isImportant" BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "isTrash" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE IF EXISTS "Email" ADD COLUMN IF NOT EXISTS "sender_email" TEXT;
+ALTER TABLE IF EXISTS "Email" ADD COLUMN IF NOT EXISTS "sender_name" TEXT;
+ALTER TABLE IF EXISTS "Email" ADD COLUMN IF NOT EXISTS "body_text" TEXT;
+ALTER TABLE IF EXISTS "Email" ADD COLUMN IF NOT EXISTS "body_html" TEXT;
+ALTER TABLE IF EXISTS "Email" ADD COLUMN IF NOT EXISTS "snippet" TEXT;
+ALTER TABLE IF EXISTS "Email" ADD COLUMN IF NOT EXISTS "isStarred" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE IF EXISTS "Email" ADD COLUMN IF NOT EXISTS "isImportant" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE IF EXISTS "Email" ADD COLUMN IF NOT EXISTS "isTrash" BOOLEAN NOT NULL DEFAULT false;
 
 -- 8. Row Level Security (RLS) Configuration
-ALTER TABLE public.email_sync_state ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.email_threads ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.email_labels ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.emails ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.gmail_connections ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.email_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.email_analytics ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.drafts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.email_sync_state ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.email_threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.email_labels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.emails ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.gmail_connections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.email_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.email_analytics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.drafts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.contacts ENABLE ROW LEVEL SECURITY;
 
 -- Service Role Policies (Full access for Edge Functions)
 DO $$ BEGIN
   CREATE POLICY "Service role full access email_sync_state" ON public.email_sync_state FOR ALL TO service_role USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN undefined_table THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Service role full access email_threads" ON public.email_threads FOR ALL TO service_role USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN undefined_table THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Service role full access email_labels" ON public.email_labels FOR ALL TO service_role USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN undefined_table THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Service role full access emails" ON public.emails FOR ALL TO service_role USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN undefined_table THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Service role full access gmail_connections" ON public.gmail_connections FOR ALL TO service_role USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN undefined_table THEN NULL; END $$;
 
 -- Authenticated Users Policies (Strictly auth.uid() = user_id)
 DO $$ BEGIN
@@ -133,51 +133,67 @@ DO $$ BEGIN
     FOR ALL TO authenticated
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN undefined_table THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Users can only access their own email_threads" ON public.email_threads
     FOR ALL TO authenticated
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN undefined_table THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Users can only access their own email_labels" ON public.email_labels
     FOR ALL TO authenticated
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN undefined_table THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Users can only access their own emails" ON public.emails
     FOR ALL TO authenticated
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN undefined_table THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "Users can only access their own gmail_connections" ON public.gmail_connections
     FOR ALL TO authenticated
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN undefined_table THEN NULL; END $$;
 
 -- 9. Enable Realtime Publications
 DO $$ BEGIN
-  ALTER PUBLICATION supabase_realtime ADD TABLE public.email_sync_state;
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'email_sync_state') THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.email_sync_state;
+    END IF;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER PUBLICATION supabase_realtime ADD TABLE public.emails;
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'emails') THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.emails;
+    END IF;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER PUBLICATION supabase_realtime ADD TABLE public.email_events;
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'email_events') THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.email_events;
+    END IF;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER PUBLICATION supabase_realtime ADD TABLE public.gmail_connections;
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'gmail_connections') THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.gmail_connections;
+    END IF;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 10. Helper Function: get_dashboard_analytics (Strictly Authenticated Real Stats)
