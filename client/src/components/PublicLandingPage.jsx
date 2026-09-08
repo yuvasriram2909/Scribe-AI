@@ -331,8 +331,8 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
             <span>Official Google OAuth 2.0 Verified Integration</span>
           </div>
 
-          {/* Heading Floating Levitation & Ambient Volumetric Glow */}
-          <div className="animate-hero-title animate-title-float space-y-3 relative py-2 select-none group">
+          {/* Heading with Each Letter Floating Individually in the Air */}
+          <div className="space-y-4 relative py-2 select-none group">
             {/* Floating Tech Pills for Desktop */}
             <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1A1918]/90 border border-[#2E2D2B] shadow-xl text-xs font-semibold text-[#ECE8E1] backdrop-blur-md animate-pill-float-1 absolute top-3 -left-16 pointer-events-none">
               <Zap className="w-3.5 h-3.5 text-[#D4A373]" />
@@ -343,7 +343,7 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               <span>100% User Confirmed</span>
             </div>
 
-            {/* Ambient Volumetric Backlight Aura (Seamless circular bloom) */}
+            {/* Ambient Volumetric Backlight Aura */}
             <div 
               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-[520px] h-28 sm:h-36 rounded-full pointer-events-none -z-10 animate-title-aura"
               style={{
@@ -352,14 +352,40 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               }}
             />
 
-            {/* Main Animated Title */}
-            <div className="relative inline-block px-4 py-1 transition-transform duration-500 ease-out group-hover:scale-[1.03]">
-              <h1 className="text-5xl sm:text-7xl md:text-8xl font-black tracking-tight leading-tight flex items-center justify-center gap-3 sm:gap-4 cursor-default">
-                <span className="text-scribe-platinum tracking-tight">
-                  Scribe
+            {/* Main Animated Title with EACH LETTER Floating Individually in Mid-Air */}
+            <div className="relative inline-block px-4 py-2">
+              <h1 className="text-5xl sm:text-7xl md:text-8xl font-black tracking-tight leading-tight flex items-center justify-center cursor-default">
+                {/* Word: Scribe (Letter by letter wave float) */}
+                <span className="inline-flex items-center">
+                  {['S', 'c', 'r', 'i', 'b', 'e'].map((letter, i) => (
+                    <span
+                      key={i}
+                      style={{ animationDelay: `${i * 120}ms` }}
+                      className="floating-letter"
+                    >
+                      <span className="text-scribe-platinum tracking-tight">
+                        {letter}
+                      </span>
+                    </span>
+                  ))}
                 </span>
+
+                {/* Space between words */}
+                <span className="inline-block w-3 sm:w-5" />
+
+                {/* Word: AI (Letter by letter wave float) */}
                 <span className="relative inline-flex items-center">
-                  <span className="text-ai-gold tracking-tight">AI</span>
+                  {['A', 'I'].map((letter, i) => (
+                    <span
+                      key={i}
+                      style={{ animationDelay: `${(6 + i) * 120}ms` }}
+                      className="floating-letter"
+                    >
+                      <span className="text-ai-gold tracking-tight">
+                        {letter}
+                      </span>
+                    </span>
+                  ))}
                   {/* Twinkling Luxury Sparkle Accent */}
                   <Sparkles className="w-5 h-5 sm:w-7 sm:h-7 text-[#D4A373] animate-sparkle-twinkle absolute -top-3 -right-6 sm:-right-8 pointer-events-none" />
                 </span>
