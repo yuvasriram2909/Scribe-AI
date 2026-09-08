@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Shield, Mail, CheckCircle, Lock, ArrowRight, FileText, ExternalLink, Zap, Key, Calendar, Users, RefreshCw } from 'lucide-react';
+import { Sparkles, Shield, Mail, CheckCircle, Lock, ArrowRight, FileText, ExternalLink, Zap, Key } from 'lucide-react';
+
 
 
 /**
@@ -226,181 +227,6 @@ function ScrollReveal({
 }
 
 /**
- * Live Interactive Demonstration Showcase (Typing Simulation & Instant Output)
- */
-function LiveAiPreviewDemo({ onTryApp }) {
-  const [activeTab, setActiveTab] = useState(0);
-  const [displayText, setDisplayText] = useState('');
-  const [isTyping, setIsTyping] = useState(true);
-
-  const samples = [
-    {
-      title: 'Leave Request',
-      icon: Calendar,
-      category: 'Leave / Holiday',
-      prompt: 'Request 3 days sick leave from next Monday due to fever and physician advice.',
-      recipient: 'sarah.manager@company.com',
-      subject: 'Leave Request: 3 Days Medical Leave (Mon-Wed)',
-      preview: 'Hi Sarah,\n\nI am writing to formally request 3 days of medical leave starting next Monday. I have been advised by my physician to take bed rest due to a persistent fever.\n\nAll urgent deliverables have been transitioned to the team, and I will be reachable for critical blockers.\n\nThank you for understanding,\nYuva Sriram'
-    },
-    {
-      title: 'Team Sync',
-      icon: Users,
-      category: 'Official / Meeting',
-      prompt: 'Schedule a 30-minute sync meeting with the engineering team to review Q4 roadmap.',
-      recipient: 'engineering-leads@company.com',
-      subject: 'Invitation: 30-Min Q4 Technical Roadmap Sync',
-      preview: 'Hello Team,\n\nI would like to schedule a quick 30-minute sync this week to review the upcoming Q4 technical deliverables and deployment milestones.\n\nPlease let me know your availability for Thursday afternoon or Friday morning.\n\nWarm regards,\nYuva Sriram'
-    },
-    {
-      title: 'Follow-up',
-      icon: RefreshCw,
-      category: 'Follow-up',
-      prompt: 'Follow up politely on the partnership integration proposal sent to leadership last week.',
-      recipient: 'partnerships@enterprise.org',
-      subject: 'Follow-up: Scribe AI Enterprise Integration Proposal',
-      preview: 'Dear Partnerships Team,\n\nI wanted to follow up on the enterprise integration proposal sent last week. We are very excited about the collaboration opportunity and would love to answer any questions.\n\nLooking forward to hearing your thoughts!\n\nBest regards,\nYuva Sriram'
-    }
-  ];
-
-  const currentSample = samples[activeTab];
-
-  // Auto-cycle tabs every 7.5 seconds
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveTab(prev => (prev + 1) % samples.length);
-    }, 7500);
-    return () => clearInterval(timer);
-  }, [samples.length]);
-
-  // Smooth typing effect for prompt
-  useEffect(() => {
-    setDisplayText('');
-    setIsTyping(true);
-    let i = 0;
-    const fullText = currentSample.prompt;
-    const interval = setInterval(() => {
-      if (i <= fullText.length) {
-        setDisplayText(fullText.slice(0, i));
-        i++;
-      } else {
-        setIsTyping(false);
-        clearInterval(interval);
-      }
-    }, 22);
-    return () => clearInterval(interval);
-  }, [activeTab]);
-
-  return (
-    <div className="w-full max-w-4xl mx-auto mt-6 rounded-3xl p-[1px] bg-gradient-to-b from-[#D4A373]/35 via-[#2E2D2B] to-transparent shadow-2xl animate-hero-box">
-      <div className="rounded-[23px] bg-[#1A1918]/95 backdrop-blur-2xl border border-[#2E2D2B] overflow-hidden">
-        
-        {/* Terminal Header Bar */}
-        <div className="px-5 py-3.5 border-b border-[#2E2D2B] bg-[#161514] flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
-            <span className="ml-2 text-xs font-mono text-[#99958F] font-semibold hidden sm:inline">
-              scribe-ai // real-time-engine
-            </span>
-          </div>
-
-          {/* Interactive Preset Buttons */}
-          <div className="flex items-center gap-1.5 bg-[#121211] p-1 rounded-xl border border-[#2E2D2B]">
-            {samples.map((s, idx) => {
-              const IconComp = s.icon;
-              return (
-                <button
-                  key={s.title}
-                  onClick={() => setActiveTab(idx)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === idx
-                      ? 'bg-[#D4A373] text-[#121211] shadow-sm scale-102'
-                      : 'text-[#99958F] hover:text-[#F5F3EF]'
-                  }`}
-                >
-                  <IconComp className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{s.title}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Live Simulation View */}
-        <div className="p-6 sm:p-8 space-y-6">
-          {/* Simulated Prompt Box */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-[#99958F] font-semibold flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#D4A373] animate-pulse" />
-                Natural Language Instruction:
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#D4A373]/15 text-[#D4A373] border border-[#D4A373]/30 animate-pulse">
-                {currentSample.category}
-              </span>
-            </div>
-            
-            <div className="p-4 rounded-2xl bg-[#121211] border border-[#2E2D2B] text-xs sm:text-sm text-[#F5F3EF] font-mono flex items-center gap-1.5 min-h-[56px] shadow-inner">
-              <span className="text-[#D4A373] font-bold">›</span>
-              <span>{displayText}</span>
-              {isTyping && <span className="w-2 h-4 bg-[#D4A373] animate-pulse ml-0.5 inline-block" />}
-            </div>
-          </div>
-
-          {/* Simulated Generated Email Output */}
-          <div className="rounded-2xl border border-[#2E2D2B] bg-[#161514] p-5 space-y-3.5 shadow-lg relative overflow-hidden group">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#2E2D2B]/80 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="text-[#99958F]">To:</span>
-                <span className="text-[#ECE8E1] font-mono bg-[#1A1918] px-2 py-0.5 rounded-md border border-[#2E2D2B]">
-                  {currentSample.recipient}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-emerald-400 text-[11px] font-semibold">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Verified OAuth Ready</span>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <span className="text-[#99958F] text-xs font-semibold">Subject:</span>
-              <p className="text-sm font-bold text-[#F5F3EF]">
-                {currentSample.subject}
-              </p>
-            </div>
-
-            <div className="pt-2 border-t border-[#2E2D2B]/80">
-              <p className="text-xs text-[#ECE8E1] leading-relaxed whitespace-pre-line font-sans opacity-95">
-                {currentSample.preview}
-              </p>
-            </div>
-
-            {/* Simulated Action Confirmation Bar */}
-            <div className="pt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#2E2D2B]/80">
-              <span className="text-[11px] text-[#99958F] flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                Never sends without explicit confirmation
-              </span>
-
-              <button
-                onClick={onTryApp}
-                className="px-4 py-2 rounded-xl gold-btn text-[#121211] text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md hover:scale-105 active:scale-95 transition-all"
-              >
-                <span>Try Scribe AI Now</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
-/**
  * ============================================================================
  * PublicLandingPage Component
  * ============================================================================
@@ -553,11 +379,6 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
             </InteractiveButton>
           </div>
         </div>
-
-        {/* Live Interactive Engine Showcase Demo */}
-        <ScrollReveal delay={150}>
-          <LiveAiPreviewDemo onTryApp={onNavigateToLogin} />
-        </ScrollReveal>
 
         {/* Feature Cards Grid with Staggered Scroll Reveal & Micro Hover Animations */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
