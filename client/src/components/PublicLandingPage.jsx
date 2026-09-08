@@ -60,17 +60,17 @@ function InteractiveCard({
     if (tilt) {
       const centerX = rect.width / 2;
       const centerY = rect.height / 2;
-      // Max 2.2 deg tilt, max 4px magnetic translation
-      const rotateX = ((y - centerY) / centerY) * -2.2;
-      const rotateY = ((x - centerX) / centerX) * 2.2;
-      const moveX = ((x - centerX) / centerX) * 4;
-      const moveY = ((y - centerY) / centerY) * 4;
+      // Responsive 3D tilt: up to 7.5 deg tilt with 6px magnetic translation and 20px Z-pop
+      const rotateX = ((y - centerY) / centerY) * -7.5;
+      const rotateY = ((x - centerX) / centerX) * 7.5;
+      const moveX = ((x - centerX) / centerX) * 6;
+      const moveY = ((y - centerY) / centerY) * 6;
 
       setTransformStyle(
-        `perspective(1000px) translateY(${lift ? -6 : 0}px) translate3d(${moveX}px, ${moveY}px, 0) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.015, 1.015, 1.015)`
+        `perspective(1200px) translateY(${lift ? -8 : 0}px) translate3d(${moveX}px, ${moveY}px, 20px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.025, 1.025, 1.025)`
       );
     } else if (lift) {
-      setTransformStyle('translateY(-6px) scale(1.015)');
+      setTransformStyle('perspective(1200px) translateY(-8px) translateZ(16px) scale(1.02)');
     }
   };
 
@@ -92,14 +92,17 @@ function InteractiveCard({
       onMouseLeave={handleMouseLeave}
       style={{
         transform: transformStyle,
+        transformStyle: 'preserve-3d',
         transition: isHovered
-          ? 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease'
+          ? 'transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease'
           : 'transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.5s cubic-bezier(0.25, 1, 0.5, 1)',
         willChange: 'transform, box-shadow',
         ...style
       }}
       className={`relative overflow-hidden transition-all duration-300 ${
-        isHovered ? 'shadow-2xl shadow-[#D4A373]/15 border-[#D4A373]/45' : 'shadow-xl shadow-black/50 border-[#2E2D2B]'
+        isHovered 
+          ? 'shadow-2xl shadow-[#D4A373]/20 border-[#D4A373]/50 ring-1 ring-[#D4A373]/20' 
+          : 'shadow-xl shadow-black/60 border-[#2E2D2B]'
       } ${className}`}
     >
       {/* Dynamic Radial Spotlight Glow Following Cursor in Cashmere Gold */}
@@ -107,11 +110,11 @@ function InteractiveCard({
         <div
           className="pointer-events-none absolute -inset-px rounded-[inherit] transition-opacity duration-300 opacity-100 z-0"
           style={{
-            background: `radial-gradient(circle 280px at ${coords.x}px ${coords.y}px, rgba(212, 163, 115, 0.16), transparent 70%)`
+            background: `radial-gradient(circle 280px at ${coords.x}px ${coords.y}px, rgba(212, 163, 115, 0.18), transparent 70%)`
           }}
         />
       )}
-      <div className="relative z-10">
+      <div className="relative z-10" style={{ transformStyle: 'preserve-3d' }}>
         {children}
       </div>
     </div>
@@ -119,7 +122,7 @@ function InteractiveCard({
 }
 
 /**
- * Magnetic Interactive Button with Hover Lift, Dynamic Shadow, and Active Press Feedback
+ * 3D Physical Interactive Button with Magnetic Tilt, Tactile Depth, and Mechanical Press
  */
 function InteractiveButton({
   children,
@@ -147,7 +150,11 @@ function InteractiveButton({
     const rect = buttonRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left - rect.width / 2;
     const y = e.clientY - rect.top - rect.height / 2;
-    setTransformStyle(`translate3d(${x * 0.1}px, ${y * 0.1 - 2}px, 0) scale3d(1.02, 1.02, 1.02)`);
+    const rotateX = (y / (rect.height / 2)) * -6;
+    const rotateY = (x / (rect.width / 2)) * 6;
+    setTransformStyle(
+      `perspective(600px) translate3d(${x * 0.12}px, ${y * 0.12 - 3}px, 12px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.025, 1.025, 1.025)`
+    );
   };
 
   const handleMouseLeave = () => {
@@ -165,15 +172,18 @@ function InteractiveButton({
       onMouseLeave={handleMouseLeave}
       style={{
         transform: transformStyle,
+        transformStyle: 'preserve-3d',
         transition: isHovered
-          ? 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease'
-          : 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s cubic-bezier(0.25, 1, 0.5, 1)',
+          ? 'transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, filter 0.2s ease'
+          : 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s cubic-bezier(0.25, 1, 0.5, 1), filter 0.2s ease',
         willChange: 'transform, box-shadow',
         ...style
       }}
-      className={`active:scale-[0.98] active:translate-y-0.5 cursor-pointer select-none ${className}`}
+      className={`cursor-pointer select-none ${className}`}
     >
-      {children}
+      <span className="relative z-10 inline-flex items-center gap-2" style={{ transform: 'translateZ(10px)' }}>
+        {children}
+      </span>
     </button>
   );
 }
@@ -440,7 +450,7 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
           </div>
         </div>
 
-        {/* Feature Cards Grid with Staggered Scroll Reveal & Micro Hover Animations */}
+        {/* Feature Cards Grid with 3D Spatial Parallax & Tilt */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
           
           <ScrollReveal delay={0}>
@@ -450,13 +460,22 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               glow={true}
               className="p-6 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-4 h-full group"
             >
-              <div className="w-11 h-11 rounded-2xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center text-[#D4A373] group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 shadow-md">
+              <div 
+                className="w-11 h-11 rounded-2xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center text-[#D4A373] group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 shadow-md shadow-black/40"
+                style={{ transform: 'translateZ(24px)' }}
+              >
                 <Mail className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors duration-200">
+              <h3 
+                className="text-lg font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors duration-200"
+                style={{ transform: 'translateZ(16px)' }}
+              >
                 Smart Intent Detection
               </h3>
-              <p className="text-xs text-[#99958F] leading-relaxed">
+              <p 
+                className="text-xs text-[#99958F] leading-relaxed"
+                style={{ transform: 'translateZ(10px)' }}
+              >
                 Convert short natural prompts into structured, professional emails tailored for leave requests, official follow-ups, emergencies, and formal business communication.
               </p>
             </InteractiveCard>
@@ -469,13 +488,22 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               glow={true}
               className="p-6 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-4 h-full group"
             >
-              <div className="w-11 h-11 rounded-2xl bg-emerald-950/70 border border-emerald-500/30 flex items-center justify-center text-emerald-300 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-300 shadow-md shadow-emerald-950/40">
+              <div 
+                className="w-11 h-11 rounded-2xl bg-emerald-950/70 border border-emerald-500/30 flex items-center justify-center text-emerald-300 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-300 shadow-md shadow-emerald-950/40"
+                style={{ transform: 'translateZ(24px)' }}
+              >
                 <Shield className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-[#F5F3EF] group-hover:text-emerald-300 transition-colors duration-200">
+              <h3 
+                className="text-lg font-bold text-[#F5F3EF] group-hover:text-emerald-300 transition-colors duration-200"
+                style={{ transform: 'translateZ(16px)' }}
+              >
                 100% Authentic Gmail API
               </h3>
-              <p className="text-xs text-[#99958F] leading-relaxed">
+              <p 
+                className="text-xs text-[#99958F] leading-relaxed"
+                style={{ transform: 'translateZ(10px)' }}
+              >
                 Emails are sent directly from your authentic Gmail account using official Google OAuth 2.0 API scope permissions.
               </p>
             </InteractiveCard>
@@ -488,13 +516,22 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               glow={true}
               className="p-6 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-4 h-full group"
             >
-              <div className="w-11 h-11 rounded-2xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center text-[#D4A373] group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 shadow-md">
+              <div 
+                className="w-11 h-11 rounded-2xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center text-[#D4A373] group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 shadow-md shadow-black/40"
+                style={{ transform: 'translateZ(24px)' }}
+              >
                 <Lock className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors duration-200">
+              <h3 
+                className="text-lg font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors duration-200"
+                style={{ transform: 'translateZ(16px)' }}
+              >
                 Explicit User Approval
               </h3>
-              <p className="text-xs text-[#99958F] leading-relaxed">
+              <p 
+                className="text-xs text-[#99958F] leading-relaxed"
+                style={{ transform: 'translateZ(10px)' }}
+              >
                 No email is ever sent automatically without your explicit review and confirmation click. Complete control over recipients, subject, and content.
               </p>
             </InteractiveCard>
@@ -502,7 +539,7 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
 
         </div>
 
-        {/* How It Works Flow with Staggered Scroll Reveal */}
+        {/* How It Works Flow with 3D Card Elevation */}
         <ScrollReveal delay={100}>
           <div className="p-8 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-6 shadow-2xl">
             <h2 className="text-xl font-extrabold text-[#F5F3EF] flex items-center gap-2">
@@ -517,13 +554,26 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
                   lift={true}
                   tilt={true}
                   glow={true}
-                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group"
+                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group shadow-lg"
                 >
-                  <span className="font-extrabold text-[#D4A373] text-sm group-hover:translate-x-1 inline-block transition-transform duration-200">
+                  <span 
+                    className="font-extrabold text-[#D4A373] text-sm group-hover:translate-x-1 inline-block transition-transform duration-200"
+                    style={{ transform: 'translateZ(18px)' }}
+                  >
                     Step 1
                   </span>
-                  <p className="font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors">Connect Gmail</p>
-                  <p className="text-[#99958F]">Authenticate securely via official Google OAuth 2.0 consent screen.</p>
+                  <p 
+                    className="font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors"
+                    style={{ transform: 'translateZ(14px)' }}
+                  >
+                    Connect Gmail
+                  </p>
+                  <p 
+                    className="text-[#99958F]"
+                    style={{ transform: 'translateZ(8px)' }}
+                  >
+                    Authenticate securely via official Google OAuth 2.0 consent screen.
+                  </p>
                 </InteractiveCard>
               </ScrollReveal>
 
@@ -532,13 +582,26 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
                   lift={true}
                   tilt={true}
                   glow={true}
-                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group"
+                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group shadow-lg"
                 >
-                  <span className="font-extrabold text-[#D4A373] text-sm group-hover:translate-x-1 inline-block transition-transform duration-200">
+                  <span 
+                    className="font-extrabold text-[#D4A373] text-sm group-hover:translate-x-1 inline-block transition-transform duration-200"
+                    style={{ transform: 'translateZ(18px)' }}
+                  >
                     Step 2
                   </span>
-                  <p className="font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors">Describe Instruction</p>
-                  <p className="text-[#99958F]">Enter a short sentence describing what email you want to write.</p>
+                  <p 
+                    className="font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors"
+                    style={{ transform: 'translateZ(14px)' }}
+                  >
+                    Describe Instruction
+                  </p>
+                  <p 
+                    className="text-[#99958F]"
+                    style={{ transform: 'translateZ(8px)' }}
+                  >
+                    Enter a short sentence describing what email you want to write.
+                  </p>
                 </InteractiveCard>
               </ScrollReveal>
 
@@ -547,13 +610,26 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
                   lift={true}
                   tilt={true}
                   glow={true}
-                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group"
+                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group shadow-lg"
                 >
-                  <span className="font-extrabold text-[#D4A373] text-sm group-hover:translate-x-1 inline-block transition-transform duration-200">
+                  <span 
+                    className="font-extrabold text-[#D4A373] text-sm group-hover:translate-x-1 inline-block transition-transform duration-200"
+                    style={{ transform: 'translateZ(18px)' }}
+                  >
                     Step 3
                   </span>
-                  <p className="font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors">AI Analysis & Review</p>
-                  <p className="text-[#99958F]">Scribe AI detects intent, formats email, and presents instant preview.</p>
+                  <p 
+                    className="font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors"
+                    style={{ transform: 'translateZ(14px)' }}
+                  >
+                    AI Analysis & Review
+                  </p>
+                  <p 
+                    className="text-[#99958F]"
+                    style={{ transform: 'translateZ(8px)' }}
+                  >
+                    Scribe AI detects intent, formats email, and presents instant preview.
+                  </p>
                 </InteractiveCard>
               </ScrollReveal>
 
@@ -562,13 +638,26 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
                   lift={true}
                   tilt={true}
                   glow={true}
-                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group"
+                  className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-2 h-full group shadow-lg"
                 >
-                  <span className="font-extrabold text-emerald-400 text-sm group-hover:translate-x-1 inline-block transition-transform duration-200">
+                  <span 
+                    className="font-extrabold text-emerald-400 text-sm group-hover:translate-x-1 inline-block transition-transform duration-200"
+                    style={{ transform: 'translateZ(18px)' }}
+                  >
                     Step 4
                   </span>
-                  <p className="font-bold text-[#F5F3EF] group-hover:text-emerald-300 transition-colors">Confirm & Dispatch</p>
-                  <p className="text-[#99958F]">Click Authorize & Send to dispatch directly from your Gmail account.</p>
+                  <p 
+                    className="font-bold text-[#F5F3EF] group-hover:text-emerald-300 transition-colors"
+                    style={{ transform: 'translateZ(14px)' }}
+                  >
+                    Confirm & Dispatch
+                  </p>
+                  <p 
+                    className="text-[#99958F]"
+                    style={{ transform: 'translateZ(8px)' }}
+                  >
+                    Click Authorize & Send to dispatch directly from your Gmail account.
+                  </p>
                 </InteractiveCard>
               </ScrollReveal>
 

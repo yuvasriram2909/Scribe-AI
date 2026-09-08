@@ -52,23 +52,32 @@
   --input-bg: #FFFFFF;
 }
 
-/* Warm Cashmere Panels & Cards */
+/* Warm Cashmere Panels & Cards with 3D Depth */
 .gold-card {
   background: var(--bg-card);
   border: 1px solid var(--border-gold);
-  box-shadow: 0 4px 20px -2px var(--gold-glow);
+  box-shadow: 
+    0 1px 0 0 rgba(255, 255, 255, 0.08) inset,
+    0 -1px 0 0 rgba(0, 0, 0, 0.65) inset,
+    0 8px 24px -4px rgba(0, 0, 0, 0.7),
+    0 2px 8px -2px var(--gold-glow);
   transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
               box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
               border-color 260ms cubic-bezier(0.22, 1, 0.36, 1),
               background-color 260ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform, box-shadow;
+  transform-style: preserve-3d;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .gold-card:hover {
-    border-color: rgba(212, 163, 115, 0.45);
-    transform: translateY(-3px);
-    box-shadow: 0 10px 28px -4px var(--gold-glow);
+    border-color: rgba(212, 163, 115, 0.5);
+    transform: translateY(-5px) translateZ(14px);
+    box-shadow: 
+      0 1px 0 0 rgba(255, 255, 255, 0.14) inset,
+      0 -1px 0 0 rgba(0, 0, 0, 0.75) inset,
+      0 18px 36px -6px rgba(0, 0, 0, 0.8),
+      0 4px 18px -2px var(--gold-glow);
   }
 }
 
@@ -104,34 +113,46 @@
   }
 }
 
-/* Warm Camel CTA Button */
+/* Warm Camel 3D Pushable Button */
 .gold-btn {
   background: linear-gradient(135deg, #D4A373 0%, #C59362 100%);
   color: #121211;
   font-weight: 700;
-  box-shadow: 0 4px 18px rgba(212, 163, 115, 0.25);
-  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
-              box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
-              filter 200ms ease;
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 
+    0 4px 0 #9E7348,
+    0 6px 2px rgba(0, 0, 0, 0.4),
+    0 12px 24px rgba(212, 163, 115, 0.25);
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1),
+              filter 180ms ease;
   will-change: transform, box-shadow;
+  transform: translateZ(0);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .gold-btn:hover {
-    filter: brightness(1.07);
-    box-shadow: 0 8px 26px rgba(212, 163, 115, 0.35);
-    transform: translateY(-2px) scale(1.02);
+    filter: brightness(1.08);
+    box-shadow: 
+      0 6px 0 #9E7348,
+      0 8px 3px rgba(0, 0, 0, 0.45),
+      0 18px 32px rgba(212, 163, 115, 0.35);
+    transform: translateY(-2px) translateZ(8px);
   }
   .gold-btn:hover .btn-arrow-slide {
-    transform: translateX(3.5px);
+    transform: translateX(4px);
   }
   .gold-btn:hover .btn-icon-spin {
-    transform: rotate(15deg) scale(1.1);
+    transform: rotate(18deg) scale(1.15);
   }
 }
 
 .gold-btn:active {
-  transform: translateY(1px) scale(0.98) !important;
+  transform: translateY(3px) !important;
+  box-shadow: 
+    0 1px 0 #9E7348,
+    0 2px 1px rgba(0, 0, 0, 0.3),
+    0 4px 12px rgba(212, 163, 115, 0.2) !important;
 }
 
 /* Outline Gold Button */
@@ -813,18 +834,30 @@
   background-clip: text;
   animation: scribeLiquidShimmer 6s ease-in-out infinite;
   display: inline-block;
-  filter: drop-shadow(0 2px 20px rgba(0, 0, 0, 0.7));
+  filter: 
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.45))
+    drop-shadow(0 3px 1px rgba(0, 0, 0, 0.8))
+    drop-shadow(0 6px 12px rgba(0, 0, 0, 0.85))
+    drop-shadow(0 0 20px rgba(212, 163, 115, 0.35));
 }
 
 /* 2. Radiant Illuminated Cashmere Gold for "AI" */
 @keyframes aiGoldPulse {
   0%, 100% {
     background-position: 0% 50%;
-    filter: drop-shadow(0 0 16px rgba(212, 163, 115, 0.45)) drop-shadow(0 2px 10px rgba(0, 0, 0, 0.7));
+    filter: 
+      drop-shadow(0 1px 0 rgba(255, 233, 208, 0.6))
+      drop-shadow(0 3px 1px rgba(0, 0, 0, 0.8))
+      drop-shadow(0 6px 14px rgba(0, 0, 0, 0.85))
+      drop-shadow(0 0 20px rgba(212, 163, 115, 0.5));
   }
   50% {
     background-position: 100% 50%;
-    filter: drop-shadow(0 0 32px rgba(212, 163, 115, 0.8)) drop-shadow(0 2px 12px rgba(0, 0, 0, 0.7));
+    filter: 
+      drop-shadow(0 1px 0 rgba(255, 233, 208, 0.8))
+      drop-shadow(0 4px 2px rgba(0, 0, 0, 0.85))
+      drop-shadow(0 8px 18px rgba(0, 0, 0, 0.9))
+      drop-shadow(0 0 35px rgba(212, 163, 115, 0.85));
   }
 }
 
