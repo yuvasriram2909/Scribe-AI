@@ -2165,10 +2165,27 @@ serve(async (req: Request) => {
         body = await req.json().catch(() => ({}));
       }
 
-      const recipient = body.recipient || body.to || "";
+      const rawRecipient = body.recipient || body.to || "";
+      const toList = (Array.isArray(rawRecipient) ? rawRecipient : String(rawRecipient).split(/[,;\n\r]+/))
+        .map((e: string) => e.trim())
+        .filter(Boolean);
+      const recipient = toList.join(", ");
+
+      const rawCc = body.cc || "";
+      const ccList = (Array.isArray(rawCc) ? rawCc : (rawCc ? String(rawCc).split(/[,;\n\r]+/) : []))
+        .map((e: string) => e.trim())
+        .filter(Boolean);
+      const formattedCc = ccList.join(", ");
+
+      const rawBcc = body.bcc || "";
+      const bccList = (Array.isArray(rawBcc) ? rawBcc : (rawBcc ? String(rawBcc).split(/[,;\n\r]+/) : []))
+        .map((e: string) => e.trim())
+        .filter(Boolean);
+      const formattedBcc = bccList.join(", ");
+
       const subject = body.subject || "";
       const emailBody = body.body || body.emailBody || body.email_body || "";
-      const { cc, bcc, category, situation, priority, tone } = body;
+      const { category, situation, priority, tone } = body;
 
       if (!recipient || !subject || !emailBody) {
         return errorResponse("Recipient (to), Subject, and Body are required.");
@@ -2238,8 +2255,8 @@ serve(async (req: Request) => {
       const emailLines = [
         `From: ${connectedEmail}`,
         `To: ${recipient}`,
-        cc ? `Cc: ${Array.isArray(cc) ? cc.join(", ") : cc}` : "",
-        bcc ? `Bcc: ${Array.isArray(bcc) ? bcc.join(", ") : bcc}` : "",
+        formattedCc ? `Cc: ${formattedCc}` : "",
+        formattedBcc ? `Bcc: ${formattedBcc}` : "",
         `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
         "MIME-Version: 1.0",
         "Content-Type: text/plain; charset=UTF-8",
@@ -2319,8 +2336,9 @@ serve(async (req: Request) => {
         sender_email: connectedEmail,
         sender: user.name || connectedEmail,
         recipient_email: recipient,
-        cc: cc ? (Array.isArray(cc) ? cc : [cc]) : [],
-        bcc: bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : [],
+        recipient_emails: toList,
+        cc: ccList,
+        bcc: bccList,
         subject,
         body: emailBody,
         email_type: (category || situation || "other").toLowerCase().replace(/[^a-z0-9_]/g, "_"),
@@ -2350,6 +2368,7 @@ serve(async (req: Request) => {
           event_type: "sent",
           metadata: {
             recipient,
+            recipient_count: toList.length,
             subject,
             gmail_message_id: sendData.id,
             sender: connectedEmail,
@@ -2367,8 +2386,8 @@ serve(async (req: Request) => {
         gmailAccount: connectedEmail,
         sender: user.name || connectedEmail,
         recipient,
-        cc: typeof cc === "string" ? cc : (cc || []).join(", "),
-        bcc: typeof bcc === "string" ? bcc : (bcc || []).join(", "),
+        cc: formattedCc || null,
+        bcc: formattedBcc || null,
         subject,
         body: emailBody,
         category: category || "Official/Professional",
@@ -2388,121 +2407,126 @@ serve(async (req: Request) => {
       const { data: emailRecord } = await safeInsertEmail(supabase, emailPayload);
 
       // 4. In-App Cross-User Received Delivery:
-      // If recipient is also a registered user in Scribe AI, immediately deliver it to their Received history!
-      const cleanRecipient = recipient.toLowerCase().trim();
-      let recipientUserId: string | null = null;
-      try {
-        const { data: recProfiles } = await supabase
-          .from("profiles")
-          .select("id, email")
-          .ilike("email", cleanRecipient)
-          .maybeSingle();
+      // If any recipient is also a registered user in Scribe AI, immediately deliver it to their Received history!
+      const allRecipientsToDeliver = [...new Set([...toList, ...ccList].map((r: string) => r.toLowerCase().trim()))];
 
-        if (recProfiles?.id) {
-          recipientUserId = recProfiles.id;
-        } else {
-          const { data: recConn } = await supabase
-            .from("gmail_connections")
-            .select("user_id")
-            .ilike("gmail_email", cleanRecipient)
+      for (const cleanRecipient of allRecipientsToDeliver) {
+        if (!cleanRecipient || cleanRecipient === (connectedEmail || "").toLowerCase().trim()) continue;
+        let recipientUserId: string | null = null;
+        try {
+          const { data: recProfiles } = await supabase
+            .from("profiles")
+            .select("id, email")
+            .ilike("email", cleanRecipient)
             .maybeSingle();
-          if (recConn?.user_id) {
-            recipientUserId = recConn.user_id;
+
+          if (recProfiles?.id) {
+            recipientUserId = recProfiles.id;
           } else {
-            const { data: recAcc } = await supabase
-              .from("GmailAccount")
-              .select("userId")
-              .ilike("gmailEmail", cleanRecipient)
+            const { data: recConn } = await supabase
+              .from("gmail_connections")
+              .select("user_id")
+              .ilike("gmail_email", cleanRecipient)
               .maybeSingle();
-            if (recAcc?.userId) recipientUserId = recAcc.userId;
+            if (recConn?.user_id) {
+              recipientUserId = recConn.user_id;
+            } else {
+              const { data: recAcc } = await supabase
+                .from("GmailAccount")
+                .select("userId")
+                .ilike("gmailEmail", cleanRecipient)
+                .maybeSingle();
+              if (recAcc?.userId) recipientUserId = recAcc.userId;
+            }
           }
+        } catch (recErr) {
+          console.warn("Recipient user lookup notice:", recErr);
         }
-      } catch (recErr) {
-        console.warn("Recipient user lookup notice:", recErr);
-      }
 
-      if (recipientUserId && recipientUserId !== user.id) {
-        const receivedEmailId = crypto.randomUUID();
-        const receivedCanonical = {
-          id: receivedEmailId,
-          user_id: recipientUserId,
-          sender_email: connectedEmail,
-          sender: user.name || connectedEmail,
-          recipient_email: cleanRecipient,
-          subject,
-          body: emailBody,
-          email_type: (category || situation || "other").toLowerCase().replace(/[^a-z0-9_]/g, "_"),
-          tone: (tone || "professional").toLowerCase(),
-          importance: (priority || "normal").toLowerCase(),
-          status: "received",
-          direction: "received",
-          spam_status: "clean",
-          gmail_message_id: sendData.id,
-          thread_id: sendData.threadId || null,
-          received_at: now,
-          created_at: now,
-          updated_at: now,
-        };
-
-        try {
-          const { error: rUpErr } = await supabase.from("emails").upsert(receivedCanonical, { onConflict: "id" });
-          if (rUpErr && (rUpErr.message?.includes("column") || rUpErr.message?.includes("does not exist"))) {
-            const { sender_email, sender, ...safeCanonical } = receivedCanonical;
-            await supabase.from("emails").upsert(safeCanonical, { onConflict: "id" });
-          }
-        } catch (_) {}
-
-        try {
-          await supabase.from("email_events").insert({
-            id: crypto.randomUUID(),
-            user_id: recipientUserId,
-            email_id: receivedEmailId,
-            event_type: "received",
-            metadata: {
-              sender: user.name || connectedEmail,
-              sender_email: connectedEmail,
-              recipient: cleanRecipient,
-              subject,
-              gmail_message_id: sendData.id,
-            },
-            created_at: now,
-          });
-        } catch (_) {}
-
-        try {
-          await supabase.from("Email").insert({
+        if (recipientUserId && recipientUserId !== user.id) {
+          const receivedEmailId = crypto.randomUUID();
+          const receivedCanonical = {
             id: receivedEmailId,
-            userId: recipientUserId,
+            user_id: recipientUserId,
+            sender_email: connectedEmail,
             sender: user.name || connectedEmail,
-            recipient: cleanRecipient,
+            recipient_email: cleanRecipient,
+            recipient_emails: toList,
             subject,
             body: emailBody,
-            category: category || "Official/Professional",
-            situation: situation || "💼 Official / Professional",
-            priority: priority || "Normal",
-            tone: tone || "Professional",
-            status: "Received",
-            isSent: false,
-            isReceived: true,
-            isSpam: false,
-            isRead: false,
-            gmailMessageId: sendData.id,
-            gmailThreadId: sendData.threadId || null,
-            receivedAt: now,
+            email_type: (category || situation || "other").toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+            tone: (tone || "professional").toLowerCase(),
+            importance: (priority || "normal").toLowerCase(),
+            status: "received",
+            direction: "received",
+            spam_status: "clean",
+            gmail_message_id: sendData.id,
+            thread_id: sendData.threadId || null,
+            received_at: now,
+            created_at: now,
+            updated_at: now,
+          };
+
+          try {
+            const { error: rUpErr } = await supabase.from("emails").upsert(receivedCanonical, { onConflict: "id" });
+            if (rUpErr && (rUpErr.message?.includes("column") || rUpErr.message?.includes("does not exist"))) {
+              const { sender_email, sender, ...safeCanonical } = receivedCanonical;
+              await supabase.from("emails").upsert(safeCanonical, { onConflict: "id" });
+            }
+          } catch (_) {}
+
+          try {
+            await supabase.from("email_events").insert({
+              id: crypto.randomUUID(),
+              user_id: recipientUserId,
+              email_id: receivedEmailId,
+              event_type: "received",
+              metadata: {
+                sender: user.name || connectedEmail,
+                sender_email: connectedEmail,
+                recipient: cleanRecipient,
+                subject,
+                gmail_message_id: sendData.id,
+              },
+              created_at: now,
+            });
+          } catch (_) {}
+
+          try {
+            await supabase.from("Email").insert({
+              id: receivedEmailId,
+              userId: recipientUserId,
+              sender: user.name || connectedEmail,
+              recipient: cleanRecipient,
+              subject,
+              body: emailBody,
+              category: category || "Official/Professional",
+              situation: situation || "💼 Official / Professional",
+              priority: priority || "Normal",
+              tone: tone || "Professional",
+              status: "Received",
+              isSent: false,
+              isReceived: true,
+              isSpam: false,
+              isRead: false,
+              gmailMessageId: sendData.id,
+              gmailThreadId: sendData.threadId || null,
+              receivedAt: now,
+              createdAt: now,
+            });
+          } catch (_) {}
+
+          await safeInsertNotification(supabase, {
+            id: crypto.randomUUID(),
+            userId: recipientUserId,
+            emailId: receivedEmailId,
+            notificationType: category || "General",
+            message: `New email from ${user.name || connectedEmail}: "${subject}"`,
+            read: false,
+            isTrashed: false,
             createdAt: now,
           });
-        } catch (_) {}
-
-        await safeInsertNotification(supabase, {
-          id: crypto.randomUUID(),
-          userId: recipientUserId,
-          emailId: receivedEmailId,
-          notificationType: category || "General",
-          message: `New email from ${user.name || connectedEmail}: "${subject}"`,
-          read: false,
-          isTrashed: false,
-          createdAt: now,
-        });
+        }
       }
 
       // Create notification for Sender
@@ -3141,10 +3165,16 @@ HUMAN-WRITTEN WRITING GUIDELINES:
 
       const body = await req.json().catch(() => ({}));
       const now = new Date().toISOString();
+      const schedRawRecip = body.recipient || body.to || "";
+      const schedToList = (Array.isArray(schedRawRecip) ? schedRawRecip : String(schedRawRecip).split(/[,;\n\r]+/))
+        .map((e: string) => e.trim())
+        .filter(Boolean);
+      const schedRecipient = schedToList.join(", ");
+
       const schedPayload = {
         id: body.id || crypto.randomUUID(),
         userId: user.id,
-        recipient: body.recipient || body.to || "",
+        recipient: schedRecipient,
         cc: body.cc || null,
         bcc: body.bcc || null,
         subject: body.subject || "(Scheduled Email)",
@@ -3173,10 +3203,15 @@ HUMAN-WRITTEN WRITING GUIDELINES:
 
       const body = await req.json().catch(() => ({}));
       const now = new Date().toISOString();
+      const pendRawRecip = body.recipient || body.to || "";
+      const pendToList = (Array.isArray(pendRawRecip) ? pendRawRecip : String(pendRawRecip).split(/[,;\n\r]+/))
+        .map((e: string) => e.trim())
+        .filter(Boolean);
+
       const pendPayload = {
         id: body.id || crypto.randomUUID(),
         userId: user.id,
-        recipient: body.recipient || body.to || "",
+        recipient: pendToList.join(", "),
         subject: body.subject || "(Pending Review)",
         body: body.body || "",
         category: body.category || "Official/Professional",

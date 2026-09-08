@@ -175,10 +175,19 @@ export function getUserInfo(accessToken) {
  * Creates raw RFC 2822 email format string with safe base64url encoding
  */
 export function createRawMessage({ to, cc, bcc, subject, body, attachments = [] }) {
+  const formatList = (val) => {
+    if (!val) return '';
+    if (Array.isArray(val)) return val.filter(Boolean).join(', ');
+    return String(val).split(/[,;\n\r]+/).map(s => s.trim()).filter(Boolean).join(', ');
+  };
+  const toStr = formatList(to);
+  const ccStr = formatList(cc);
+  const bccStr = formatList(bcc);
+
   let messageParts = [];
-  messageParts.push(`To: ${to}`);
-  if (cc && cc.trim()) messageParts.push(`Cc: ${cc}`);
-  if (bcc && bcc.trim()) messageParts.push(`Bcc: ${bcc}`);
+  messageParts.push(`To: ${toStr}`);
+  if (ccStr) messageParts.push(`Cc: ${ccStr}`);
+  if (bccStr) messageParts.push(`Bcc: ${bccStr}`);
   
   // RFC 2822 standard headers for inbox deliverability
   const encodedSubject = `=?UTF-8?B?${Buffer.from(subject || '').toString('base64')}?=`;
@@ -306,11 +315,17 @@ export async function sendGmailMessage({ senderEmail, appPassword, accessToken, 
         socketTimeout: 7000
       });
 
+      const formatList = (val) => {
+        if (!val) return undefined;
+        if (Array.isArray(val)) return val.filter(Boolean).join(', ');
+        return String(val).split(/[,;\n\r]+/).map(s => s.trim()).filter(Boolean).join(', ') || undefined;
+      };
+
       const mailOptions = {
         from: senderEmail,
-        to,
-        cc: cc || undefined,
-        bcc: bcc || undefined,
+        to: formatList(to),
+        cc: formatList(cc),
+        bcc: formatList(bcc),
         subject,
         text: body,
         attachments: attachments.map(att => ({

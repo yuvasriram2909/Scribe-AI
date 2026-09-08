@@ -11,6 +11,11 @@ import {
   classifyEmailIntent, 
   generateIntelligentEmail 
 } from '../utils/aiEngine';
+import { 
+  validateEmailList, 
+  parseEmailList, 
+  formatEmailList 
+} from '../utils/emailValidation';
 
 const AVAILABLE_TONES = [
   'Formal',
@@ -71,6 +76,13 @@ export function ComposeWorkflow({
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleTime, setScheduleTime] = useState('');
 
+  // Parsed recipient list for multi-recipient rendering and interaction
+  const parsedRecipients = parseEmailList(recipient);
+  const removeRecipient = (toRemove) => {
+    const remaining = parsedRecipients.filter(r => r.toLowerCase() !== toRemove.toLowerCase());
+    updateState({ recipient: remaining.join(', '), errorMessage: '' });
+  };
+
   // Register Pending Review when entering Step 3 Preview
   useEffect(() => {
     if (step === 3 && subject && body && recipient) {
@@ -121,16 +133,31 @@ export function ComposeWorkflow({
   };
 
   const handleConfirmSchedule = async () => {
-    if (!recipient.trim()) {
-      updateState({ errorMessage: 'Please enter a valid recipient email before scheduling.' });
+    const valRes = validateEmailList(recipient, { fieldName: 'Recipient email' });
+    if (!valRes.isValid) {
+      updateState({ errorMessage: valRes.error });
       return;
+    }
+    if (cc && cc.trim()) {
+      const ccVal = validateEmailList(cc, { fieldName: 'CC', allowEmpty: true });
+      if (!ccVal.isValid) {
+        updateState({ errorMessage: ccVal.error });
+        return;
+      }
+    }
+    if (bcc && bcc.trim()) {
+      const bccVal = validateEmailList(bcc, { fieldName: 'BCC', allowEmpty: true });
+      if (!bccVal.isValid) {
+        updateState({ errorMessage: bccVal.error });
+        return;
+      }
     }
     try {
       const res = await apiFetch('/api/emails/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipient,
+          recipient: valRes.formatted,
           cc,
           bcc,
           subject: subject || '(Scheduled Email)',
@@ -237,17 +264,31 @@ export function ComposeWorkflow({
       updateState({ errorMessage: 'Please describe what you want to send in the problem details.' });
       return;
     }
-    if (!cleanRecip) {
-      updateState({ errorMessage: 'Please enter a recipient email address.' });
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanRecip)) {
-      updateState({ errorMessage: 'Please enter a valid email address (e.g. manager@example.com).' });
+    const valRes = validateEmailList(cleanRecip, { fieldName: 'Recipient email' });
+    if (!valRes.isValid) {
+      updateState({ errorMessage: valRes.error });
       return;
     }
 
-    executeAIGeneration(cleanInstr || subject.trim(), cleanRecip);
+    if (cc && cc.trim()) {
+      const ccVal = validateEmailList(cc, { fieldName: 'CC', allowEmpty: true });
+      if (!ccVal.isValid) {
+        updateState({ errorMessage: ccVal.error });
+        return;
+      }
+    }
+
+    if (bcc && bcc.trim()) {
+      const bccVal = validateEmailList(bcc, { fieldName: 'BCC', allowEmpty: true });
+      if (!bccVal.isValid) {
+        updateState({ errorMessage: bccVal.error });
+        return;
+      }
+    }
+
+    const normalizedRecipient = valRes.formatted;
+    updateState({ recipient: normalizedRecipient, errorMessage: '' });
+    executeAIGeneration(cleanInstr || subject.trim(), normalizedRecipient);
   };
 
   // User override for Category (regenerates email with new category while keeping recipient & facts)
@@ -311,15 +352,28 @@ export function ComposeWorkflow({
 
   // STEP 3 -> STEP 4: Trigger Security Confirmation Modal
   const handleStartSending = () => {
-    if (!recipient.trim()) {
-      updateState({ errorMessage: 'Recipient email is required.' });
+    const valRes = validateEmailList(recipient, { fieldName: 'Recipient email' });
+    if (!valRes.isValid) {
+      updateState({ errorMessage: valRes.error });
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(recipient.trim())) {
-      updateState({ errorMessage: 'Please enter a valid recipient email address.' });
-      return;
+
+    if (cc && cc.trim()) {
+      const ccVal = validateEmailList(cc, { fieldName: 'CC', allowEmpty: true });
+      if (!ccVal.isValid) {
+        updateState({ errorMessage: ccVal.error });
+        return;
+      }
     }
+
+    if (bcc && bcc.trim()) {
+      const bccVal = validateEmailList(bcc, { fieldName: 'BCC', allowEmpty: true });
+      if (!bccVal.isValid) {
+        updateState({ errorMessage: bccVal.error });
+        return;
+      }
+    }
+
     if (!subject.trim()) {
       updateState({ errorMessage: 'Email subject is required.' });
       return;
@@ -328,7 +382,8 @@ export function ComposeWorkflow({
       updateState({ errorMessage: 'Email body cannot be empty.' });
       return;
     }
-    updateState({ errorMessage: '' });
+
+    updateState({ recipient: valRes.formatted, errorMessage: '' });
     setShowConfirmModal(true);
   };
 
@@ -466,13 +521,44 @@ export function ComposeWorkflow({
               </div>
 
               <input
-                type="email"
+                type="text"
                 required
                 placeholder="manager@example.com, client@example.com, hr@company.com"
                 value={recipient}
                 onChange={(e) => updateState({ recipient: e.target.value, errorMessage: '' })}
                 className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-[#F5F3EF] placeholder-[#99958F]"
               />
+
+              <div className="flex items-center justify-between text-[11px] text-[#99958F] px-1">
+                <span>💡 You can enter multiple recipient emails separated by comma (<code className="text-[#D4A373]">,</code>) or semicolon (<code className="text-[#D4A373]">;</code>)</span>
+                {parsedRecipients.length > 1 && (
+                  <span className="text-[#D4A373] font-bold bg-[#D4A373]/10 px-2 py-0.5 rounded-md border border-[#D4A373]/30">
+                    ✓ {parsedRecipients.length} recipients detected
+                  </span>
+                )}
+              </div>
+
+              {parsedRecipients.length > 1 && (
+                <div className="flex flex-wrap gap-1.5 pt-1 animate-fadeIn">
+                  {parsedRecipients.map((emailAddr, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#22211F] border border-[#2E2D2B] text-xs text-[#ECE8E1] font-mono shadow-sm"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4A373]"></span>
+                      <span className="text-[#D4A373] font-bold">{emailAddr}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeRecipient(emailAddr)}
+                        className="text-[#99958F] hover:text-rose-400 font-bold ml-1 cursor-pointer transition-colors"
+                        title={`Remove ${emailAddr}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {showCcBcc && (
                 <div className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-3 animate-fadeIn">
@@ -778,14 +864,24 @@ export function ComposeWorkflow({
                     <span className="text-[#99958F] font-bold w-12 shrink-0">To:</span>
                     {isEditing ? (
                       <input
-                        type="email"
+                        type="text"
                         value={recipient}
                         onChange={(e) => updateState({ recipient: e.target.value })}
-                        placeholder="recipient@example.com"
+                        placeholder="recipient1@example.com, recipient2@example.com"
                         className="w-full px-3 py-1.5 rounded-lg glass-input text-xs text-[#D4A373] font-mono font-bold"
                       />
                     ) : (
-                      <span className="text-[#D4A373] font-mono font-bold truncate">{recipient}</span>
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        {parsedRecipients.length > 0 ? (
+                          parsedRecipients.map((em, idx) => (
+                            <span key={idx} className="px-2 py-0.5 rounded-md bg-[#22211F] border border-[#2E2D2B] text-[11px] text-[#D4A373] font-mono font-bold">
+                              {em}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[#D4A373] font-mono font-bold truncate">{recipient}</span>
+                        )}
+                      </div>
                     )}
                   </div>
                   {!isEditing && (
@@ -1003,9 +1099,21 @@ export function ComposeWorkflow({
                 <span className="text-[#99958F]">Priority:</span>
                 <span className="font-bold text-[#F5F3EF]">{priority}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#99958F]">Recipient (To):</span>
-                <span className="font-mono font-bold text-[#D4A373]">{recipient}</span>
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-[#99958F] shrink-0">
+                  Recipient (To){parsedRecipients.length > 1 ? ` (${parsedRecipients.length})` : ''}:
+                </span>
+                <div className="flex flex-wrap justify-end gap-1 font-mono font-bold text-[#D4A373] max-w-[280px]">
+                  {parsedRecipients.length > 0 ? (
+                    parsedRecipients.map((em, idx) => (
+                      <span key={idx} className="px-1.5 py-0.5 rounded bg-[#22211F] border border-[#2E2D2B] text-[11px]">
+                        {em}
+                      </span>
+                    ))
+                  ) : (
+                    <span>{recipient}</span>
+                  )}
+                </div>
               </div>
               {cc && (
                 <div className="flex items-center justify-between">
@@ -1075,7 +1183,11 @@ export function ComposeWorkflow({
           <div className="space-y-2">
             <h3 className="text-2xl font-extrabold text-[#F5F3EF]">Email Sent Successfully!</h3>
             <p className="text-[#99958F] text-xs max-w-md mx-auto">
-              Your email was successfully delivered to <strong className="text-[#D4A373] font-mono">{recipient}</strong> and recorded in your account email history.
+              {parsedRecipients.length > 1 ? (
+                <>Your email was successfully delivered to <strong className="text-[#D4A373]">{parsedRecipients.length} recipients</strong> (<span className="font-mono text-[#D4A373]">{recipient}</span>) and recorded in your account email history.</>
+              ) : (
+                <>Your email was successfully delivered to <strong className="text-[#D4A373] font-mono">{recipient}</strong> and recorded in your account email history.</>
+              )}
             </p>
           </div>
 

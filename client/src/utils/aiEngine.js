@@ -367,8 +367,36 @@ export function getSenderDisplayName(providedName = '') {
 
 /**
  * Determines appropriate recipient greeting (warm and human)
+ * Dynamically handles single recipients and group multi-recipients
  */
 export function determineGreeting(recipient = '', recipientType = 'unknown') {
+  // Check if multiple recipients are provided
+  const rawList = typeof recipient === 'string' ? recipient.split(/[,;\n]+/).map(r => r.trim()).filter(Boolean) : [];
+
+  if (rawList.length > 1) {
+    if (recipientType === 'friend') return 'Hi everyone,';
+    if (recipientType === 'manager') return 'Dear Team Leaders,';
+    if (recipientType === 'client') return 'Dear Clients,';
+    if (recipientType === 'hr') return 'Dear Hiring Team,';
+    if (recipientType === 'professor') return 'Dear Professors,';
+
+    // If exactly 2 recipients, try personalized dual greeting: "Hello Samson and Yuva,"
+    if (rawList.length === 2) {
+      const getFirstName = (raw) => {
+        const email = raw.includes('<') ? (raw.match(/<([^>]+)>/)?.[1] || raw) : raw;
+        const local = (email.split('@')[0] || '').replace(/[0-9._-]/g, ' ').trim().split(/\s+/)[0] || '';
+        return local.length >= 2 ? local.charAt(0).toUpperCase() + local.slice(1).toLowerCase() : '';
+      };
+      const name1 = getFirstName(rawList[0]);
+      const name2 = getFirstName(rawList[1]);
+      if (name1 && name2 && name1 !== name2) {
+        return `Hello ${name1} and ${name2},`;
+      }
+    }
+
+    return 'Hello everyone,';
+  }
+
   if (recipientType === 'friend') {
     return 'Hi there,';
   }
@@ -386,7 +414,8 @@ export function determineGreeting(recipient = '', recipientType = 'unknown') {
   }
 
   if (recipient && recipient.includes('@')) {
-    const localPart = recipient.split('@')[0];
+    const cleanAddress = recipient.includes('<') ? (recipient.match(/<([^>]+)>/)?.[1] || recipient) : recipient;
+    const localPart = cleanAddress.split('@')[0];
     const cleanName = localPart.replace(/[0-9._-]/g, ' ').trim();
     if (cleanName.length > 2 && !cleanName.includes('info') && !cleanName.includes('support') && !cleanName.includes('contact') && !cleanName.includes('admin')) {
       const formatted = cleanName.split(/\s+/)[0];

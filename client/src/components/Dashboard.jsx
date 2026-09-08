@@ -5,6 +5,7 @@ import {
   Sun, Moon, TrendingUp, BarChart3, Zap, MoreVertical
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import { validateEmailList, parseEmailList } from '../utils/emailValidation';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
 import { supabase, subscribeToEmailChanges, subscribeToEmailEvents, signInWithGoogle, subscribeToSyncState } from '../utils/supabaseClient';
 
@@ -545,20 +546,31 @@ export function Dashboard({
       return;
     }
 
-    if (!cleanRecipient) {
-      setQuickError('Please enter a recipient email address.');
+    const valRes = validateEmailList(cleanRecipient, { fieldName: 'Recipient email' });
+    if (!valRes.isValid) {
+      setQuickError(valRes.error);
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanRecipient)) {
-      setQuickError('Please enter a valid email address (e.g. manager@example.com).');
-      return;
+    if (quickCc.trim()) {
+      const ccVal = validateEmailList(quickCc.trim(), { fieldName: 'CC', allowEmpty: true });
+      if (!ccVal.isValid) {
+        setQuickError(ccVal.error);
+        return;
+      }
+    }
+
+    if (quickBcc.trim()) {
+      const bccVal = validateEmailList(quickBcc.trim(), { fieldName: 'BCC', allowEmpty: true });
+      if (!bccVal.isValid) {
+        setQuickError(bccVal.error);
+        return;
+      }
     }
 
     onStartCompose({
       instruction: cleanInstruction,
-      recipient: cleanRecipient,
+      recipient: valRes.formatted,
       cc: quickCc.trim(),
       bcc: quickBcc.trim(),
       autoGenerate: true
@@ -857,6 +869,11 @@ export function Dashboard({
                     }`}>
                       <Users className="w-3 h-3 text-[#D4A373]" />
                       <span>Recipient Email</span>
+                      {parseEmailList(quickRecipient).length > 1 && (
+                        <span className="text-[#D4A373] font-mono text-[10px] ml-1">
+                          ({parseEmailList(quickRecipient).length} recipients)
+                        </span>
+                      )}
                     </label>
                     <button
                       type="button"
@@ -873,8 +890,8 @@ export function Dashboard({
                         : 'bg-[#FAF8F5] border-amber-900/15'
                     }`}>
                       <input
-                        type="email"
-                        placeholder="manager@example.com"
+                        type="text"
+                        placeholder="manager@example.com, client@example.com"
                         value={quickRecipient}
                         onChange={(e) => {
                           setQuickRecipient(e.target.value);
