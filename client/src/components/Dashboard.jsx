@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
-import { supabase, subscribeToEmailChanges, subscribeToEmailEvents, signInWithGoogle } from '../utils/supabaseClient';
+import { supabase, subscribeToEmailChanges, subscribeToEmailEvents, signInWithGoogle, subscribeToSyncState } from '../utils/supabaseClient';
 
 function GoldMiniBarChart() {
   return (
@@ -197,6 +197,7 @@ export function Dashboard({
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncToast, setSyncToast] = useState('');
+  const [syncState, setSyncState] = useState(null);
 
   const [connectionStatus, setConnectionStatus] = useState({
     isConnected: false,
@@ -277,6 +278,19 @@ export function Dashboard({
     const unsubscribeEvents = subscribeToEmailEvents(targetUser, () => {
       fetchDashboardData();
     });
+    const syncSub = subscribeToSyncState((payload) => {
+      if (payload?.new) {
+        setSyncState(payload.new);
+        if (payload.new.sync_status === 'syncing') {
+          setIsSyncing(true);
+        } else if (payload.new.sync_status === 'success') {
+          setIsSyncing(false);
+          fetchDashboardData();
+        } else if (payload.new.sync_status === 'error') {
+          setIsSyncing(false);
+        }
+      }
+    });
 
     // Real-time tab visibility & focus listener (triggers sync when switching tabs)
     const handleFocusSync = () => {
@@ -313,6 +327,7 @@ export function Dashboard({
     return () => {
       if (typeof unsubscribeEmail === 'function') unsubscribeEmail();
       if (typeof unsubscribeEvents === 'function') unsubscribeEvents();
+      if (syncSub && typeof syncSub.unsubscribe === 'function') syncSub.unsubscribe();
       window.removeEventListener('focus', handleFocusSync);
       document.removeEventListener('visibilitychange', handleFocusSync);
       clearInterval(interval);
@@ -489,6 +504,9 @@ export function Dashboard({
       let sData = null;
       if (statsRes.ok) {
         sData = await statsRes.json();
+        if (sData?.syncState) {
+          setSyncState(sData.syncState);
+        }
       }
 
       const resolvedCategories = {};
@@ -658,44 +676,75 @@ export function Dashboard({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className={`text-sm font-extrabold ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
-                  Gmail Connected
+                  {connectionStatus.isConnected ? 'Gmail Connected' : 'Gmail Disconnected'}
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 inline-flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  OAuth Active
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#D4A373]/15 border border-[#D4A373]/30 text-[#D4A373] inline-flex items-center gap-1">
-                  👤 Active: {displayName}
-                </span>
+                {connectionStatus.isConnected ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 inline-flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    OAuth Active
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-400 inline-flex items-center gap-1">
+                    Ready to Connect
+                  </span>
+                )}
+                {displayName && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#D4A373]/15 border border-[#D4A373]/30 text-[#D4A373] inline-flex items-center gap-1">
+                    👤 {displayName}
+                  </span>
+                )}
               </div>
-              <p className={`text-xs mt-0.5 font-mono ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
-                Connected account: {connectionStatus.connectedEmail || currentUserEmail || 'Not Connected'}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                <p className={`text-xs font-mono ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
+                  {connectionStatus.isConnected
+                    ? `Connected account: ${connectionStatus.connectedEmail || currentUserEmail || 'Active'}`
+                    : 'Connect your Gmail account to synchronize emails and analytics.'}
+                </p>
+                {syncState?.last_synced_at && (
+                  <span className={`text-[11px] font-sans px-2 py-0.5 rounded-md ${
+                    theme === 'dark' ? 'bg-[#22211F] text-[#99958F]' : 'bg-stone-100 text-stone-600'
+                  }`}>
+                    🕒 Synced {new Date(syncState.last_synced_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* 3 Action Buttons Side-by-Side */}
+          {/* Action Buttons */}
           <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-            <button
-              onClick={handleManualSync}
-              disabled={isSyncing}
-              className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 hover:border-[#D4A373]/40 hover:shadow-md cursor-pointer shadow-xs disabled:opacity-50 group ${
-                theme === 'dark'
-                  ? 'bg-[#22211F] hover:bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]'
-                  : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
-              }`}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 transition-transform duration-500 ${isSyncing ? 'animate-spin text-[#D4A373]' : 'text-[#99958F] group-hover:text-[#D4A373] group-hover:rotate-180'}`} />
-              <span>{isSyncing ? 'Syncing...' : 'Sync Gmail'}</span>
-            </button>
+            {connectionStatus.isConnected ? (
+              <>
+                <button
+                  onClick={handleManualSync}
+                  disabled={isSyncing}
+                  className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 hover:border-[#D4A373]/40 hover:shadow-md cursor-pointer shadow-xs disabled:opacity-50 group ${
+                    theme === 'dark'
+                      ? 'bg-[#22211F] hover:bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]'
+                      : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
+                  }`}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 transition-transform duration-500 ${isSyncing ? 'animate-spin text-[#D4A373]' : 'text-[#99958F] group-hover:text-[#D4A373] group-hover:rotate-180'}`} />
+                  <span>{isSyncing ? 'Syncing...' : 'Sync Gmail'}</span>
+                </button>
 
-            <button
-              onClick={handleDisconnectGmail}
-              className="px-3.5 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 cursor-pointer shadow-xs"
-            >
-              <LogOut className="w-3.5 h-3.5 text-rose-400" />
-              <span>Disconnect</span>
-            </button>
+                <button
+                  onClick={handleDisconnectGmail}
+                  className="px-3.5 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 cursor-pointer shadow-xs"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Disconnect</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handleConnectGmail}
+                className="px-4 py-2 rounded-xl gold-btn text-[#121211] font-bold text-xs flex items-center gap-2 transition-all duration-200 hover:scale-102 cursor-pointer shadow-md"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Connect Gmail</span>
+              </button>
+            )}
 
             <button
               onClick={onNavigateToSettings}

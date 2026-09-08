@@ -372,6 +372,50 @@ async function getValidAccessToken(account: any, supabase: any) {
 // Safe Database Insert Helpers (Graceful Fallback)
 // ----------------------------------------------------
 
+function decodeMimeHeader(headerStr: string): string {
+  if (!headerStr) return "";
+  try {
+    return headerStr.replace(/=\?([^?]+)\?([BQbq])\?([^?]+)\?=/g, (_, _charset, encoding, text) => {
+      if (encoding.toUpperCase() === "B") {
+        try {
+          return decodeURIComponent(escape(atob(text)));
+        } catch (_) {
+          return text;
+        }
+      } else if (encoding.toUpperCase() === "Q") {
+        try {
+          const unescaped = text.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (_: any, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+          return decodeURIComponent(escape(unescaped));
+        } catch (_) {
+          return text;
+        }
+      }
+      return text;
+    });
+  } catch (_) {
+    return headerStr;
+  }
+}
+
+function parseEmailList(headerStr: string): { emails: string[]; names: string[] } {
+  if (!headerStr) return { emails: [], names: [] };
+  const rawParts = headerStr.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+  const emails: string[] = [];
+  const names: string[] = [];
+  for (const part of rawParts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const match = trimmed.match(/^(.*?)\s*<([^>]+)>/);
+    if (match) {
+      names.push(match[1].replace(/^["']|["']$/g, "").trim());
+      emails.push(match[2].trim().toLowerCase());
+    } else if (trimmed.includes("@")) {
+      emails.push(trimmed.replace(/^["']|["']$/g, "").trim().toLowerCase());
+    }
+  }
+  return { emails, names };
+}
+
 async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
   const emailId = payload.id || crypto.randomUUID();
   const now = new Date().toISOString();
@@ -380,42 +424,101 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
   try {
     const isReceived = !!payload.isReceived;
     const isSpam = !!payload.isSpam;
-    const direction = isReceived ? 'received' : 'sent';
-    const status = (payload.status || (isReceived ? 'received' : 'sent')).toLowerCase();
-    const senderVal = payload.sender || payload.sender_email || payload.from || payload.gmailAccount || '';
-    const senderEmailVal = payload.sender_email || payload.sender || payload.from || '';
+    const isTrash = !!payload.isTrash;
+    const isDraft = payload.status?.toLowerCase() === "draft" || payload.direction?.toLowerCase() === "draft";
+    const direction = isDraft ? 'draft' : (isReceived ? 'received' : 'sent');
+    const status = (payload.status || (isDraft ? 'draft' : isReceived ? 'received' : 'sent')).toLowerCase();
+    
+    let senderVal = payload.sender || payload.sender_name || payload.sender_email || payload.from || payload.gmailAccount || '';
+    let senderEmailVal = payload.sender_email || payload.sender || payload.from || '';
+    let senderNameVal = payload.sender_name || '';
+    if (!senderNameVal && senderVal.includes('<')) {
+      const match = senderVal.match(/^(.*?)\s*<([^>]+)>/);
+      if (match) {
+        senderNameVal = match[1].replace(/^["']|["']$/g, '').trim();
+        senderEmailVal = match[2].trim();
+      }
+    } else if (!senderNameVal) {
+      senderNameVal = senderVal.split('@')[0];
+    }
+
+    const recipientEmails = Array.isArray(payload.recipient_emails) 
+      ? payload.recipient_emails 
+      : (payload.recipient || payload.recipient_email ? [payload.recipient || payload.recipient_email] : []);
+
+    const ccEmails = payload.cc_emails ? (Array.isArray(payload.cc_emails) ? payload.cc_emails : [payload.cc_emails]) 
+      : (payload.cc ? (Array.isArray(payload.cc) ? payload.cc : [payload.cc]) : null);
+
+    const bccEmails = payload.bcc_emails ? (Array.isArray(payload.bcc_emails) ? payload.bcc_emails : [payload.bcc_emails]) 
+      : (payload.bcc ? (Array.isArray(payload.bcc) ? payload.bcc : [payload.bcc]) : null);
+
+    const labelsArray = payload.labels 
+      ? (Array.isArray(payload.labels) ? payload.labels : payload.labels.split(',').map((s: string) => s.trim())) 
+      : [];
 
     const canonicalPayload = {
       id: emailId,
       user_id: payload.userId,
-      gmail_message_id: payload.gmailMessageId || null,
-      thread_id: payload.gmailThreadId || null,
+      gmail_message_id: payload.gmailMessageId || payload.gmail_message_id || null,
+      gmail_thread_id: payload.gmailThreadId || payload.gmail_thread_id || payload.thread_id || null,
+      thread_id: payload.gmailThreadId || payload.gmail_thread_id || payload.thread_id || null,
       sender_email: senderEmailVal,
+      sender_name: senderNameVal,
       sender: senderVal,
-      recipient_email: payload.recipient || payload.recipient_email || '',
-      cc: payload.cc ? (Array.isArray(payload.cc) ? payload.cc : [payload.cc]) : null,
-      bcc: payload.bcc ? (Array.isArray(payload.bcc) ? payload.bcc : [payload.bcc]) : null,
+      recipient_email: recipientEmails[0] || payload.recipient || payload.recipient_email || '',
+      recipient_emails: recipientEmails,
+      cc_emails: ccEmails,
+      bcc_emails: bccEmails,
+      cc: ccEmails,
+      bcc: bccEmails,
       subject: payload.subject || '(No Subject)',
-      body: payload.body || '',
+      body: payload.body || payload.body_text || '',
+      body_text: payload.body_text || payload.body || '',
+      body_html: payload.body_html || null,
+      snippet: payload.snippet || payload.body?.slice(0, 160) || '',
       email_type: payload.category || payload.email_type || payload.situation || 'Professional / Official',
       tone: payload.tone || 'Professional',
       importance: payload.priority || payload.importance || 'Normal',
       status: status,
       direction: direction,
       spam_status: isSpam ? 'spam' : 'clean',
-      sent_at: payload.sentAt || (direction === 'sent' ? now : null),
-      received_at: payload.receivedAt || (direction === 'received' ? now : null),
-      created_at: payload.createdAt || now,
+      is_read: payload.isRead !== undefined ? !!payload.isRead : (payload.is_read !== undefined ? !!payload.is_read : true),
+      is_starred: !!payload.isStarred || !!payload.is_starred,
+      is_important: !!payload.isImportant || !!payload.is_important,
+      is_spam: isSpam,
+      is_trash: isTrash,
+      labels: labelsArray,
+      history_id: payload.historyId || payload.history_id || null,
+      sent_at: payload.sentAt || payload.sent_at || (direction === 'sent' ? now : null),
+      received_at: payload.receivedAt || payload.received_at || (direction === 'received' ? now : null),
+      created_at: payload.createdAt || payload.created_at || now,
+      updated_at: now,
     };
 
     try {
-      const { error: upErr } = await supabase.from("emails").upsert(canonicalPayload, { onConflict: "id" });
-      if (upErr && (upErr.message?.includes("column") || upErr.message?.includes("does not exist"))) {
-        const { sender_email, sender, ...safeCanonical } = canonicalPayload;
-        await supabase.from("emails").upsert(safeCanonical, { onConflict: "id" });
+      const onConflictTarget = canonicalPayload.gmail_message_id ? "user_id,gmail_message_id" : "id";
+      const { error: upErr } = await supabase.from("emails").upsert(canonicalPayload, { onConflict: onConflictTarget });
+      if (upErr) {
+        await supabase.from("emails").upsert(canonicalPayload, { onConflict: "id" });
       }
     } catch (e: any) {
       console.warn("Canonical emails upsert notice:", e?.message);
+    }
+
+    // Upsert into email_threads if threadId is present
+    if (canonicalPayload.gmail_thread_id) {
+      try {
+        await supabase.from("email_threads").upsert({
+          user_id: payload.userId,
+          gmail_thread_id: canonicalPayload.gmail_thread_id,
+          snippet: canonicalPayload.snippet,
+          history_id: canonicalPayload.history_id,
+          last_message_at: canonicalPayload.sent_at || canonicalPayload.received_at || now,
+          updated_at: now,
+        }, { onConflict: "user_id,gmail_thread_id" });
+      } catch (tErr: any) {
+        console.warn("email_threads upsert notice:", tErr?.message);
+      }
     }
 
     // 2. Insert into Canonical "email_analytics" table
@@ -476,342 +579,462 @@ async function safeInsertNotification(supabase: any, payload: Record<string, any
 }
 
 // ----------------------------------------------------
-// Gmail Inbox, Spam, Sent, & Draft Synchronization
+// Gmail Inbox, Spam, Sent, & Draft Synchronization Engine
 // ----------------------------------------------------
+
+async function fetchGmailMessagesPaginated(
+  accessToken: string,
+  query: string,
+  maxTotal = 50
+): Promise<Array<{ id: string; threadId: string }>> {
+  const messages: Array<{ id: string; threadId: string }> = [];
+  let pageToken = "";
+  const pageSize = Math.min(maxTotal, 50);
+
+  while (messages.length < maxTotal) {
+    let fetchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${pageSize}&q=${encodeURIComponent(query)}`;
+    if (pageToken) {
+      fetchUrl += `&pageToken=${encodeURIComponent(pageToken)}`;
+    }
+
+    const res = await fetch(fetchUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!res.ok) break;
+
+    const data = await res.json();
+    const batch = data.messages || [];
+    if (batch.length === 0) break;
+
+    for (const m of batch) {
+      messages.push({ id: m.id, threadId: m.threadId });
+      if (messages.length >= maxTotal) break;
+    }
+
+    if (!data.nextPageToken) break;
+    pageToken = data.nextPageToken;
+  }
+
+  return messages;
+}
 
 async function syncUserGmail(user: any, account: any, supabase: any) {
   if (!account) return { error: "No Gmail account connected" };
   const accessToken = await getValidAccessToken(account, supabase);
-  if (!accessToken) return { error: "No valid access token" };
+  if (!accessToken) return { error: "No valid access token. Please reconnect Gmail." };
 
-  const accountEmail = account.gmail_email || account.gmailEmail || "";
+  const accountEmail = (account.gmail_email || account.gmailEmail || "").toLowerCase().trim();
+  const nowIso = new Date().toISOString();
+
+  // Mark sync state as 'syncing'
+  try {
+    await supabase.from("email_sync_state").upsert({
+      user_id: user.id,
+      sync_status: "syncing",
+      updated_at: nowIso,
+    }, { onConflict: "user_id" });
+  } catch (_) {}
+
   let newReceived = 0;
   let newSpam = 0;
   let newSent = 0;
   let newDrafts = 0;
+  let updatedCount = 0;
+  let latestHistoryId: string | null = null;
 
   try {
-    // 1. Fetch Inbox Messages
-    const inboxRes = await fetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=label:INBOX",
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (inboxRes.ok) {
-      const inboxData = await inboxRes.json();
-      const messages = inboxData.messages || [];
+    // 1. Fetch current Gmail Profile to get latest historyId & email
+    let profileHistoryId: string | null = null;
+    try {
+      const profRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (profRes.ok) {
+        const profData = await profRes.json();
+        profileHistoryId = profData.historyId || null;
+      }
+    } catch (_) {}
 
-      for (const m of messages) {
-        const { data: existing } = await supabase
-          .from("Email")
-          .select("id")
-          .eq("userId", user.id)
-          .eq("gmailMessageId", m.id)
-          .maybeSingle();
+    // Check existing sync state for historyId
+    const { data: existingSyncState } = await supabase
+      .from("email_sync_state")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-        const { data: existingCanonical } = await supabase
-          .from("emails")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("gmail_message_id", m.id)
-          .maybeSingle();
+    const storedHistoryId = existingSyncState?.history_id;
+    let incrementalSucceeded = false;
 
-        if (existing || existingCanonical) continue;
-
-        const metaRes = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
+    // 2. Try Incremental Sync via Gmail History API if historyId exists
+    if (storedHistoryId) {
+      try {
+        const historyRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/history?startHistoryId=${encodeURIComponent(storedHistoryId)}&maxResults=100`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
-        if (metaRes.ok) {
-          const meta = await metaRes.json();
-          const headers = meta.payload?.headers || [];
-          const fromHeader = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "";
-          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || accountEmail;
-          const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(No Subject)";
-          const dateHeader = headers.find((h: any) => h.name.toLowerCase() === "date")?.value || "";
 
-          let parsedSender = fromHeader;
-          let parsedSenderEmail = fromHeader;
-          const fromMatch = fromHeader.match(/^(.*?)\s*<([^>]+)>/);
-          if (fromMatch) {
-            parsedSender = fromMatch[1].replace(/^["']|["']$/g, '').trim() || fromMatch[2].trim();
-            parsedSenderEmail = fromMatch[2].trim();
+        if (historyRes.ok) {
+          const histData = await historyRes.json();
+          latestHistoryId = histData.historyId || profileHistoryId || storedHistoryId;
+
+          const historyRecords = histData.history || [];
+          const processedMessageIds = new Set<string>();
+
+          for (const h of historyRecords) {
+            // Handle messages added
+            if (h.messagesAdded) {
+              for (const ma of h.messagesAdded) {
+                const msg = ma.message;
+                if (!msg?.id || processedMessageIds.has(msg.id)) continue;
+                processedMessageIds.add(msg.id);
+
+                const metaRes = await fetch(
+                  `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Bcc&metadataHeaders=Subject&metadataHeaders=Date`,
+                  { headers: { Authorization: `Bearer ${accessToken}` } }
+                );
+                if (metaRes.ok) {
+                  const meta = await metaRes.json();
+                  const headers = meta.payload?.headers || [];
+                  const fromHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "from")?.value || "");
+                  const toHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "to")?.value || accountEmail);
+                  const ccHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "cc")?.value || "");
+                  const bccHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "bcc")?.value || "");
+                  const subjectHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "subject")?.value || "(No Subject)");
+                  const dateHeader = headers.find((hdr: any) => hdr.name.toLowerCase() === "date")?.value || "";
+
+                  const { emails: toEmails } = parseEmailList(toHeader);
+                  const { emails: ccEmails } = parseEmailList(ccHeader);
+                  const { emails: bccEmails } = parseEmailList(bccHeader);
+
+                  let parsedSender = fromHeader;
+                  let parsedSenderEmail = fromHeader;
+                  let parsedSenderName = "";
+                  const fromMatch = fromHeader.match(/^(.*?)\s*<([^>]+)>/);
+                  if (fromMatch) {
+                    parsedSenderName = fromMatch[1].replace(/^["']|["']$/g, '').trim();
+                    parsedSenderEmail = fromMatch[2].trim().toLowerCase();
+                    parsedSender = parsedSenderName || parsedSenderEmail;
+                  } else {
+                    parsedSenderEmail = fromHeader.toLowerCase().trim();
+                    parsedSenderName = parsedSenderEmail.split("@")[0];
+                  }
+
+                  const labelIds = meta.labelIds || [];
+                  const isSpam = labelIds.includes("SPAM");
+                  const isSent = labelIds.includes("SENT");
+                  const isTrash = labelIds.includes("TRASH");
+                  const isDraft = labelIds.includes("DRAFT");
+                  const isUnread = labelIds.includes("UNREAD");
+                  const isStarred = labelIds.includes("STARRED");
+                  const isImportant = labelIds.includes("IMPORTANT");
+
+                  const detectedCat = detectSituationEngine(`${subjectHeader} ${meta.snippet || ""}`);
+                  const dateIso = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
+
+                  await safeInsertEmail(supabase, {
+                    id: crypto.randomUUID(),
+                    userId: user.id,
+                    gmailAccount: accountEmail,
+                    gmailMessageId: msg.id,
+                    gmailThreadId: msg.threadId || null,
+                    sender: parsedSender,
+                    sender_email: parsedSenderEmail,
+                    sender_name: parsedSenderName,
+                    recipient: toEmails[0] || toHeader,
+                    recipient_emails: toEmails,
+                    cc: ccHeader,
+                    cc_emails: ccEmails,
+                    bcc: bccHeader,
+                    bcc_emails: bccEmails,
+                    subject: subjectHeader,
+                    body: meta.snippet || "",
+                    body_text: meta.snippet || "",
+                    snippet: meta.snippet || "",
+                    category: detectedCat.category,
+                    situation: detectedCat.name,
+                    priority: detectedCat.priority,
+                    tone: detectedCat.tone,
+                    status: isDraft ? "Draft" : isSpam ? "Spam" : isTrash ? "Trash" : isSent ? "Sent" : "Received",
+                    isReceived: !isSent && !isSpam && !isDraft,
+                    isSent: isSent,
+                    isSpam: isSpam,
+                    isTrash: isTrash,
+                    isRead: !isUnread,
+                    isStarred: isStarred,
+                    isImportant: isImportant,
+                    labels: labelIds.join(","),
+                    historyId: latestHistoryId,
+                    createdAt: dateIso,
+                    receivedAt: !isSent ? dateIso : null,
+                    sentAt: isSent ? dateIso : null,
+                  });
+
+                  if (isSpam) newSpam++;
+                  else if (isSent) newSent++;
+                  else if (isDraft) newDrafts++;
+                  else newReceived++;
+                }
+              }
+            }
+
+            // Handle labels added (read, starred, etc.)
+            if (h.labelsAdded) {
+              for (const la of h.labelsAdded) {
+                const msg = la.message;
+                const added = la.labelIds || [];
+                if (!msg?.id) continue;
+                const updateData: Record<string, any> = { updated_at: nowIso };
+                if (added.includes("UNREAD")) updateData.is_read = false;
+                if (added.includes("STARRED")) updateData.is_starred = true;
+                if (added.includes("IMPORTANT")) updateData.is_important = true;
+                if (added.includes("SPAM")) { updateData.is_spam = true; updateData.status = "Spam"; }
+                if (added.includes("TRASH")) { updateData.is_trash = true; updateData.status = "Trash"; }
+
+                await supabase.from("emails").update(updateData).eq("user_id", user.id).eq("gmail_message_id", msg.id);
+                updatedCount++;
+              }
+            }
+
+            // Handle labels removed
+            if (h.labelsRemoved) {
+              for (const lr of h.labelsRemoved) {
+                const msg = lr.message;
+                const removed = lr.labelIds || [];
+                if (!msg?.id) continue;
+                const updateData: Record<string, any> = { updated_at: nowIso };
+                if (removed.includes("UNREAD")) updateData.is_read = true;
+                if (removed.includes("STARRED")) updateData.is_starred = false;
+                if (removed.includes("IMPORTANT")) updateData.is_important = false;
+                if (removed.includes("SPAM")) { updateData.is_spam = false; }
+                if (removed.includes("TRASH")) { updateData.is_trash = false; }
+
+                await supabase.from("emails").update(updateData).eq("user_id", user.id).eq("gmail_message_id", msg.id);
+                updatedCount++;
+              }
+            }
           }
 
-          const isSpam = (meta.labelIds || []).includes("SPAM");
-          const isSent = (meta.labelIds || []).includes("SENT");
-          const isUnread = (meta.labelIds || []).includes("UNREAD");
-
-          const detectedCat = detectSituationEngine(`${subjectHeader} ${meta.snippet || ""}`);
-          const dateIso = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
-
-          await safeInsertEmail(supabase, {
-            id: crypto.randomUUID(),
-            userId: user.id,
-            gmailAccount: accountEmail,
-            gmailMessageId: m.id,
-            gmailThreadId: m.threadId || null,
-            sender: parsedSender,
-            sender_email: parsedSenderEmail,
-            recipient: toHeader,
-            subject: subjectHeader,
-            body: meta.snippet || "",
-            snippet: meta.snippet || "",
-            category: detectedCat.category,
-            situation: detectedCat.name,
-            priority: detectedCat.priority,
-            tone: detectedCat.tone,
-            status: isSpam ? "Spam" : isSent ? "Sent" : "Received",
-            isReceived: !isSent && !isSpam,
-            isSent: isSent,
-            isSpam: isSpam,
-            isRead: !isUnread,
-            labels: (meta.labelIds || []).join(","),
-            createdAt: dateIso,
-            receivedAt: !isSent ? dateIso : null,
-            sentAt: isSent ? dateIso : null,
-          });
-
-          if (isSpam) newSpam++;
-          else if (isSent) newSent++;
-          else newReceived++;
+          incrementalSucceeded = true;
+        } else if (historyRes.status === 404 || historyRes.status === 400) {
+          console.log(`[Gmail Sync] History ID ${storedHistoryId} expired or invalid. Running full sync fallback.`);
         }
+      } catch (histEx) {
+        console.warn("[Gmail Sync] Incremental sync attempt note:", histEx);
       }
     }
 
-    // 2. Fetch Spam Messages explicitly
-    const spamRes = await fetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=15&q=label:SPAM",
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (spamRes.ok) {
-      const spamData = await spamRes.json();
-      const messages = spamData.messages || [];
+    // 3. Full Paginated Sync (Initial sync or fallback if incremental was not performed)
+    if (!incrementalSucceeded) {
+      latestHistoryId = profileHistoryId || latestHistoryId;
 
-      for (const m of messages) {
-        const { data: existing } = await supabase
-          .from("Email")
-          .select("id")
-          .eq("userId", user.id)
-          .eq("gmailMessageId", m.id)
-          .maybeSingle();
+      // A. INBOX Messages (Paginated up to 50)
+      const inboxList = await fetchGmailMessagesPaginated(accessToken, "label:INBOX", 50);
 
-        const { data: existingCanonical } = await supabase
-          .from("emails")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("gmail_message_id", m.id)
-          .maybeSingle();
+      // B. SENT Messages (Paginated up to 50)
+      const sentList = await fetchGmailMessagesPaginated(accessToken, "label:SENT", 50);
 
-        if (existing || existingCanonical) continue;
+      // C. SPAM Messages (Paginated up to 25)
+      const spamList = await fetchGmailMessagesPaginated(accessToken, "label:SPAM", 25);
 
+      // D. TRASH Messages (Paginated up to 25)
+      const trashList = await fetchGmailMessagesPaginated(accessToken, "label:TRASH", 25);
+
+      // Combine message IDs and remove duplicates
+      const uniqueMsgMap = new Map<string, { id: string; threadId: string; defaultDir: string }>();
+      for (const m of inboxList) uniqueMsgMap.set(m.id, { ...m, defaultDir: "received" });
+      for (const m of sentList) uniqueMsgMap.set(m.id, { ...m, defaultDir: "sent" });
+      for (const m of spamList) uniqueMsgMap.set(m.id, { ...m, defaultDir: "spam" });
+      for (const m of trashList) uniqueMsgMap.set(m.id, { ...m, defaultDir: "trash" });
+
+      const allMessages = Array.from(uniqueMsgMap.values());
+
+      for (const m of allMessages) {
         const metaRes = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Bcc&metadataHeaders=Subject&metadataHeaders=Date`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
-        if (metaRes.ok) {
-          const meta = await metaRes.json();
-          const headers = meta.payload?.headers || [];
-          const fromHeader = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "";
-          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || accountEmail;
-          const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(Spam Message)";
-          const dateHeader = headers.find((h: any) => h.name.toLowerCase() === "date")?.value || "";
 
-          let parsedSender = fromHeader;
-          let parsedSenderEmail = fromHeader;
-          const fromMatch = fromHeader.match(/^(.*?)\s*<([^>]+)>/);
-          if (fromMatch) {
-            parsedSender = fromMatch[1].replace(/^["']|["']$/g, '').trim() || fromMatch[2].trim();
-            parsedSenderEmail = fromMatch[2].trim();
-          }
+        if (!metaRes.ok) continue;
 
-          const detectedCat = detectSituationEngine(`${subjectHeader} ${meta.snippet || ""}`);
-          const dateIso = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
+        const meta = await metaRes.json();
+        const headers = meta.payload?.headers || [];
+        const fromHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "from")?.value || "");
+        const toHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "to")?.value || accountEmail);
+        const ccHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "cc")?.value || "");
+        const bccHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "bcc")?.value || "");
+        const subjectHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "subject")?.value || "(No Subject)");
+        const dateHeader = headers.find((hdr: any) => hdr.name.toLowerCase() === "date")?.value || "";
 
-          await safeInsertEmail(supabase, {
-            id: crypto.randomUUID(),
-            userId: user.id,
-            gmailAccount: accountEmail,
-            gmailMessageId: m.id,
-            gmailThreadId: m.threadId || null,
-            sender: parsedSender,
-            sender_email: parsedSenderEmail,
-            recipient: toHeader,
-            subject: subjectHeader,
-            body: meta.snippet || "",
-            snippet: meta.snippet || "",
-            category: detectedCat.category,
-            situation: detectedCat.name,
-            priority: detectedCat.priority,
-            tone: detectedCat.tone,
-            status: "Spam",
-            isReceived: false,
-            isSent: false,
-            isSpam: true,
-            isRead: false,
-            labels: "SPAM",
-            createdAt: dateIso,
-            receivedAt: dateIso,
-          });
+        const { emails: toEmails } = parseEmailList(toHeader);
+        const { emails: ccEmails } = parseEmailList(ccHeader);
+        const { emails: bccEmails } = parseEmailList(bccHeader);
 
-          newSpam++;
+        let parsedSender = fromHeader;
+        let parsedSenderEmail = fromHeader;
+        let parsedSenderName = "";
+        const fromMatch = fromHeader.match(/^(.*?)\s*<([^>]+)>/);
+        if (fromMatch) {
+          parsedSenderName = fromMatch[1].replace(/^["']|["']$/g, '').trim();
+          parsedSenderEmail = fromMatch[2].trim().toLowerCase();
+          parsedSender = parsedSenderName || parsedSenderEmail;
+        } else {
+          parsedSenderEmail = fromHeader.toLowerCase().trim();
+          parsedSenderName = parsedSenderEmail.split("@")[0];
         }
+
+        const labelIds = meta.labelIds || [];
+        const isSpam = labelIds.includes("SPAM") || m.defaultDir === "spam";
+        const isSent = labelIds.includes("SENT") || m.defaultDir === "sent";
+        const isTrash = labelIds.includes("TRASH") || m.defaultDir === "trash";
+        const isDraft = labelIds.includes("DRAFT");
+        const isUnread = labelIds.includes("UNREAD");
+        const isStarred = labelIds.includes("STARRED");
+        const isImportant = labelIds.includes("IMPORTANT");
+
+        const detectedCat = detectSituationEngine(`${subjectHeader} ${meta.snippet || ""}`);
+        const dateIso = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
+
+        await safeInsertEmail(supabase, {
+          id: crypto.randomUUID(),
+          userId: user.id,
+          gmailAccount: accountEmail,
+          gmailMessageId: m.id,
+          gmailThreadId: m.threadId || null,
+          sender: parsedSender,
+          sender_email: parsedSenderEmail,
+          sender_name: parsedSenderName,
+          recipient: toEmails[0] || toHeader,
+          recipient_emails: toEmails,
+          cc: ccHeader,
+          cc_emails: ccEmails,
+          bcc: bccHeader,
+          bcc_emails: bccEmails,
+          subject: subjectHeader,
+          body: meta.snippet || "",
+          body_text: meta.snippet || "",
+          snippet: meta.snippet || "",
+          category: detectedCat.category,
+          situation: detectedCat.name,
+          priority: detectedCat.priority,
+          tone: detectedCat.tone,
+          status: isDraft ? "Draft" : isSpam ? "Spam" : isTrash ? "Trash" : isSent ? "Sent" : "Received",
+          isReceived: !isSent && !isSpam && !isDraft,
+          isSent: isSent,
+          isSpam: isSpam,
+          isTrash: isTrash,
+          isRead: !isUnread,
+          isStarred: isStarred,
+          isImportant: isImportant,
+          labels: labelIds.join(","),
+          historyId: latestHistoryId,
+          createdAt: dateIso,
+          receivedAt: !isSent ? dateIso : null,
+          sentAt: isSent ? dateIso : null,
+        });
+
+        if (isSpam) newSpam++;
+        else if (isSent) newSent++;
+        else newReceived++;
+      }
+
+      // E. Drafts from Gmail
+      try {
+        const draftsRes = await fetch(
+          "https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=20",
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (draftsRes.ok) {
+          const draftsData = await draftsRes.json();
+          const drafts = draftsData.drafts || [];
+
+          for (const d of drafts) {
+            if (!d.id) continue;
+            const msgId = d.message?.id || d.id;
+
+            const dRes = await fetch(
+              `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${d.id}?format=metadata&metadataHeaders=To&metadataHeaders=Subject`,
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
+            if (dRes.ok) {
+              const dMeta = await dRes.json();
+              const headers = dMeta.message?.payload?.headers || [];
+              const toHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "to")?.value || "");
+              const subjectHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "subject")?.value || "(Untitled Draft)");
+              const { emails: toEmails } = parseEmailList(toHeader);
+
+              await safeInsertEmail(supabase, {
+                id: crypto.randomUUID(),
+                userId: user.id,
+                gmailAccount: accountEmail,
+                gmailMessageId: msgId,
+                recipient: toEmails[0] || toHeader || "(No recipient)",
+                recipient_emails: toEmails,
+                subject: subjectHeader,
+                body: dMeta.message?.snippet || "",
+                body_text: dMeta.message?.snippet || "",
+                snippet: dMeta.message?.snippet || "",
+                category: "Official/Professional",
+                situation: "💼 Official / Professional",
+                priority: "Normal",
+                tone: "Professional",
+                status: "Draft",
+                isReceived: false,
+                isSent: false,
+                isSpam: false,
+                isRead: true,
+                createdAt: new Date().toISOString(),
+              });
+
+              newDrafts++;
+            }
+          }
+        }
+      } catch (dErr) {
+        console.warn("[Gmail Sync] Drafts sync note:", dErr);
       }
     }
 
-    // 3. Fetch Drafts from Gmail
-    const draftsRes = await fetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=10",
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (draftsRes.ok) {
-      const draftsData = await draftsRes.json();
-      const drafts = draftsData.drafts || [];
-
-      for (const d of drafts) {
-        if (!d.id) continue;
-        const msgId = d.message?.id || d.id;
-        const { data: existing } = await supabase
-          .from("Email")
-          .select("id")
-          .eq("userId", user.id)
-          .eq("gmailMessageId", msgId)
-          .maybeSingle();
-
-        const { data: existingCanonical } = await supabase
-          .from("emails")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("gmail_message_id", msgId)
-          .maybeSingle();
-
-        if (existing || existingCanonical) continue;
-
-        const dRes = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${d.id}?format=metadata&metadataHeaders=To&metadataHeaders=Subject`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        if (dRes.ok) {
-          const dMeta = await dRes.json();
-          const headers = dMeta.message?.payload?.headers || [];
-          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || "";
-          const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(Untitled Draft)";
-
-          await safeInsertEmail(supabase, {
-            id: crypto.randomUUID(),
-            userId: user.id,
-            gmailAccount: account.gmailEmail,
-            gmailMessageId: msgId,
-            recipient: toHeader || "(No recipient)",
-            subject: subjectHeader,
-            body: dMeta.message?.snippet || "",
-            snippet: dMeta.message?.snippet || "",
-            category: "Official/Professional",
-            situation: "💼 Official / Professional",
-            priority: "Normal",
-            tone: "Professional",
-            status: "Draft",
-            isReceived: false,
-            isSent: false,
-            isSpam: false,
-            isRead: true,
-            createdAt: new Date().toISOString(),
-          });
-
-          newDrafts++;
-        }
-      }
-    }
-
-    // 4. Fetch Sent Messages from Gmail
-    const sentRes = await fetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=label:SENT",
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (sentRes.ok) {
-      const sentData = await sentRes.json();
-      const messages = sentData.messages || [];
-
-      for (const m of messages) {
-        const { data: existing } = await supabase
-          .from("Email")
-          .select("id")
-          .eq("userId", user.id)
-          .eq("gmailMessageId", m.id)
-          .maybeSingle();
-
-        const { data: existingCanonical } = await supabase
-          .from("emails")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("gmail_message_id", m.id)
-          .maybeSingle();
-
-        if (existing || existingCanonical) continue;
-
-        const metaRes = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        if (metaRes.ok) {
-          const meta = await metaRes.json();
-          const headers = meta.payload?.headers || [];
-          const fromHeader = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || accountEmail;
-          const toHeader = headers.find((h: any) => h.name.toLowerCase() === "to")?.value || "";
-          const subjectHeader = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(No Subject)";
-          const dateHeader = headers.find((h: any) => h.name.toLowerCase() === "date")?.value || "";
-
-          let parsedSender = fromHeader;
-          let parsedSenderEmail = fromHeader;
-          const fromMatch = fromHeader.match(/^(.*?)\s*<([^>]+)>/);
-          if (fromMatch) {
-            parsedSender = fromMatch[1].replace(/^["']|["']$/g, '').trim() || fromMatch[2].trim();
-            parsedSenderEmail = fromMatch[2].trim();
-          }
-
-          const detectedCat = detectSituationEngine(`${subjectHeader} ${meta.snippet || ""}`);
-          const dateIso = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
-
-          await safeInsertEmail(supabase, {
-            id: crypto.randomUUID(),
-            userId: user.id,
-            gmailAccount: accountEmail,
-            gmailMessageId: m.id,
-            gmailThreadId: m.threadId || null,
-            sender: parsedSender,
-            sender_email: parsedSenderEmail,
-            recipient: toHeader,
-            subject: subjectHeader,
-            body: meta.snippet || "",
-            snippet: meta.snippet || "",
-            category: detectedCat.category,
-            situation: detectedCat.name,
-            priority: detectedCat.priority,
-            tone: detectedCat.tone,
-            status: "Sent",
-            isReceived: false,
-            isSent: true,
-            isSpam: false,
-            isRead: true,
-            labels: "SENT",
-            createdAt: dateIso,
-            sentAt: dateIso,
-          });
-
-          newSent++;
-        }
-      }
+    // 4. Update email_sync_state with final results
+    const totalSynced = newReceived + newSent + newSpam + newDrafts;
+    try {
+      await supabase.from("email_sync_state").upsert({
+        user_id: user.id,
+        history_id: latestHistoryId || profileHistoryId,
+        last_synced_at: nowIso,
+        sync_status: "success",
+        sync_error: null,
+        messages_synced: (existingSyncState?.messages_synced || 0) + totalSynced,
+        new_messages: totalSynced,
+        updated_messages: updatedCount,
+        updated_at: nowIso,
+      }, { onConflict: "user_id" });
+    } catch (sErr) {
+      console.warn("[Gmail Sync] Sync state update note:", sErr);
     }
 
     return {
       success: true,
-      synced: newReceived + newSpam + newSent + newDrafts,
+      synced: totalSynced,
       newReceived,
       newSpam,
       newSent,
       newDrafts,
+      updatedMessages: updatedCount,
+      lastSyncedAt: nowIso,
+      historyId: latestHistoryId || profileHistoryId,
     };
   } catch (err: any) {
     console.error("Gmail sync error:", err);
+    try {
+      await supabase.from("email_sync_state").upsert({
+        user_id: user.id,
+        sync_status: "error",
+        sync_error: err.message || "Sync failed",
+        updated_at: nowIso,
+      }, { onConflict: "user_id" });
+    } catch (_) {}
+
     return { error: err.message || "Failed to sync Gmail" };
   }
 }
@@ -2855,6 +3078,28 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       return jsonResponse(syncResult);
     }
 
+    if ((path === "/gmail/sync-state" || path === "/sync-state") && method === "GET") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+
+      const { data: syncState } = await supabase
+        .from("email_sync_state")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      return jsonResponse({
+        success: true,
+        syncState: syncState || {
+          sync_status: "idle",
+          last_synced_at: null,
+          messages_synced: 0,
+          new_messages: 0,
+          updated_messages: 0,
+        },
+      });
+    }
+
     // ----------------------------------------------------
     // Save as Draft, Scheduled, or Pending
     // ----------------------------------------------------
@@ -3045,7 +3290,44 @@ HUMAN-WRITTEN WRITING GUIDELINES:
         });
       }
 
-      const list = unifiedList;
+      // Date range filtering (today, yesterday, week, month, all)
+      const dateRangeParam = (url.searchParams.get("range") || url.searchParams.get("dateRange") || url.searchParams.get("timeRange") || "all").toLowerCase().trim();
+      let filteredList = unifiedList;
+      if (dateRangeParam && dateRangeParam !== "all") {
+        if (dateRangeParam === "today") {
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          filteredList = unifiedList.filter((e: any) => {
+            const t = new Date(e.sent_at || e.sentAt || e.received_at || e.receivedAt || e.created_at || e.createdAt || 0).getTime();
+            return !isNaN(t) && t >= todayStart.getTime();
+          });
+        } else if (dateRangeParam === "yesterday") {
+          const yStart = new Date();
+          yStart.setDate(yStart.getDate() - 1);
+          yStart.setHours(0, 0, 0, 0);
+          const yEnd = new Date();
+          yEnd.setDate(yEnd.getDate() - 1);
+          yEnd.setHours(23, 59, 59, 999);
+          filteredList = unifiedList.filter((e: any) => {
+            const t = new Date(e.sent_at || e.sentAt || e.received_at || e.receivedAt || e.created_at || e.createdAt || 0).getTime();
+            return !isNaN(t) && t >= yStart.getTime() && t <= yEnd.getTime();
+          });
+        } else if (dateRangeParam === "week" || dateRangeParam === "last7days") {
+          const weekAgo = Date.now() - 7 * 86400 * 1000;
+          filteredList = unifiedList.filter((e: any) => {
+            const t = new Date(e.sent_at || e.sentAt || e.received_at || e.receivedAt || e.created_at || e.createdAt || 0).getTime();
+            return !isNaN(t) && t >= weekAgo;
+          });
+        } else if (dateRangeParam === "month" || dateRangeParam === "last30days") {
+          const monthAgo = Date.now() - 30 * 86400 * 1000;
+          filteredList = unifiedList.filter((e: any) => {
+            const t = new Date(e.sent_at || e.sentAt || e.received_at || e.receivedAt || e.created_at || e.createdAt || 0).getTime();
+            return !isNaN(t) && t >= monthAgo;
+          });
+        }
+      }
+
+      const list = filteredList;
       const total = list.length;
 
       const sent = list.filter((e: any) => {
@@ -3227,23 +3509,36 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       let finalPending = pendingReview;
       let finalTotal = total;
 
-      try {
-        const { data: rpcStats, error: rpcErr } = await supabase.rpc("get_dashboard_analytics", { p_user_id: user.id });
-        if (!rpcErr && rpcStats) {
-          finalSent = Math.max(finalSent, rpcStats.sent || 0);
-          finalReceived = Math.max(finalReceived, rpcStats.received || 0);
-          finalDrafts = Math.max(finalDrafts, rpcStats.drafts || 0);
-          finalScheduled = Math.max(finalScheduled, rpcStats.scheduled || 0);
-          finalEmergency = Math.max(finalEmergency, rpcStats.emergency || 0);
-          finalSpam = Math.max(finalSpam, rpcStats.spam || 0);
-          finalPending = Math.max(finalPending, rpcStats.pendingReview || 0);
-          finalTotal = Math.max(finalTotal, rpcStats.total || 0);
-          if (rpcStats.categories && typeof rpcStats.categories === 'object') {
-            for (const [k, v] of Object.entries(rpcStats.categories)) {
-              categories[k] = Math.max(categories[k] || 0, Number(v) || 0);
+      if (dateRangeParam === "all") {
+        try {
+          const { data: rpcStats, error: rpcErr } = await supabase.rpc("get_dashboard_analytics", { p_user_id: user.id });
+          if (!rpcErr && rpcStats) {
+            finalSent = Math.max(finalSent, rpcStats.sent || 0);
+            finalReceived = Math.max(finalReceived, rpcStats.received || 0);
+            finalDrafts = Math.max(finalDrafts, rpcStats.drafts || 0);
+            finalScheduled = Math.max(finalScheduled, rpcStats.scheduled || 0);
+            finalEmergency = Math.max(finalEmergency, rpcStats.emergency || 0);
+            finalSpam = Math.max(finalSpam, rpcStats.spam || 0);
+            finalPending = Math.max(finalPending, rpcStats.pendingReview || 0);
+            finalTotal = Math.max(finalTotal, rpcStats.total || 0);
+            if (rpcStats.categories && typeof rpcStats.categories === 'object') {
+              for (const [k, v] of Object.entries(rpcStats.categories)) {
+                categories[k] = Math.max(categories[k] || 0, Number(v) || 0);
+              }
             }
           }
-        }
+        } catch (_) {}
+      }
+
+      // Query current sync state for this user
+      let syncState: any = null;
+      try {
+        const { data: ss } = await supabase
+          .from("email_sync_state")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        syncState = ss;
       } catch (_) {}
 
       return jsonResponse({
@@ -3267,6 +3562,13 @@ HUMAN-WRITTEN WRITING GUIDELINES:
         resume: categories.jobApplication,
         official: categories.official,
         recentActivity: activityStream,
+        syncState: syncState || {
+          sync_status: "idle",
+          last_synced_at: null,
+          messages_synced: 0,
+          new_messages: 0,
+          updated_messages: 0,
+        },
         stats: {
           total: finalTotal,
           sent: finalSent,

@@ -664,3 +664,126 @@ BEGIN
   RETURN COALESCE(v_result, '{}'::jsonb);
 END;
 $$;
+
+-- ============================================================================
+-- 18. GMAIL SYNCHRONIZATION SYSTEM TABLES & RLS
+-- ============================================================================
+
+-- Email Synchronization State Table
+CREATE TABLE IF NOT EXISTS public.email_sync_state (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    history_id TEXT,
+    last_synced_at TIMESTAMPTZ,
+    sync_status TEXT NOT NULL DEFAULT 'idle',
+    sync_error TEXT,
+    messages_synced INTEGER NOT NULL DEFAULT 0,
+    new_messages INTEGER NOT NULL DEFAULT 0,
+    updated_messages INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT email_sync_state_user_id_unique UNIQUE(user_id)
+);
+CREATE INDEX IF NOT EXISTS email_sync_state_user_id_idx ON public.email_sync_state(user_id);
+
+-- Email Threads Table
+CREATE TABLE IF NOT EXISTS public.email_threads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    gmail_thread_id TEXT NOT NULL,
+    snippet TEXT,
+    history_id TEXT,
+    message_count INTEGER NOT NULL DEFAULT 1,
+    last_message_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT email_threads_user_thread_unique UNIQUE(user_id, gmail_thread_id)
+);
+CREATE INDEX IF NOT EXISTS email_threads_user_id_idx ON public.email_threads(user_id);
+
+-- Email Labels Table
+CREATE TABLE IF NOT EXISTS public.email_labels (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    gmail_label_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'system',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT email_labels_user_label_unique UNIQUE(user_id, gmail_label_id)
+);
+CREATE INDEX IF NOT EXISTS email_labels_user_id_idx ON public.email_labels(user_id);
+
+-- Standardize Columns on public.emails
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS sender_email TEXT;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS sender_name TEXT;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS recipient_emails TEXT[];
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS cc_emails TEXT[];
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS bcc_emails TEXT[];
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS body_text TEXT;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS body_html TEXT;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS snippet TEXT;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS direction TEXT NOT NULL DEFAULT 'sent';
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS is_starred BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS is_important BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS is_spam BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS is_trash BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS labels TEXT[];
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS gmail_thread_id TEXT;
+ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS history_id TEXT;
+
+-- Standardize Columns on legacy Email table
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "sender_email" TEXT;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "sender_name" TEXT;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "body_text" TEXT;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "body_html" TEXT;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "snippet" TEXT;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "isStarred" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "isImportant" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "isTrash" BOOLEAN NOT NULL DEFAULT false;
+
+-- Enable RLS for new tables
+ALTER TABLE public.email_sync_state ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_labels ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access email_sync_state" ON public.email_sync_state FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access email_threads" ON public.email_threads FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access email_labels" ON public.email_labels FOR ALL TO service_role USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Users can only access their own email_sync_state" ON public.email_sync_state
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Users can only access their own email_threads" ON public.email_threads
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Users can only access their own email_labels" ON public.email_labels
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Enable Realtime for email_sync_state
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.email_sync_state;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+

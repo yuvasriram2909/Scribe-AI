@@ -38,7 +38,7 @@ export async function signInWithGoogle() {
     provider: 'google',
     options: {
       redirectTo: `${redirectUri}?gmail=connected`,
-      scopes: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+      scopes: 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
       queryParams: {
         access_type: 'offline',
         prompt: 'consent',
@@ -264,3 +264,42 @@ export function subscribeToEmailEvents(userId, onEvent) {
     return () => {};
   }
 }
+
+/**
+ * Subscribe to real-time changes on the email_sync_state table
+ */
+export function subscribeToSyncState(userIdOrCallback, maybeCallback) {
+  const onSyncStateChange = typeof userIdOrCallback === 'function' ? userIdOrCallback : maybeCallback;
+  const userId = typeof userIdOrCallback === 'string' ? userIdOrCallback : (localStorage.getItem('userId') || '');
+  if (!supabase || !onSyncStateChange) return () => {};
+
+  try {
+    const isUuid = isValidUuid(userId);
+    const channelName = `rt_sync_${userId || 'all'}_${Math.random().toString(36).slice(2, 7)}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'email_sync_state',
+          ...(isUuid ? { filter: `user_id=eq.${userId}` } : {}),
+        },
+        (payload) => {
+          onSyncStateChange(payload);
+        }
+      )
+      .subscribe();
+
+    return {
+      unsubscribe: () => {
+        supabase.removeChannel(channel);
+      }
+    };
+  } catch (err) {
+    console.warn('[Supabase Realtime] Failed to initialize Sync state channel:', err);
+    return () => {};
+  }
+}
+

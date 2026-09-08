@@ -24,6 +24,7 @@ const STATUS_FILTER = ['All', 'Sent', 'Received', 'Draft', 'Scheduled', 'Failed'
 const DATE_RANGES = [
   { id: 'All', label: 'All Time' },
   { id: 'today', label: 'Today' },
+  { id: 'yesterday', label: 'Yesterday' },
   { id: 'week', label: 'Last 7 Days' },
   { id: 'month', label: 'Last 30 Days' }
 ];
