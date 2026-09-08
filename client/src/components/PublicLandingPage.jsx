@@ -322,8 +322,8 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
         
         <div className="text-center space-y-7 max-w-3xl mx-auto relative">
           
-          {/* Badge with Entrance Motion and Pulse Ring */}
-          <div className="animate-hero-badge inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-bold tracking-wide uppercase shadow-lg shadow-emerald-950/40 hover:scale-105 transition-transform duration-200 cursor-default backdrop-blur-md">
+          {/* Badge Floating with Pulse Ring */}
+          <div className="animate-hero-badge animate-top-badge-float inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-bold tracking-wide uppercase shadow-lg shadow-emerald-950/40 hover:scale-105 transition-transform duration-200 cursor-default backdrop-blur-md">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
@@ -331,23 +331,29 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
             <span>Official Google OAuth 2.0 Verified Integration</span>
           </div>
 
-          {/* Heading with Bespoke Luxury Animation & Volumetric Aura */}
-          <div className="animate-hero-title space-y-3 relative py-2 select-none group">
-            {/* Floating Badges for Desktop */}
-            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1A1918]/90 border border-[#2E2D2B] shadow-xl text-xs font-semibold text-[#ECE8E1] backdrop-blur-md animate-soft-float absolute top-3 -left-16 pointer-events-none">
+          {/* Heading Floating Levitation & Ambient Volumetric Glow */}
+          <div className="animate-hero-title animate-title-float space-y-3 relative py-2 select-none group">
+            {/* Floating Tech Pills for Desktop */}
+            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1A1918]/90 border border-[#2E2D2B] shadow-xl text-xs font-semibold text-[#ECE8E1] backdrop-blur-md animate-pill-float-1 absolute top-3 -left-16 pointer-events-none">
               <Zap className="w-3.5 h-3.5 text-[#D4A373]" />
               <span>Instant AI Drafting</span>
             </div>
-            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1A1918]/90 border border-[#2E2D2B] shadow-xl text-xs font-semibold text-emerald-400 backdrop-blur-md animate-soft-float-delayed absolute top-3 -right-16 pointer-events-none">
+            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1A1918]/90 border border-[#2E2D2B] shadow-xl text-xs font-semibold text-emerald-400 backdrop-blur-md animate-pill-float-2 absolute top-3 -right-16 pointer-events-none">
               <Shield className="w-3.5 h-3.5 text-emerald-400" />
               <span>100% User Confirmed</span>
             </div>
 
-            {/* Ambient Volumetric Backlight Aura */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-[500px] h-28 sm:h-36 bg-radial from-[#D4A373]/30 via-[#D4A373]/10 to-transparent blur-3xl rounded-full pointer-events-none -z-10 animate-title-aura" />
+            {/* Ambient Volumetric Backlight Aura (Seamless circular bloom) */}
+            <div 
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-[520px] h-28 sm:h-36 rounded-full pointer-events-none -z-10 animate-title-aura"
+              style={{
+                background: 'radial-gradient(ellipse at center, rgba(212, 163, 115, 0.22) 0%, rgba(212, 163, 115, 0.05) 50%, transparent 75%)',
+                filter: 'blur(36px)'
+              }}
+            />
 
-            {/* Main Animated Title with Light Beam Sweep */}
-            <div className="relative inline-block title-beam-sweep rounded-3xl px-6 py-2 transition-transform duration-500 ease-out group-hover:scale-[1.03]">
+            {/* Main Animated Title */}
+            <div className="relative inline-block px-4 py-1 transition-transform duration-500 ease-out group-hover:scale-[1.03]">
               <h1 className="text-5xl sm:text-7xl md:text-8xl font-black tracking-tight leading-tight flex items-center justify-center gap-3 sm:gap-4 cursor-default">
                 <span className="text-scribe-platinum tracking-tight">
                   Scribe
@@ -365,25 +371,38 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
             </p>
           </div>
 
-          {/* Information Card with Conic Border Beam Highlight & 3D Tilt */}
-          <div className="animate-hero-box border-beam-container p-[1.5px] max-w-2xl mx-auto shadow-2xl">
-            <InteractiveCard
-              lift={true}
-              tilt={true}
-              glow={true}
-              className="p-6 sm:p-8 rounded-[23px] bg-[#1A1918]/95 border border-[#2E2D2B] text-[#ECE8E1] space-y-3 text-center backdrop-blur-xl"
-            >
-              <p className="text-lg sm:text-xl font-extrabold text-[#F5F3EF] leading-relaxed">
-                Scribe AI helps users compose and send emails through their own Gmail account using Google OAuth.
-              </p>
-              <p className="text-sm sm:text-base text-[#D4A373] font-semibold leading-relaxed">
-                Users connect their Gmail account securely with Google OAuth and approve emails before sending.
-              </p>
-            </InteractiveCard>
+          {/* Zero-Gravity Floating Card Suspended in Mid-Air */}
+          <div className="relative max-w-2xl mx-auto pt-3 pb-4 w-full">
+            
+            {/* Reactive Floor Shadow beneath Floating Card */}
+            <div className="absolute -bottom-2 left-1/2 w-[85%] h-10 bg-black/80 rounded-[100%] pointer-events-none -z-10 animate-card-shadow" />
+            
+            {/* Soft Ambient Floating Cushion Glow */}
+            <div className="absolute -bottom-3 left-1/2 w-[70%] h-12 bg-[#D4A373]/12 rounded-[100%] blur-2xl pointer-events-none -z-10 animate-card-shadow" />
+
+            {/* Card Levitation Container */}
+            <div className="animate-card-float">
+              <div className="border-beam-container p-[1.5px] max-w-2xl mx-auto shadow-2xl rounded-[25px]">
+                <InteractiveCard
+                  lift={true}
+                  tilt={true}
+                  glow={true}
+                  className="p-6 sm:p-8 rounded-[23px] bg-[#1A1918]/95 border border-[#2E2D2B] text-[#ECE8E1] space-y-3 text-center backdrop-blur-xl shadow-2xl shadow-black/80"
+                >
+                  <p className="text-lg sm:text-xl font-extrabold text-[#F5F3EF] leading-relaxed">
+                    Scribe AI helps users compose and send emails through their own Gmail account using Google OAuth.
+                  </p>
+                  <p className="text-sm sm:text-base text-[#D4A373] font-semibold leading-relaxed">
+                    Users connect their Gmail account securely with Google OAuth and approve emails before sending.
+                  </p>
+                </InteractiveCard>
+              </div>
+            </div>
+
           </div>
 
-          {/* CTA Button with Backlight Aura & Continuous Light Sweep */}
-          <div className="animate-hero-cta relative flex items-center justify-center pt-2">
+          {/* CTA Button Floating in the Air */}
+          <div className="animate-hero-cta animate-button-float relative flex items-center justify-center pt-1">
             <div className="absolute w-56 h-12 bg-[#D4A373] rounded-full animate-aura pointer-events-none -z-10" />
             <InteractiveButton
               onClick={onNavigateToLogin}

@@ -883,31 +883,6 @@
   }
 }
 
-.title-beam-sweep {
-  position: relative;
-  overflow: hidden;
-}
-
-.title-beam-sweep::after {
-  content: '';
-  position: absolute;
-  top: -20%;
-  left: 0;
-  width: 35%;
-  height: 140%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.5) 45%,
-    rgba(212, 163, 115, 0.8) 55%,
-    transparent 100%
-  );
-  transform: translateX(-150%) skewX(-25deg);
-  pointer-events: none;
-  animation: titleBeamSlice 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  mix-blend-mode: overlay;
-}
-
 /* 5. Sparkle Twinkle Animation */
 @keyframes sparkleTwinkle {
   0%, 100% {
@@ -925,4 +900,121 @@
 .animate-sparkle-twinkle {
   animation: sparkleTwinkle 3.6s ease-in-out infinite;
 }
+
+/* ==========================================================================
+   Zero-Gravity "Floating in the Air" Animation Suite
+   ========================================================================== */
+
+/* 1. Main Hero Card Floating Levitation */
+@keyframes levitateCard {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  30% {
+    transform: translateY(-15px) rotate(0.4deg);
+  }
+  70% {
+    transform: translateY(-7px) rotate(-0.35deg);
+  }
+}
+
+.animate-card-float {
+  animation: levitateCard 6.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* 2. Reactive Floor Shadow Beneath Floating Card */
+@keyframes levitateShadow {
+  0%, 100% {
+    transform: translateX(-50%) scaleX(0.9) scaleY(0.85);
+    opacity: 0.6;
+    filter: blur(20px);
+  }
+  30% {
+    transform: translateX(-50%) scaleX(1.08) scaleY(1.05);
+    opacity: 0.28;
+    filter: blur(32px);
+  }
+  70% {
+    transform: translateX(-50%) scaleX(0.96) scaleY(0.95);
+    opacity: 0.45;
+    filter: blur(25px);
+  }
+}
+
+.animate-card-shadow {
+  animation: levitateShadow 6.8s ease-in-out infinite;
+  will-change: transform, opacity, filter;
+}
+
+/* 3. Hero Title Floating Levitation */
+@keyframes levitateTitle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+.animate-title-float {
+  animation: levitateTitle 5.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* 4. Asynchronous Floating Tech Pills */
+@keyframes floatPill1 {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(-1.2deg);
+  }
+}
+
+@keyframes floatPill2 {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(1.4deg);
+  }
+}
+
+.animate-pill-float-1 {
+  animation: floatPill1 5s ease-in-out infinite;
+}
+
+.animate-pill-float-2 {
+  animation: floatPill2 6.2s ease-in-out infinite 1.2s;
+}
+
+/* 5. Top Badge Float */
+@keyframes floatBadgeTop {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-top-badge-float {
+  animation: floatBadgeTop 5.8s ease-in-out infinite 0.4s;
+}
+
+/* 6. CTA Button Levitation */
+@keyframes floatButton {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+.animate-button-float {
+  animation: floatButton 5.4s ease-in-out infinite 0.8s;
+}
+
 
