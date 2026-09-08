@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Shield, Mail, CheckCircle, Lock, ArrowRight, FileText, ExternalLink, Zap, Key } from 'lucide-react';
+import { Sparkles, Shield, Mail, CheckCircle, Lock, ArrowRight, FileText, ExternalLink, Zap, Key, Calendar, Users, RefreshCw } from 'lucide-react';
+
 
 /**
  * ============================================================================
@@ -97,15 +98,15 @@ function InteractiveCard({
         ...style
       }}
       className={`relative overflow-hidden transition-all duration-300 ${
-        isHovered ? 'shadow-2xl shadow-purple-500/20 border-purple-500/40' : 'shadow-xl shadow-black/40 border-slate-800/80'
+        isHovered ? 'shadow-2xl shadow-[#D4A373]/15 border-[#D4A373]/45' : 'shadow-xl shadow-black/50 border-[#2E2D2B]'
       } ${className}`}
     >
-      {/* Dynamic Radial Spotlight Glow Following Cursor */}
+      {/* Dynamic Radial Spotlight Glow Following Cursor in Cashmere Gold */}
       {glow && isHovered && canHover && !prefersReducedMotion && (
         <div
           className="pointer-events-none absolute -inset-px rounded-[inherit] transition-opacity duration-300 opacity-100 z-0"
           style={{
-            background: `radial-gradient(circle 280px at ${coords.x}px ${coords.y}px, rgba(168, 85, 247, 0.15), transparent 70%)`
+            background: `radial-gradient(circle 280px at ${coords.x}px ${coords.y}px, rgba(212, 163, 115, 0.16), transparent 70%)`
           }}
         />
       )}
@@ -225,6 +226,181 @@ function ScrollReveal({
 }
 
 /**
+ * Live Interactive Demonstration Showcase (Typing Simulation & Instant Output)
+ */
+function LiveAiPreviewDemo({ onTryApp }) {
+  const [activeTab, setActiveTab] = useState(0);
+  const [displayText, setDisplayText] = useState('');
+  const [isTyping, setIsTyping] = useState(true);
+
+  const samples = [
+    {
+      title: 'Leave Request',
+      icon: Calendar,
+      category: 'Leave / Holiday',
+      prompt: 'Request 3 days sick leave from next Monday due to fever and physician advice.',
+      recipient: 'sarah.manager@company.com',
+      subject: 'Leave Request: 3 Days Medical Leave (Mon-Wed)',
+      preview: 'Hi Sarah,\n\nI am writing to formally request 3 days of medical leave starting next Monday. I have been advised by my physician to take bed rest due to a persistent fever.\n\nAll urgent deliverables have been transitioned to the team, and I will be reachable for critical blockers.\n\nThank you for understanding,\nYuva Sriram'
+    },
+    {
+      title: 'Team Sync',
+      icon: Users,
+      category: 'Official / Meeting',
+      prompt: 'Schedule a 30-minute sync meeting with the engineering team to review Q4 roadmap.',
+      recipient: 'engineering-leads@company.com',
+      subject: 'Invitation: 30-Min Q4 Technical Roadmap Sync',
+      preview: 'Hello Team,\n\nI would like to schedule a quick 30-minute sync this week to review the upcoming Q4 technical deliverables and deployment milestones.\n\nPlease let me know your availability for Thursday afternoon or Friday morning.\n\nWarm regards,\nYuva Sriram'
+    },
+    {
+      title: 'Follow-up',
+      icon: RefreshCw,
+      category: 'Follow-up',
+      prompt: 'Follow up politely on the partnership integration proposal sent to leadership last week.',
+      recipient: 'partnerships@enterprise.org',
+      subject: 'Follow-up: Scribe AI Enterprise Integration Proposal',
+      preview: 'Dear Partnerships Team,\n\nI wanted to follow up on the enterprise integration proposal sent last week. We are very excited about the collaboration opportunity and would love to answer any questions.\n\nLooking forward to hearing your thoughts!\n\nBest regards,\nYuva Sriram'
+    }
+  ];
+
+  const currentSample = samples[activeTab];
+
+  // Auto-cycle tabs every 7.5 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveTab(prev => (prev + 1) % samples.length);
+    }, 7500);
+    return () => clearInterval(timer);
+  }, [samples.length]);
+
+  // Smooth typing effect for prompt
+  useEffect(() => {
+    setDisplayText('');
+    setIsTyping(true);
+    let i = 0;
+    const fullText = currentSample.prompt;
+    const interval = setInterval(() => {
+      if (i <= fullText.length) {
+        setDisplayText(fullText.slice(0, i));
+        i++;
+      } else {
+        setIsTyping(false);
+        clearInterval(interval);
+      }
+    }, 22);
+    return () => clearInterval(interval);
+  }, [activeTab]);
+
+  return (
+    <div className="w-full max-w-4xl mx-auto mt-6 rounded-3xl p-[1px] bg-gradient-to-b from-[#D4A373]/35 via-[#2E2D2B] to-transparent shadow-2xl animate-hero-box">
+      <div className="rounded-[23px] bg-[#1A1918]/95 backdrop-blur-2xl border border-[#2E2D2B] overflow-hidden">
+        
+        {/* Terminal Header Bar */}
+        <div className="px-5 py-3.5 border-b border-[#2E2D2B] bg-[#161514] flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
+            <span className="ml-2 text-xs font-mono text-[#99958F] font-semibold hidden sm:inline">
+              scribe-ai // real-time-engine
+            </span>
+          </div>
+
+          {/* Interactive Preset Buttons */}
+          <div className="flex items-center gap-1.5 bg-[#121211] p-1 rounded-xl border border-[#2E2D2B]">
+            {samples.map((s, idx) => {
+              const IconComp = s.icon;
+              return (
+                <button
+                  key={s.title}
+                  onClick={() => setActiveTab(idx)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === idx
+                      ? 'bg-[#D4A373] text-[#121211] shadow-sm scale-102'
+                      : 'text-[#99958F] hover:text-[#F5F3EF]'
+                  }`}
+                >
+                  <IconComp className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{s.title}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Live Simulation View */}
+        <div className="p-6 sm:p-8 space-y-6">
+          {/* Simulated Prompt Box */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[#99958F] font-semibold flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#D4A373] animate-pulse" />
+                Natural Language Instruction:
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#D4A373]/15 text-[#D4A373] border border-[#D4A373]/30 animate-pulse">
+                {currentSample.category}
+              </span>
+            </div>
+            
+            <div className="p-4 rounded-2xl bg-[#121211] border border-[#2E2D2B] text-xs sm:text-sm text-[#F5F3EF] font-mono flex items-center gap-1.5 min-h-[56px] shadow-inner">
+              <span className="text-[#D4A373] font-bold">›</span>
+              <span>{displayText}</span>
+              {isTyping && <span className="w-2 h-4 bg-[#D4A373] animate-pulse ml-0.5 inline-block" />}
+            </div>
+          </div>
+
+          {/* Simulated Generated Email Output */}
+          <div className="rounded-2xl border border-[#2E2D2B] bg-[#161514] p-5 space-y-3.5 shadow-lg relative overflow-hidden group">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#2E2D2B]/80 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-[#99958F]">To:</span>
+                <span className="text-[#ECE8E1] font-mono bg-[#1A1918] px-2 py-0.5 rounded-md border border-[#2E2D2B]">
+                  {currentSample.recipient}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-emerald-400 text-[11px] font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Verified OAuth Ready</span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[#99958F] text-xs font-semibold">Subject:</span>
+              <p className="text-sm font-bold text-[#F5F3EF]">
+                {currentSample.subject}
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-[#2E2D2B]/80">
+              <p className="text-xs text-[#ECE8E1] leading-relaxed whitespace-pre-line font-sans opacity-95">
+                {currentSample.preview}
+              </p>
+            </div>
+
+            {/* Simulated Action Confirmation Bar */}
+            <div className="pt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#2E2D2B]/80">
+              <span className="text-[11px] text-[#99958F] flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                Never sends without explicit confirmation
+              </span>
+
+              <button
+                onClick={onTryApp}
+                className="px-4 py-2 rounded-xl gold-btn text-[#121211] text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md hover:scale-105 active:scale-95 transition-all"
+              >
+                <span>Try Scribe AI Now</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+/**
  * ============================================================================
  * PublicLandingPage Component
  * ============================================================================
@@ -255,15 +431,20 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
   return (
     <div className="min-h-screen bg-[#121211] text-[#F5F3EF] font-sans selection:bg-[#D4A373] selection:text-[#121211] flex flex-col relative overflow-hidden">
       
+      {/* Subtle Dot Grid Texture */}
+      <div className="pointer-events-none fixed inset-0 z-0 bg-grid-subtle opacity-30" />
+
       {/* Dynamic Cosmic Gradient Mesh & Background Lights */}
       <div 
-        className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-1000 opacity-70"
+        className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-1000 opacity-60"
         style={{
-          background: `radial-gradient(700px circle at ${ambientPos.x}% ${ambientPos.y}%, rgba(212, 163, 115, 0.12), transparent 80%)`
+          background: `radial-gradient(750px circle at ${ambientPos.x}% ${ambientPos.y}%, rgba(212, 163, 115, 0.12), transparent 80%)`
         }}
       />
-      <div className="fixed -top-40 -right-40 w-96 h-96 bg-[#D4A373]/10 rounded-full blur-3xl pointer-events-none -z-10 animate-pulseGlow" />
-      <div className="fixed -bottom-40 -left-40 w-96 h-96 bg-[#D4A373]/5 rounded-full blur-3xl pointer-events-none -z-10" />
+      {/* Floating Slow Cashmere Orbs */}
+      <div className="fixed -top-40 -right-40 w-96 h-96 bg-[#D4A373]/12 rounded-full blur-3xl pointer-events-none -z-10 animate-float-slow-1" />
+      <div className="fixed top-1/3 -left-48 w-96 h-96 bg-[#D4A373]/08 rounded-full blur-3xl pointer-events-none -z-10 animate-float-slow-2" />
+      <div className="fixed -bottom-40 -right-24 w-96 h-96 bg-[#C59362]/10 rounded-full blur-3xl pointer-events-none -z-10 animate-float-slow-1" />
 
       {/* Public Header Navigation Bar */}
       <header className="border-b border-[#2E2D2B] bg-[#121211]/80 backdrop-blur-xl sticky top-0 z-50 shadow-xl transition-all duration-300">
@@ -278,7 +459,7 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               </div>
             </div>
             <span className="text-xl font-extrabold text-[#F5F3EF] tracking-tight">
-              Scribe <span className="text-[#D4A373]">AI</span>
+              Scribe <span className="text-gold-shimmer">AI</span>
             </span>
           </div>
 
@@ -300,7 +481,7 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
 
             <InteractiveButton
               onClick={onNavigateToLogin}
-              className="px-5 py-2.5 rounded-xl gold-btn text-[#121211] font-bold text-xs inline-flex items-center gap-2 shadow-lg shadow-[#D4A373]/20"
+              className="px-5 py-2.5 rounded-xl gold-btn sweep-auto text-[#121211] font-bold text-xs inline-flex items-center gap-2 shadow-lg shadow-[#D4A373]/20"
             >
               <span>Sign In / Launch App</span>
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
@@ -310,33 +491,46 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
       </header>
 
       {/* Main Hero Section */}
-      <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20 flex flex-col justify-center space-y-12 relative z-10">
+      <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20 flex flex-col justify-center space-y-14 relative z-10">
         
-        <div className="text-center space-y-6 max-w-3xl mx-auto">
+        <div className="text-center space-y-7 max-w-3xl mx-auto relative">
           
-          {/* Badge with Entrance Motion */}
-          <div className="animate-hero-badge inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-bold tracking-wide uppercase shadow-lg shadow-emerald-950/40 hover:scale-105 transition-transform duration-200 cursor-default">
-            <Shield className="w-4 h-4 text-emerald-400 animate-pulse" />
+          {/* Badge with Entrance Motion and Pulse Ring */}
+          <div className="animate-hero-badge inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-bold tracking-wide uppercase shadow-lg shadow-emerald-950/40 hover:scale-105 transition-transform duration-200 cursor-default backdrop-blur-md">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
             <span>Official Google OAuth 2.0 Verified Integration</span>
           </div>
 
-          {/* Heading with Entrance Motion */}
-          <div className="animate-hero-title space-y-2">
+          {/* Heading with Entrance Motion and Shimmer */}
+          <div className="animate-hero-title space-y-2.5 relative">
+            {/* Floating Badges for Desktop */}
+            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1A1918]/90 border border-[#2E2D2B] shadow-xl text-xs font-semibold text-[#ECE8E1] backdrop-blur-md animate-soft-float absolute -top-4 -left-16 pointer-events-none">
+              <Zap className="w-3.5 h-3.5 text-[#D4A373]" />
+              <span>Instant AI Drafting</span>
+            </div>
+            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1A1918]/90 border border-[#2E2D2B] shadow-xl text-xs font-semibold text-emerald-400 backdrop-blur-md animate-soft-float-delayed absolute -top-4 -right-16 pointer-events-none">
+              <Shield className="w-3.5 h-3.5 text-emerald-400" />
+              <span>100% User Confirmed</span>
+            </div>
+
             <h1 className="text-4xl sm:text-6xl font-extrabold text-[#F5F3EF] tracking-tight leading-tight">
-              Scribe <span className="text-[#D4A373]">AI</span>
+              Scribe <span className="text-gold-shimmer">AI</span>
             </h1>
-            <p className="text-xs sm:text-sm font-semibold tracking-wider text-[#D4A373] uppercase">
+            <p className="text-xs sm:text-sm font-semibold tracking-widest text-[#D4A373] uppercase">
               AI-Powered Gmail Automation Platform
             </p>
           </div>
 
-          {/* Information Card with 3D Tilt, Magnetic Tracking & Radial Glow */}
-          <div className="animate-hero-box">
+          {/* Information Card with Conic Border Beam Highlight & 3D Tilt */}
+          <div className="animate-hero-box border-beam-container p-[1.5px] max-w-2xl mx-auto shadow-2xl">
             <InteractiveCard
               lift={true}
               tilt={true}
               glow={true}
-              className="p-6 sm:p-8 rounded-3xl bg-[#1A1918] border border-[#2E2D2B] text-[#ECE8E1] space-y-3 text-center backdrop-blur-xl"
+              className="p-6 sm:p-8 rounded-[23px] bg-[#1A1918]/95 border border-[#2E2D2B] text-[#ECE8E1] space-y-3 text-center backdrop-blur-xl"
             >
               <p className="text-lg sm:text-xl font-extrabold text-[#F5F3EF] leading-relaxed">
                 Scribe AI helps users compose and send emails through their own Gmail account using Google OAuth.
@@ -347,19 +541,25 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
             </InteractiveCard>
           </div>
 
-          {/* CTA Button with Entrance Motion & Magnetic Interaction */}
-          <div className="animate-hero-cta flex items-center justify-center gap-4 pt-2">
+          {/* CTA Button with Backlight Aura & Continuous Light Sweep */}
+          <div className="animate-hero-cta relative flex items-center justify-center pt-2">
+            <div className="absolute w-56 h-12 bg-[#D4A373] rounded-full animate-aura pointer-events-none -z-10" />
             <InteractiveButton
               onClick={onNavigateToLogin}
-              className="px-8 py-4 rounded-2xl gold-btn text-[#121211] font-extrabold text-sm inline-flex items-center gap-2.5 shadow-xl shadow-[#D4A373]/20 group"
+              className="px-8 py-4 rounded-2xl gold-btn sweep-auto text-[#121211] font-extrabold text-sm inline-flex items-center gap-2.5 shadow-xl shadow-[#D4A373]/25 group"
             >
               <span>Get Started with Scribe AI</span>
-              <ArrowRight className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
+              <ArrowRight className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1.5" />
             </InteractiveButton>
           </div>
         </div>
 
-        {/* Feature Cards Grid with Staggered Scroll Reveal & 3D Tilt */}
+        {/* Live Interactive Engine Showcase Demo */}
+        <ScrollReveal delay={150}>
+          <LiveAiPreviewDemo onTryApp={onNavigateToLogin} />
+        </ScrollReveal>
+
+        {/* Feature Cards Grid with Staggered Scroll Reveal & Micro Hover Animations */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
           
           <ScrollReveal delay={0}>
@@ -369,7 +569,7 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               glow={true}
               className="p-6 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-4 h-full group"
             >
-              <div className="w-11 h-11 rounded-2xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center text-[#D4A373] group-hover:scale-110 transition-all duration-300 shadow-md">
+              <div className="w-11 h-11 rounded-2xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center text-[#D4A373] group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 shadow-md">
                 <Mail className="w-5 h-5" />
               </div>
               <h3 className="text-lg font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors duration-200">
@@ -388,7 +588,7 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               glow={true}
               className="p-6 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-4 h-full group"
             >
-              <div className="w-11 h-11 rounded-2xl bg-emerald-950/70 border border-emerald-500/30 flex items-center justify-center text-emerald-300 group-hover:scale-110 transition-all duration-300 shadow-md shadow-emerald-950/40">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-950/70 border border-emerald-500/30 flex items-center justify-center text-emerald-300 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-300 shadow-md shadow-emerald-950/40">
                 <Shield className="w-5 h-5" />
               </div>
               <h3 className="text-lg font-bold text-[#F5F3EF] group-hover:text-emerald-300 transition-colors duration-200">
@@ -407,7 +607,7 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
               glow={true}
               className="p-6 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-4 h-full group"
             >
-              <div className="w-11 h-11 rounded-2xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center text-[#D4A373] group-hover:scale-110 transition-all duration-300 shadow-md">
+              <div className="w-11 h-11 rounded-2xl bg-[#22211F] border border-[#2E2D2B] flex items-center justify-center text-[#D4A373] group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 shadow-md">
                 <Lock className="w-5 h-5" />
               </div>
               <h3 className="text-lg font-bold text-[#F5F3EF] group-hover:text-[#D4A373] transition-colors duration-200">

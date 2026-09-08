@@ -608,3 +608,178 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #D4A373;
 }
+
+/* ==========================================================================
+   "WOW" Factor Animation Suite (Preserving Warm Cashmere & Charcoal Palette)
+   ========================================================================== */
+
+/* 1. Shimmering Metallic Gold Text Reflection */
+@keyframes textGoldShimmer {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.text-gold-shimmer {
+  background: linear-gradient(
+    90deg,
+    #F5F3EF 0%,
+    #D4A373 30%,
+    #FAF6F0 50%,
+    #D4A373 70%,
+    #F5F3EF 100%
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: textGoldShimmer 5s ease-in-out infinite;
+}
+
+/* 2. Ambient Floating Orbs */
+@keyframes floatSlow1 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(35px, -25px) scale(1.08); }
+  66% { transform: translate(-25px, 20px) scale(0.94); }
+}
+
+@keyframes floatSlow2 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(-30px, 30px) scale(0.95); }
+  66% { transform: translate(35px, -20px) scale(1.06); }
+}
+
+.animate-float-slow-1 {
+  animation: floatSlow1 14s ease-in-out infinite;
+}
+
+.animate-float-slow-2 {
+  animation: floatSlow2 18s ease-in-out infinite;
+}
+
+/* 3. Soft Floating for Floating Elements */
+@keyframes softFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-7px); }
+}
+
+.animate-soft-float {
+  animation: softFloat 4.5s ease-in-out infinite;
+}
+
+.animate-soft-float-delayed {
+  animation: softFloat 5.2s ease-in-out infinite 1.8s;
+}
+
+/* 4. Living Radiant Aura Behind CTA */
+@keyframes auraPulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.98);
+    filter: blur(18px);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.08);
+    filter: blur(26px);
+  }
+}
+
+.animate-aura {
+  animation: auraPulse 3.2s ease-in-out infinite;
+}
+
+/* 5. Continuous Smooth Light Sweep for CTA Button */
+@keyframes continuousSweep {
+  0% { transform: translateX(-150%) skewX(-20deg); opacity: 0; }
+  15% { opacity: 0.45; }
+  32% { transform: translateX(250%) skewX(-20deg); opacity: 0; }
+  100% { transform: translateX(250%) skewX(-20deg); opacity: 0; }
+}
+
+.sweep-auto {
+  position: relative;
+  overflow: hidden;
+}
+
+.sweep-auto::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%
+  );
+  transform: translateX(-150%) skewX(-20deg);
+  pointer-events: none;
+  animation: continuousSweep 4.2s ease-in-out infinite;
+}
+
+/* 6. High-End Border Beam Animation */
+@keyframes borderBeamSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.border-beam-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.5rem;
+}
+
+.border-beam-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0deg,
+    transparent 65deg,
+    rgba(212, 163, 115, 0.45) 90deg,
+    transparent 115deg,
+    transparent 360deg
+  );
+  animation: borderBeamSpin 7.5s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 7. Subtle Dot Grid Background */
+.bg-grid-subtle {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(46, 45, 43, 0.3) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(46, 45, 43, 0.3) 1px, transparent 1px);
+}
+
+/* 8. Pulsing Ping Ring */
+@keyframes pingSlow {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+}
+
+.animate-ping-slow {
+  animation: pingSlow 2.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
