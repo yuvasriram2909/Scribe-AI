@@ -53,7 +53,47 @@ CREATE TABLE IF NOT EXISTS public.email_labels (
 );
 CREATE INDEX IF NOT EXISTS email_labels_user_id_idx ON public.email_labels(user_id);
 
--- 5. Standardize public.emails Table Columns
+-- 5. Standardize public.emails Table
+CREATE TABLE IF NOT EXISTS public.emails (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    gmail_connection_id UUID,
+    sender_email TEXT,
+    sender_name TEXT,
+    sender TEXT,
+    recipient_email TEXT,
+    recipient_emails TEXT[],
+    cc TEXT[],
+    cc_emails TEXT[],
+    bcc TEXT[],
+    bcc_emails TEXT[],
+    subject TEXT,
+    body TEXT,
+    body_text TEXT,
+    body_html TEXT,
+    snippet TEXT,
+    email_type TEXT NOT NULL DEFAULT 'other',
+    tone TEXT NOT NULL DEFAULT 'professional',
+    importance TEXT NOT NULL DEFAULT 'normal',
+    status TEXT NOT NULL DEFAULT 'draft',
+    direction TEXT NOT NULL DEFAULT 'sent',
+    spam_status TEXT NOT NULL DEFAULT 'clean',
+    is_read BOOLEAN NOT NULL DEFAULT true,
+    is_starred BOOLEAN NOT NULL DEFAULT false,
+    is_important BOOLEAN NOT NULL DEFAULT false,
+    is_spam BOOLEAN NOT NULL DEFAULT false,
+    is_trash BOOLEAN NOT NULL DEFAULT false,
+    labels TEXT[],
+    gmail_message_id TEXT,
+    gmail_thread_id TEXT,
+    thread_id TEXT,
+    history_id TEXT,
+    sent_at TIMESTAMPTZ,
+    received_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS sender_email TEXT;
 ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS sender_name TEXT;
 ALTER TABLE IF EXISTS public.emails ADD COLUMN IF NOT EXISTS recipient_emails TEXT[];
@@ -82,6 +122,15 @@ CREATE INDEX IF NOT EXISTS emails_user_id_direction_idx ON public.emails(user_id
 CREATE INDEX IF NOT EXISTS emails_user_id_is_spam_idx ON public.emails(user_id, is_spam);
 CREATE INDEX IF NOT EXISTS emails_user_id_is_read_idx ON public.emails(user_id, is_read);
 CREATE INDEX IF NOT EXISTS emails_user_id_gmail_thread_id_idx ON public.emails(user_id, gmail_thread_id);
+
+DO $$ BEGIN
+  DELETE FROM public.emails a USING public.emails b
+  WHERE a.id < b.id
+    AND a.user_id = b.user_id
+    AND a.gmail_message_id = b.gmail_message_id
+    AND a.gmail_message_id IS NOT NULL;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_column THEN NULL; END $$;
+
 CREATE UNIQUE INDEX IF NOT EXISTS emails_user_id_gmail_message_id_unique ON public.emails(user_id, gmail_message_id) WHERE gmail_message_id IS NOT NULL;
 
 -- 7. Dual-Table Column Migrations for Legacy "Email" Table
