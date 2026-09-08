@@ -407,36 +407,6 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
             </p>
           </div>
 
-          {/* Zero-Gravity Floating Card Suspended in Mid-Air */}
-          <div className="relative max-w-2xl mx-auto pt-3 pb-4 w-full">
-            
-            {/* Reactive Floor Shadow beneath Floating Card */}
-            <div className="absolute -bottom-2 left-1/2 w-[85%] h-10 bg-black/80 rounded-[100%] pointer-events-none -z-10 animate-card-shadow" />
-            
-            {/* Soft Ambient Floating Cushion Glow */}
-            <div className="absolute -bottom-3 left-1/2 w-[70%] h-12 bg-[#D4A373]/12 rounded-[100%] blur-2xl pointer-events-none -z-10 animate-card-shadow" />
-
-            {/* Card Levitation Container */}
-            <div className="animate-card-float">
-              <div className="border-beam-container p-[1.5px] max-w-2xl mx-auto shadow-2xl rounded-[25px]">
-                <InteractiveCard
-                  lift={true}
-                  tilt={true}
-                  glow={true}
-                  className="p-6 sm:p-8 rounded-[23px] bg-[#1A1918]/95 border border-[#2E2D2B] text-[#ECE8E1] space-y-3 text-center backdrop-blur-xl shadow-2xl shadow-black/80"
-                >
-                  <p className="text-lg sm:text-xl font-extrabold text-[#F5F3EF] leading-relaxed">
-                    Scribe AI helps users compose and send emails through their own Gmail account using Google OAuth.
-                  </p>
-                  <p className="text-sm sm:text-base text-[#D4A373] font-semibold leading-relaxed">
-                    Users connect their Gmail account securely with Google OAuth and approve emails before sending.
-                  </p>
-                </InteractiveCard>
-              </div>
-            </div>
-
-          </div>
-
           {/* CTA Button Floating in the Air */}
           <div className="animate-hero-cta animate-button-float relative flex items-center justify-center pt-1">
             <div className="absolute w-56 h-12 bg-[#D4A373] rounded-full animate-aura pointer-events-none -z-10" />
