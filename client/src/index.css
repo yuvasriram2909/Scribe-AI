@@ -783,3 +783,146 @@
   animation: pingSlow 2.8s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
+/* ==========================================================================
+   Luxury "Scribe AI" Hero Title Animation Suite
+   ========================================================================== */
+
+/* 1. Luminous Liquid Metallic Reflection for "Scribe" */
+@keyframes scribeLiquidShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.text-scribe-platinum {
+  background: linear-gradient(
+    120deg,
+    #F5F3EF 0%,
+    #FFFFFF 20%,
+    #D4A373 40%,
+    #FFFFFF 60%,
+    #ECE8E1 80%,
+    #F5F3EF 100%
+  );
+  background-size: 250% 100%;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: scribeLiquidShimmer 6s ease-in-out infinite;
+  display: inline-block;
+  filter: drop-shadow(0 2px 20px rgba(0, 0, 0, 0.7));
+}
+
+/* 2. Radiant Illuminated Cashmere Gold for "AI" */
+@keyframes aiGoldPulse {
+  0%, 100% {
+    background-position: 0% 50%;
+    filter: drop-shadow(0 0 16px rgba(212, 163, 115, 0.45)) drop-shadow(0 2px 10px rgba(0, 0, 0, 0.7));
+  }
+  50% {
+    background-position: 100% 50%;
+    filter: drop-shadow(0 0 32px rgba(212, 163, 115, 0.8)) drop-shadow(0 2px 12px rgba(0, 0, 0, 0.7));
+  }
+}
+
+.text-ai-gold {
+  background: linear-gradient(
+    120deg,
+    #D4A373 0%,
+    #FFE9D0 25%,
+    #C59362 50%,
+    #FFF4E6 75%,
+    #D4A373 100%
+  );
+  background-size: 250% 100%;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: aiGoldPulse 4.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+/* 3. Ambient Volumetric Backlight Bloom behind "Scribe AI" */
+@keyframes titleAuraBreath {
+  0%, 100% {
+    opacity: 0.45;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+
+.animate-title-aura {
+  animation: titleAuraBreath 5s ease-in-out infinite;
+}
+
+/* 4. Diagonal Light Sweep Beam directly slicing across Title */
+@keyframes titleBeamSlice {
+  0% {
+    transform: translateX(-150%) skewX(-25deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.75;
+  }
+  28% {
+    transform: translateX(250%) skewX(-25deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(250%) skewX(-25deg);
+    opacity: 0;
+  }
+}
+
+.title-beam-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.title-beam-sweep::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: 0;
+  width: 35%;
+  height: 140%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 45%,
+    rgba(212, 163, 115, 0.8) 55%,
+    transparent 100%
+  );
+  transform: translateX(-150%) skewX(-25deg);
+  pointer-events: none;
+  animation: titleBeamSlice 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  mix-blend-mode: overlay;
+}
+
+/* 5. Sparkle Twinkle Animation */
+@keyframes sparkleTwinkle {
+  0%, 100% {
+    transform: scale(0.85) rotate(0deg);
+    opacity: 0.6;
+    filter: drop-shadow(0 0 6px rgba(212, 163, 115, 0.4));
+  }
+  50% {
+    transform: scale(1.25) rotate(90deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 16px rgba(212, 163, 115, 0.95));
+  }
+}
+
+.animate-sparkle-twinkle {
+  animation: sparkleTwinkle 3.6s ease-in-out infinite;
+}
+

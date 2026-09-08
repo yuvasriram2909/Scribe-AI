@@ -284,8 +284,9 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
                 <Sparkles className="w-5 h-5 text-[#D4A373] animate-pulse" />
               </div>
             </div>
-            <span className="text-xl font-extrabold text-[#F5F3EF] tracking-tight">
-              Scribe <span className="text-gold-shimmer">AI</span>
+            <span className="text-xl font-extrabold tracking-tight flex items-center gap-1.5">
+              <span className="text-scribe-platinum">Scribe</span>
+              <span className="text-ai-gold">AI</span>
             </span>
           </div>
 
@@ -330,22 +331,36 @@ export function PublicLandingPage({ onNavigateToLogin, onNavigateToPrivacy, onNa
             <span>Official Google OAuth 2.0 Verified Integration</span>
           </div>
 
-          {/* Heading with Entrance Motion and Shimmer */}
-          <div className="animate-hero-title space-y-2.5 relative">
+          {/* Heading with Bespoke Luxury Animation & Volumetric Aura */}
+          <div className="animate-hero-title space-y-3 relative py-2 select-none group">
             {/* Floating Badges for Desktop */}
-            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1A1918]/90 border border-[#2E2D2B] shadow-xl text-xs font-semibold text-[#ECE8E1] backdrop-blur-md animate-soft-float absolute -top-4 -left-16 pointer-events-none">
+            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1A1918]/90 border border-[#2E2D2B] shadow-xl text-xs font-semibold text-[#ECE8E1] backdrop-blur-md animate-soft-float absolute top-3 -left-16 pointer-events-none">
               <Zap className="w-3.5 h-3.5 text-[#D4A373]" />
               <span>Instant AI Drafting</span>
             </div>
-            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1A1918]/90 border border-[#2E2D2B] shadow-xl text-xs font-semibold text-emerald-400 backdrop-blur-md animate-soft-float-delayed absolute -top-4 -right-16 pointer-events-none">
+            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1A1918]/90 border border-[#2E2D2B] shadow-xl text-xs font-semibold text-emerald-400 backdrop-blur-md animate-soft-float-delayed absolute top-3 -right-16 pointer-events-none">
               <Shield className="w-3.5 h-3.5 text-emerald-400" />
               <span>100% User Confirmed</span>
             </div>
 
-            <h1 className="text-4xl sm:text-6xl font-extrabold text-[#F5F3EF] tracking-tight leading-tight">
-              Scribe <span className="text-gold-shimmer">AI</span>
-            </h1>
-            <p className="text-xs sm:text-sm font-semibold tracking-widest text-[#D4A373] uppercase">
+            {/* Ambient Volumetric Backlight Aura */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-[500px] h-28 sm:h-36 bg-radial from-[#D4A373]/30 via-[#D4A373]/10 to-transparent blur-3xl rounded-full pointer-events-none -z-10 animate-title-aura" />
+
+            {/* Main Animated Title with Light Beam Sweep */}
+            <div className="relative inline-block title-beam-sweep rounded-3xl px-6 py-2 transition-transform duration-500 ease-out group-hover:scale-[1.03]">
+              <h1 className="text-5xl sm:text-7xl md:text-8xl font-black tracking-tight leading-tight flex items-center justify-center gap-3 sm:gap-4 cursor-default">
+                <span className="text-scribe-platinum tracking-tight">
+                  Scribe
+                </span>
+                <span className="relative inline-flex items-center">
+                  <span className="text-ai-gold tracking-tight">AI</span>
+                  {/* Twinkling Luxury Sparkle Accent */}
+                  <Sparkles className="w-5 h-5 sm:w-7 sm:h-7 text-[#D4A373] animate-sparkle-twinkle absolute -top-3 -right-6 sm:-right-8 pointer-events-none" />
+                </span>
+              </h1>
+            </div>
+
+            <p className="text-xs sm:text-sm font-semibold tracking-widest text-[#D4A373] uppercase transition-colors duration-300 group-hover:text-[#F5F3EF]">
               AI-Powered Gmail Automation Platform
             </p>
           </div>
