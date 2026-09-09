@@ -380,11 +380,23 @@ export function buildNaturalBody({ instruction, situationObj, recipientName, use
     paragraphs.push(`Thank you for your time, guidance, and consideration.`);
   }
 
-  // Scenario H: Resume / Job Application
-  else if (sitName.includes('Resume') || lower.includes('resume') || lower.includes('job application')) {
-    paragraphs.push(`I am writing to express my strong interest in applying for the [Job Title / Position] role at [Company Name].`);
-    paragraphs.push(`With relevant experience in software development and project execution, I have developed technical skills and practical expertise that align with your team's objectives. I have attached my updated resume for your review.`);
-    paragraphs.push(`I would welcome the opportunity to discuss my qualifications in an interview. Thank you for your time and consideration.`);
+  // Scenario H1: Recruiter Acknowledgment
+  else if (lower.includes('received your application') || lower.includes('reviewing applications') || lower.includes('next steps in the hiring') || lower.includes('credentials received')) {
+    paragraphs.push(`Thank you for reaching out and sharing your application for the Senior Software Engineer position.`);
+    paragraphs.push(`We have received your email and credentials. Our team is currently reviewing applications and will be in touch regarding the next steps in the hiring process.`);
+  }
+
+  // Scenario H2: Candidate Status Reply
+  else if (lower.includes('thank you for the update') || lower.includes('look forward to hearing')) {
+    paragraphs.push(`Thank you for the update regarding my application for the Senior Software Engineer position. I appreciate your team taking the time to review my credentials.`);
+    paragraphs.push(`I look forward to hearing from you regarding the next steps in the hiring process. Please let me know if any additional details or references are needed in the interim.`);
+  }
+
+  // Scenario H3: Resume / Job Application
+  else if (sitName.includes('Resume') || lower.includes('resume') || lower.includes('job application') || lower.includes('application for') || lower.includes('position')) {
+    paragraphs.push(`I am writing to express my strong interest in the Senior Software Engineer position at your organization.`);
+    paragraphs.push(`With a dedicated background in software engineering, practical problem-solving experience, and a proven track record of architecting scalable systems, I am confident in my ability to make an immediate and valuable contribution to your engineering initiatives. I have attached my resume and credentials for your review.`);
+    paragraphs.push(`I would welcome the opportunity to discuss how my qualifications align with your requirements in an introductory conversation. Thank you very much for your time and consideration.`);
   }
 
   // Scenario I: General Problem Input

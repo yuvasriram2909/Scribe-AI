@@ -130,6 +130,16 @@ export const EMAIL_CATEGORIES = [
     keywords: ['received your application', 'application received', 'thank you for reaching out', 'reviewing applications', 'next steps in the hiring', 'credentials received', 'hiring process', 'recruiter response', 'candidate acknowledgment', 'shortlisted', 'recruitment update', 'in touch regarding the next steps']
   },
   {
+    id: 'candidate_response',
+    name: 'Candidate Reply / Status Follow-up',
+    icon: '💬',
+    defaultTone: 'Polite & Diplomatic',
+    importance: 'MEDIUM',
+    urgency: 'Prompt response',
+    description: 'Replying to recruiter acknowledgments, confirming interview availability, status follow-ups',
+    keywords: ['thank you for the update', 'look forward to hearing from you', 'status update reply', 'recruiter reply', 'interview availability', 'next steps reply', 'hearing from you', 'appreciate the update', 'update on my application']
+  },
+  {
     id: 'resume_submission',
     name: 'Resume / Document Submission',
     icon: '📄',
@@ -332,6 +342,14 @@ export function classifyEmailIntent(input = '', subject = '') {
     return EMAIL_CATEGORIES.find(c => c.id === 'application_acknowledgment');
   }
 
+  if (text.includes('thank you for the update') || text.includes('look forward to hearing') || (text.includes('update') && (text.includes('hearing from you') || text.includes('application status') || text.includes('next step')))) {
+    return EMAIL_CATEGORIES.find(c => c.id === 'candidate_response');
+  }
+
+  if (text.includes('application for') || text.includes('applying for') || (text.includes('position') && (text.includes('engineer') || text.includes('developer') || text.includes('candidate') || text.includes('apply')))) {
+    return EMAIL_CATEGORIES.find(c => c.id === 'job_application');
+  }
+
   if (text.includes('accident') || text.includes('emergency') || (text.includes('immediate') && (text.includes('leave') || text.includes('hospital')))) {
     return EMAIL_CATEGORIES.find(c => c.id === 'emergency');
   }
@@ -419,17 +437,28 @@ export function extractFactualDetails(input = '') {
   }
 
   let jobRole = 'Senior Software Engineer';
-  const roleMatch = text.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job|opportunity)/i);
-  if (roleMatch) {
-    jobRole = roleMatch[1].trim();
+  if (lower.includes('senior software engineer')) {
+    jobRole = 'Senior Software Engineer';
+  } else if (lower.includes('software engineer')) {
+    jobRole = 'Software Engineer';
+  } else if (lower.includes('software developer')) {
+    jobRole = 'Software Developer';
+  } else if (lower.includes('frontend developer')) {
+    jobRole = 'Frontend Developer';
+  } else if (lower.includes('backend developer')) {
+    jobRole = 'Backend Developer';
+  } else if (lower.includes('full stack') || lower.includes('fullstack')) {
+    jobRole = 'Full Stack Developer';
+  } else if (lower.includes('product manager')) {
+    jobRole = 'Product Manager';
+  } else if (lower.includes('data analyst')) {
+    jobRole = 'Data Analyst';
   } else {
-    if (lower.includes('senior software engineer')) jobRole = 'Senior Software Engineer';
-    else if (lower.includes('software engineer')) jobRole = 'Software Engineer';
-    else if (lower.includes('frontend developer')) jobRole = 'Frontend Developer';
-    else if (lower.includes('backend developer')) jobRole = 'Backend Developer';
-    else if (lower.includes('full stack developer') || lower.includes('fullstack')) jobRole = 'Full Stack Developer';
-    else if (lower.includes('product manager')) jobRole = 'Product Manager';
-    else if (lower.includes('data analyst')) jobRole = 'Data Analyst';
+    const roleMatch = text.match(/(?:application\s+for|apply(?:ing)?\s+for|position\s+of|role\s+of)\s+(?:the\s+)?([a-zA-Z\s]{2,35}?)(?:\s+(?:position|role|job|opportunity)|[.,\n]|$)/i)
+      || text.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z]{2,20}(?:\s+[a-zA-Z]{2,20}){0,2})\s+(?:position|role|job|opportunity)/i);
+    if (roleMatch && roleMatch[1].trim() && !roleMatch[1].toLowerCase().includes('reaching')) {
+      jobRole = roleMatch[1].trim();
+    }
   }
 
   let recipientType = 'unknown';
@@ -492,13 +521,43 @@ export function getSenderDisplayName(providedName = '') {
  */
 export function extractRecipientFirstName(recipient = '') {
   if (!recipient) return '';
-  const clean = recipient.includes('<') ? (recipient.match(/<([^>]+)>/)?.[1] || recipient) : recipient;
+  const firstItem = typeof recipient === 'string' ? recipient.split(/[,;\n]+/)[0].trim() : '';
+  if (!firstItem) return '';
+
+  // 1. If format is "Balaji <email@domain.com>" or "Balaji Kumar <...>"
+  if (firstItem.includes('<')) {
+    const namePart = firstItem.split('<')[0].trim().replace(/^["']|["']$/g, '');
+    if (namePart) {
+      const firstWord = namePart.split(/\s+/)[0];
+      return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+    }
+  }
+
+  const clean = firstItem.includes('<') ? (firstItem.match(/<([^>]+)>/)?.[1] || firstItem) : firstItem;
   if (!clean.includes('@')) {
     const trimmed = clean.replace(/[0-9._-]/g, ' ').trim();
-    return trimmed ? (trimmed.charAt(0).toUpperCase() + trimmed.slice(1)) : '';
+    if (trimmed) {
+      const firstWord = trimmed.split(/\s+/)[0];
+      return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+    }
+    return '';
   }
+
   const local = clean.split('@')[0].replace(/[0-9._-]/g, ' ').trim();
   if (local.length >= 2 && !local.includes('info') && !local.includes('support') && !local.includes('contact') && !local.includes('admin') && !local.includes('noreply')) {
+    const rawLocal = clean.split('@')[0];
+    if (rawLocal.toLowerCase().startsWith('lbalaji')) {
+      return 'Balaji';
+    }
+    const matchPunctInitial = rawLocal.match(/^[a-z][._-]([a-z]{2,})/i);
+    if (matchPunctInitial) {
+      const subName = matchPunctInitial[1];
+      return subName.charAt(0).toUpperCase() + subName.slice(1).toLowerCase();
+    }
+    const matchCamelInitial = rawLocal.match(/^[a-z]([A-Z][a-z]{2,})/);
+    if (matchCamelInitial) {
+      return matchCamelInitial[1];
+    }
     const firstWord = local.split(/\s+/)[0];
     return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
   }
@@ -689,6 +748,48 @@ ${closing}`;
       break;
     }
 
+    case 'candidate_response': {
+      // Direct response to recruiter updates or application status notifications
+      if (!finalSubject) {
+        finalSubject = `Re: Application for ${role} Position`;
+      }
+
+      if (toneId === 'action_concise') {
+        // Direct match with Gmail suggested quick reply in screenshot
+        bodyContent = `${greeting}
+
+Thank you for the update. I look forward to hearing from you.
+
+${closing}`;
+      } else if (toneId === 'executive') {
+        bodyContent = `${greeting}
+
+Thank you for the update regarding the review timeline for the ${role} position.
+
+I appreciate your team's evaluation and remain eager to discuss how my technical leadership and architectural experience align with your strategic milestones.
+
+${closing}`;
+      } else if (toneId === 'candidate_application' || toneId === 'warm_collaborative') {
+        bodyContent = `${greeting}
+
+Thank you very much for confirming receipt of my application for the ${role} position and for the update on the hiring timeline.
+
+I am enthusiastic about the opportunity to contribute to your engineering team. I look forward to hearing from you regarding the next steps, and please feel free to reach out if you need any additional materials in the meantime.
+
+${closing}`;
+      } else {
+        // Polite & Diplomatic / Corporate Professional standard
+        bodyContent = `${greeting}
+
+Thank you for the update regarding my application for the ${role} position. I appreciate your team taking the time to review my credentials.
+
+I look forward to hearing from you regarding the next steps in the hiring process. Please let me know if any additional details or references are needed in the interim.
+
+${closing}`;
+      }
+      break;
+    }
+
     case 'job_application': {
       if (!finalSubject) {
         finalSubject = `Application for ${role} Position – ${myName}`;
@@ -719,8 +820,28 @@ Key Highlights:
 ${attachmentLine} I look forward to speaking with your team.
 
 ${closing}`;
+      } else if (toneId === 'candidate_application') {
+        bodyContent = `${greeting}
+
+I am excited to submit my application for the ${role} position at your organization.
+
+Having developed and deployed production-grade applications with a strong emphasis on clean code, system performance, and reliability, I am eager to bring my technical skills and collaborative mindset to your team. ${attachmentLine}
+
+I look forward to discussing how my background aligns with your team's upcoming milestones. Thank you for your time and consideration.
+
+${closing}`;
+      } else if (toneId === 'formal_authoritative' || toneId === 'polite_diplomatic') {
+        bodyContent = `${greeting}
+
+I am writing to formally present my application for the ${role} position with your organization.
+
+I possess a solid technical background, a deep dedication to engineering excellence, and extensive experience delivering dependable software architectures. It would be a privilege to contribute to your organization's continued success. ${attachmentLine}
+
+I respectfully request the opportunity to discuss my qualifications with your team at your earliest convenience. Thank you for your courteous consideration.
+
+${closing}`;
       } else {
-        // Corporate Professional / Candidate Application (Clean, authentic, high-impact)
+        // Corporate Professional (Clean, authentic, articulate)
         bodyContent = `${greeting}
 
 I am writing to express my strong interest in the ${role} opportunity at your organization.

@@ -1169,6 +1169,39 @@ export function Dashboard({
                 </span>
                 <button
                   type="button"
+                  onClick={() => handleQuickChip('Application for Senior Software Engineer Position - Yuva Sri Ram')}
+                  className={`px-3 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-[#22211F] hover:bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]'
+                      : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                  }`}
+                >
+                  <span className="chip-emoji inline-block transition-transform duration-200">💼</span> Job Application
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickChip('Thank you for reaching out and sharing your application for the Senior Software Engineer position. We have received your credentials and are reviewing.')}
+                  className={`px-3 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-[#22211F] hover:bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]'
+                      : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                  }`}
+                >
+                  <span className="chip-emoji inline-block transition-transform duration-200">📩</span> Recruiter Acknowledgment
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickChip('Thank you for the update. I look forward to hearing from you regarding the next steps.')}
+                  className={`px-3 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-[#22211F] hover:bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]'
+                      : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                  }`}
+                >
+                  <span className="chip-emoji inline-block transition-transform duration-200">💬</span> Candidate Reply
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleQuickChip('I need sick leave for 3 days due to high fever.')}
                   className={`px-3 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
                     theme === 'dark'
@@ -1187,18 +1220,7 @@ export function Dashboard({
                       : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
                   }`}
                 >
-                  <span className="chip-emoji inline-block transition-transform duration-200">⚠️</span> Emergency leave today
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickChip('Please find attached my resume for the Senior Software Engineer position.')}
-                  className={`px-3 py-1.5 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 chip-interactive cursor-pointer ${
-                    theme === 'dark'
-                      ? 'bg-[#22211F] hover:bg-[#1A1918] border-[#2E2D2B] text-[#F5F3EF]'
-                      : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
-                  }`}
-                >
-                  <span className="chip-emoji inline-block transition-transform duration-200">📄</span> Send Resume
+                  <span className="chip-emoji inline-block transition-transform duration-200">⚠️</span> Emergency leave
                 </button>
               </div>
             </form>

@@ -1247,6 +1247,26 @@ const SUPPORTED_SITUATIONS: SituationConfig[] = [
     keywords: ["accident", "emergency", "urgent personal", "immediate attention", "critical incident", "hospital", "casualty", "leave immediately", "urgent departure", "family emergency"]
   },
   {
+    id: "application_acknowledgment",
+    name: "📩 Application Acknowledgment / Recruiter Response",
+    category: "Application Acknowledgment",
+    priority: "MEDIUM",
+    importance: "MEDIUM",
+    urgency: "Normal response",
+    tone: "Recruiter / HR Response",
+    keywords: ["received your application", "application received", "thank you for reaching out", "reviewing applications", "next steps in the hiring", "credentials received", "hiring process", "recruiter response", "candidate acknowledgment", "shortlisted", "recruitment update", "in touch regarding the next steps"]
+  },
+  {
+    id: "candidate_response",
+    name: "💬 Candidate Reply / Status Follow-up",
+    category: "Candidate Reply",
+    priority: "MEDIUM",
+    importance: "MEDIUM",
+    urgency: "Prompt response",
+    tone: "Polite & Diplomatic",
+    keywords: ["thank you for the update", "look forward to hearing from you", "status update reply", "recruiter reply", "interview availability", "next steps reply", "hearing from you", "appreciate the update", "update on my application"]
+  },
+  {
     id: "job_application",
     name: "💼 Job Application",
     category: "Job Application",
@@ -1432,6 +1452,14 @@ function detectSituationEngine(text: string): SituationConfig {
   if (!text) return SUPPORTED_SITUATIONS[2];
   const lower = text.toLowerCase().trim();
 
+  if (lower.includes('received your application') || lower.includes('reviewing applications') || lower.includes('next steps in the hiring') || lower.includes('credentials received') || (lower.includes('application') && (lower.includes('received') || lower.includes('reviewing') || lower.includes('next step')))) {
+    return SUPPORTED_SITUATIONS.find(s => s.id === 'application_acknowledgment') || SUPPORTED_SITUATIONS[0];
+  }
+
+  if (lower.includes('thank you for the update') || lower.includes('look forward to hearing') || (lower.includes('update') && (lower.includes('hearing from you') || lower.includes('application status') || lower.includes('next step')))) {
+    return SUPPORTED_SITUATIONS.find(s => s.id === 'candidate_response') || SUPPORTED_SITUATIONS[0];
+  }
+
   for (const sit of SUPPORTED_SITUATIONS) {
     if (sit.keywords.some(k => lower.includes(k))) {
       return sit;
@@ -1448,8 +1476,9 @@ function generateNaturalEmailContent(params: {
   recipientName?: string;
   senderName?: string;
   situationObj?: SituationConfig;
+  tone?: string;
 }) {
-  const { instruction, subject, recipient, recipientName, senderName, situationObj } = params;
+  const { instruction, subject, recipient, recipientName, senderName, situationObj, tone } = params;
   const sit = situationObj || detectSituationEngine(instruction || subject || "");
   
   // Clean trailing stray letters (e.g. "d" or ".") and conversational prefixes
@@ -1460,22 +1489,75 @@ function generateNaturalEmailContent(params: {
   let greeting = "Hello,";
   if (recipientName && recipientName.trim()) {
     greeting = `Dear ${recipientName.trim()},`;
-  } else if (recipient && recipient.includes("@")) {
-    const local = recipient.split("@")[0].replace(/[0-9._-]/g, " ").trim();
-    if (local.length > 2 && !local.includes("info") && !local.includes("support") && !local.includes("contact") && !local.includes("admin")) {
-      const formatted = local.split(/\s+/)[0];
-      greeting = `Dear ${formatted.charAt(0).toUpperCase() + formatted.slice(1).toLowerCase()},`;
+  } else if (recipient) {
+    const firstItem = recipient.split(/[,;\n]+/)[0].trim();
+    if (firstItem.includes("<")) {
+      const namePart = firstItem.split("<")[0].trim().replace(/^["']|["']$/g, "");
+      if (namePart) {
+        const firstWord = namePart.split(/\s+/)[0];
+        greeting = `Dear ${firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase()},`;
+      }
+    } else if (firstItem.includes("@")) {
+      const local = firstItem.split("@")[0].replace(/[0-9._-]/g, " ").trim();
+      if (local.length > 2 && !local.includes("info") && !local.includes("support") && !local.includes("contact") && !local.includes("admin")) {
+        const matchInitialPlusName = local.match(/^[a-z]([a-z]{4,})$/i);
+        const nameWord = matchInitialPlusName ? matchInitialPlusName[1] : local.split(/\s+/)[0];
+        greeting = `Dear ${nameWord.charAt(0).toUpperCase() + nameWord.slice(1).toLowerCase()},`;
+      }
     }
   }
 
   const myName = senderName && !senderName.includes("[Your Name]") ? senderName : "Sender";
-  const closing = `Warm regards,\n${myName}`;
+  let closing = `Best regards,\n${myName}`;
+  const t = (tone || sit.tone || "").toLowerCase();
+  if (t.includes("exec") || t.includes("c-suite")) closing = `Sincerely,\n${myName}`;
+  else if (t.includes("candidate") || t.includes("warm")) closing = `Warm regards,\n${myName}`;
+  else if (t.includes("action") || t.includes("concise")) closing = `Best,\n${myName}`;
+  else if (t.includes("diplomat") || t.includes("polite")) closing = `With sincere appreciation,\n${myName}`;
+  else if (t.includes("authoritative") || t.includes("formal")) closing = `Respectfully yours,\n${myName}`;
+  else if (t.includes("urgent")) closing = `Urgent regards,\n${myName}`;
 
   let outSubject = subject ? subject.trim() : "";
   let outBody = "";
 
-  // 1. Leave / Sick Leave
-  if (sit.category === "Leave/Holiday" || lower.includes("leave") || lower.includes("sick") || lower.includes("illness") || lower.includes("fever")) {
+  // 1. Application Acknowledgment / Recruiter Response (matches real recruiter screenshot)
+  if (sit.id === "application_acknowledgment" || sit.category === "Application Acknowledgment" || lower.includes("received your application") || lower.includes("reviewing applications") || lower.includes("next steps in the hiring") || lower.includes("credentials received") || (lower.includes("application") && (lower.includes("received") || lower.includes("reviewing")))) {
+    let role = "Senior Software Engineer";
+    const roleMatch = cleanInput.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
+    if (roleMatch) role = roleMatch[1].trim();
+
+    if (!outSubject) {
+      outSubject = `Application for ${role} Position – Acknowledgment`;
+    }
+
+    outBody = `${greeting}
+
+Thank you for reaching out and sharing your application for the ${role} position.
+
+We have received your email and credentials. Our team is currently reviewing applications and will be in touch regarding the next steps in the hiring process.
+
+${closing}`;
+  }
+  // 2. Candidate Reply / Recruiter Response Follow-up
+  else if (sit.id === "candidate_response" || sit.category === "Candidate Reply" || lower.includes("thank you for the update") || lower.includes("look forward to hearing") || (lower.includes("update") && (lower.includes("hearing from you") || lower.includes("application status")))) {
+    let role = "Senior Software Engineer";
+    const roleMatch = cleanInput.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
+    if (roleMatch) role = roleMatch[1].trim();
+
+    if (!outSubject) {
+      outSubject = `Re: Application for ${role} Position`;
+    }
+
+    outBody = `${greeting}
+
+Thank you for the update regarding my application for the ${role} position. I appreciate your team taking the time to review my credentials.
+
+I look forward to hearing from you regarding the next steps in the hiring process. Please let me know if any additional details or references are needed in the interim.
+
+${closing}`;
+  }
+  // 3. Leave / Sick Leave
+  else if (sit.category === "Leave/Holiday" || lower.includes("leave") || lower.includes("sick") || lower.includes("illness") || lower.includes("fever")) {
     let days = "a few days";
     const dayMatch = lower.match(/(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*days?/);
     if (dayMatch) {
@@ -1507,7 +1589,7 @@ I expect to return to work once I am recovered and will keep you informed of my 
 
 ${closing}`;
   }
-  // 2. Emergency
+  // 4. Emergency
   else if (sit.category === "Emergency" || lower.includes("emergency") || lower.includes("accident") || lower.includes("hospital")) {
     let emergDetail = cleanInput.replace(/^emergency\s*(?:leave)?\s*(?:today)?[:\s-]*/i, "").trim();
     if (!emergDetail) emergDetail = "an urgent family emergency that requires my immediate presence";
@@ -1528,23 +1610,23 @@ Thank you very much for your prompt understanding and cooperation.
 
 ${closing}`;
   }
-  // 3. Resume / Job Application
-  else if (sit.category === "Resume/Job Application" || lower.includes("resume") || lower.includes("job") || lower.includes("apply")) {
-    let role = "Software Developer";
-    const roleMatch = cleanInput.match(/for\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
+  // 5. Resume / Job Application
+  else if (sit.category === "Resume/Job Application" || sit.id === "job_application" || lower.includes("resume") || lower.includes("job") || lower.includes("apply") || lower.includes("position") || lower.includes("application for")) {
+    let role = "Senior Software Engineer";
+    const roleMatch = cleanInput.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
     if (roleMatch) role = roleMatch[1].trim();
 
     if (!outSubject) {
-      outSubject = `Application for ${role.charAt(0).toUpperCase() + role.slice(1)} Position – ${myName}`;
+      outSubject = `Application for ${role} Position – ${myName}`;
     }
 
     outBody = `${greeting}
 
 I am writing to express my strong interest in the ${role} opportunity at your organization.
 
-With a dedicated background in this domain, practical problem-solving experience, and a track record of delivering quality results, I am confident in my ability to make a meaningful and immediate contribution to your team's goals. I have attached my resume and credentials for your review.
+With a dedicated background in software engineering, practical problem-solving experience, and a proven track record of architecting scalable systems, I am confident in my ability to make an immediate and valuable contribution to your engineering initiatives. I have attached my resume and credentials for your review.
 
-I would welcome the opportunity to discuss how my experience and qualifications align with your requirements in an interview. Thank you very much for your time and consideration.
+I would welcome the opportunity to discuss how my qualifications align with your requirements in an introductory conversation. Thank you very much for your time and consideration.
 
 ${closing}`;
   }
@@ -2906,6 +2988,7 @@ serve(async (req: Request) => {
         recipientName,
         senderName,
         situationObj: sitObj,
+        tone,
       });
 
       let finalSubject = generated.subject;
@@ -2915,23 +2998,25 @@ serve(async (req: Request) => {
       const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("AI_API_KEY");
       if (geminiApiKey) {
         try {
-          const geminiPrompt = `You are an expert human professional communication assistant.
-Write a completely natural, human-written, warm, and authentic email tailored precisely to the user's situation.
-DO NOT sound like an AI, corporate robot, or generic chatbot. Write like an authentic, thoughtful person.
+          const geminiPrompt = `You are an elite corporate communications expert and executive email strategist.
+Your task is to write an authentically human, perfectly structured, professional email matching Fortune 500 corporate communication standards.
+NEVER sound like a generic AI bot or chatbot. Avoid robotic clichés.
 
-USER SITUATION / INSTRUCTION: "${input}"
-USER SUBJECT: "${subject || ''}"
-DESIRED TONE: "${tone || generated.tone}"
-RECIPIENT: "${recipientName || recipient || 'Recipient'}"
-SENDER NAME: "${senderName}"
+CONTEXT & SPECIFICATIONS:
+- USER SITUATION / INSTRUCTION: "${input}"
+- USER SUBJECT: "${subject || ''}"
+- TARGET TONE: "${tone || generated.tone}"
+- RECIPIENT: "${recipientName || recipient || 'Recipient'}"
+- SENDER NAME: "${senderName}"
 
-HUMAN-WRITTEN WRITING GUIDELINES:
-1. Address the recipient naturally (e.g. "Hi [Name]," or "Dear [Name],").
-2. Get straight to the point with natural phrasing, without stiff robotic clichés like "I am writing to formally request...".
-3. Incorporate every specific detail from the instruction (duration, reason, role, symptoms, timeline).
-4. Keep the body concise, polite, empathetic, and formatted with clean paragraphs.
-5. Sign off naturally with the sender's real name: "${senderName}".
-6. Return strictly valid JSON:
+PROFESSIONAL WRITING RULES:
+1. Address the recipient naturally (e.g. "Dear [RecipientFirstName]," or "Dear Hiring Team,").
+2. For job applications, write articulate, credentialed copy highlighting engineering excellence and value proposition.
+3. For recruiter acknowledgments, match standard professional HR responses acknowledging application receipt and outlining review timelines.
+4. For candidate replies, produce polite, polished status follow-ups.
+5. Strictly adhere to fact-grounding: do not invent attachments, non-existent dates, or interview time slots unless specified.
+6. Sign off professionally with the sender's authentic name: "${senderName}".
+7. Return strictly valid JSON:
 {
   "subject": "Concise, descriptive subject line",
   "body": "Full body text formatted with proper line breaks"
