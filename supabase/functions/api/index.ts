@@ -1448,8 +1448,9 @@ function generateNaturalEmailContent(params: {
   recipientName?: string;
   senderName?: string;
   situationObj?: SituationConfig;
+  tone?: string;
 }) {
-  const { instruction, subject, recipient, recipientName, senderName, situationObj } = params;
+  const { instruction, subject, recipient, recipientName, senderName, situationObj, tone } = params;
   const sit = situationObj || detectSituationEngine(instruction || subject || "");
   
   // Clean trailing stray letters (e.g. "d" or ".") and conversational prefixes
@@ -1469,7 +1470,21 @@ function generateNaturalEmailContent(params: {
   }
 
   const myName = senderName && !senderName.includes("[Your Name]") ? senderName : "Sender";
-  const closing = `Warm regards,\n${myName}`;
+  let closing = `Best regards,\n${myName}`;
+  const tLower = (tone || "").toLowerCase();
+  if (tLower.includes("exec") || tLower.includes("c-suite")) {
+    closing = `Sincerely,\n${myName}`;
+  } else if (tLower.includes("formal") || tLower.includes("authoritative")) {
+    closing = `Respectfully yours,\n${myName}`;
+  } else if (tLower.includes("action") || tLower.includes("concise")) {
+    closing = `Best,\n${myName}`;
+  } else if (tLower.includes("polite") || tLower.includes("diplomat")) {
+    closing = `With sincere appreciation,\n${myName}`;
+  } else if (tLower.includes("warm") || tLower.includes("collab")) {
+    closing = `Warmly,\n${myName}`;
+  } else if (tLower.includes("candidate") || tLower.includes("application")) {
+    closing = `Warm regards,\n${myName}`;
+  }
 
   let outSubject = subject ? subject.trim() : "";
   let outBody = "";
@@ -1528,7 +1543,47 @@ Thank you very much for your prompt understanding and cooperation.
 
 ${closing}`;
   }
-  // 3. Resume / Job Application
+  // 3. Recruiter Response / Application Acknowledgment (Matching authentic recruiter communications)
+  else if (lower.includes("received your application") || lower.includes("reviewing applications") || lower.includes("next steps in the hiring") || lower.includes("credentials received") || (lower.includes("application") && (lower.includes("received") || lower.includes("reviewing") || lower.includes("next step")))) {
+    let role = "Senior Software Engineer";
+    const roleMatch = cleanInput.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job|opportunity)/i);
+    if (roleMatch) role = roleMatch[1].trim();
+
+    if (!outSubject) {
+      outSubject = `Application for ${role} Position – Acknowledgment`;
+    }
+
+    if (tLower.includes("action") || tLower.includes("concise")) {
+      outBody = `${greeting}
+
+Thank you for your application for the ${role} position.
+
+Status Update:
+- Credentials & Portfolio: Received and logged
+- Review Pipeline: Candidate profiles are actively being assessed by our hiring team
+- Next Steps: Shortlisted candidates will be contacted within 3–5 business days
+
+${closing}`;
+    } else if (tLower.includes("exec")) {
+      outBody = `${greeting}
+
+Thank you for your interest in joining our organization for the ${role} position.
+
+We have received your email and credentials. Our leadership team is evaluating submissions to align with our technical strategy and architectural roadmap. Should your background match our strategic priorities, we will be in touch directly.
+
+${closing}`;
+    } else {
+      // Standard Recruiter / HR Response (Exact authentic phrasing from user's Gmail screenshot)
+      outBody = `${greeting}
+
+Thank you for reaching out and sharing your application for the ${role} position.
+
+We have received your email and credentials. Our team is currently reviewing applications and will be in touch regarding the next steps in the hiring process.
+
+${closing}`;
+    }
+  }
+  // 4. Resume / Job Application
   else if (sit.category === "Resume/Job Application" || lower.includes("resume") || lower.includes("job") || lower.includes("apply")) {
     let role = "Software Developer";
     const roleMatch = cleanInput.match(/for\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
@@ -2871,6 +2926,7 @@ serve(async (req: Request) => {
         recipientName,
         senderName,
         situationObj: sitObj,
+        tone: tone || generated?.tone,
       });
 
       let finalSubject = generated.subject;
@@ -2880,25 +2936,39 @@ serve(async (req: Request) => {
       const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("AI_API_KEY");
       if (geminiApiKey) {
         try {
-          const geminiPrompt = `You are an expert human professional communication assistant.
-Write a completely natural, human-written, warm, and authentic email tailored precisely to the user's situation.
-DO NOT sound like an AI, corporate robot, or generic chatbot. Write like an authentic, thoughtful person.
+          const geminiPrompt = `You are an elite corporate communications specialist and executive email strategist.
+Write a completely authentic, sophisticated, original professional email tailored precisely to the user's situation and target tone.
+DO NOT sound like an AI, formulaic bot, or generic chatbot. Write with the natural fluency, poise, and elegance of a seasoned corporate leader or tech recruiter.
 
 USER SITUATION / INSTRUCTION: "${input}"
 USER SUBJECT: "${subject || ''}"
-DESIRED TONE: "${tone || generated.tone}"
+TARGET TONE: "${tone || generated.tone}"
 RECIPIENT: "${recipientName || recipient || 'Recipient'}"
 SENDER NAME: "${senderName}"
 
-HUMAN-WRITTEN WRITING GUIDELINES:
-1. Address the recipient naturally (e.g. "Hi [Name]," or "Dear [Name],").
-2. Get straight to the point with natural phrasing, without stiff robotic clichés like "I am writing to formally request...".
-3. Incorporate every specific detail from the instruction (duration, reason, role, symptoms, timeline).
-4. Keep the body concise, polite, empathetic, and formatted with clean paragraphs.
+ADVANCED PROFESSIONAL TONE CRITERIA:
+- "Corporate Professional": Impeccable business etiquette, articulate, well-structured, balanced, and clear.
+- "Executive / C-Suite": High-level, strategic, concise, direct, authoritative yet courteous. Focuses on outcomes and key decisions.
+- "Recruiter / HR Response": Warm, courteous, structured acknowledgment, outlining next steps, perfectly calibrated corporate communication (e.g., "Thank you for reaching out and sharing your application for the [Role] position. We have received your email and credentials. Our team is currently reviewing applications and will be in touch regarding the next steps in the hiring process.").
+- "Candidate Application": Impactful, value-driven, credentialed outreach emphasizing technical competence and achievements.
+- "Polite & Diplomatic": Tactful, considerate, constructive, relationship-preserving phrasing for delicate inquiries.
+- "Action-Oriented & Concise": High efficiency, clear action items/bullet points, zero fluff, clear deadlines.
+- "Formal & Authoritative": Institutional rigor, elevated vocabulary, traditional professional letter standards.
+- "Warm & Collaborative": Empathetic, partnership-focused, friendly yet thoroughly professional.
+- "Persuasive & Pitch": Compelling value proposition, metric-backed, clear call-to-action.
+- "Firm & Assertive": Unambiguous boundaries, decisive call-to-action, resolute tone.
+- "Apologetic & Resolution": Sincere accountability, transparent corrective action, reassuring next steps.
+- "Urgent & Time-Sensitive": Immediate priority, rapid clarity, critical timeline, direct escalation.
+
+STRICT WRITING RULES:
+1. Address the recipient naturally (e.g. "Dear [Name]," or "Hi [Name],").
+2. Get straight to the point with natural corporate phrasing. Avoid generic AI openers like "I hope this email finds you well" unless explicitly fitting.
+3. Incorporate every specific detail from the instruction (dates, durations, roles, symptoms, project names, timelines).
+4. Do NOT hallucinate fake company names, credentials, or amounts if not provided.
 5. Sign off naturally with the sender's real name: "${senderName}".
 6. Return strictly valid JSON:
 {
-  "subject": "Concise, descriptive subject line",
+  "subject": "Clear, professional, descriptive subject line",
   "body": "Full body text formatted with proper line breaks"
 }`;
 

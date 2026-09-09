@@ -33,7 +33,21 @@ const CATEGORIES_FILTER = [
   'Other'
 ];
 
-const TONES_FILTER = ['All', 'Professional', 'Formal', 'Friendly', 'Urgent', 'Polite', 'Apologetic', 'Concise'];
+const TONES_FILTER = [
+  'All', 
+  'Corporate Professional', 
+  'Executive', 
+  'Recruiter Response', 
+  'Candidate Application', 
+  'Polite & Diplomatic', 
+  'Action-Oriented', 
+  'Formal', 
+  'Warm', 
+  'Persuasive', 
+  'Firm', 
+  'Apologetic', 
+  'Urgent'
+];
 const IMPORTANCE_FILTER = ['All', 'Low', 'Normal', 'High', 'Critical'];
 const DIRECTION_FILTER = ['All', 'Sent', 'Received', 'Drafts'];
 const STATUS_FILTER = ['All', 'Sent', 'Received', 'Draft', 'Scheduled', 'Failed', 'Spam'];

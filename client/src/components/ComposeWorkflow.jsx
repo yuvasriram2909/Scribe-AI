@@ -8,6 +8,7 @@ import { apiFetch, safeParseResponse } from '../utils/api';
 import { signInWithGoogle } from '../utils/supabaseClient';
 import { 
   EMAIL_CATEGORIES, 
+  ADVANCED_TONES,
   classifyEmailIntent, 
   generateIntelligentEmail 
 } from '../utils/aiEngine';
@@ -17,20 +18,7 @@ import {
   formatEmailList 
 } from '../utils/emailValidation';
 
-const AVAILABLE_TONES = [
-  'Formal',
-  'Professional',
-  'Polite',
-  'Friendly',
-  'Casual',
-  'Warm',
-  'Persuasive',
-  'Apologetic',
-  'Urgent',
-  'Firm',
-  'Respectful',
-  'Concise'
-];
+const AVAILABLE_TONES = ADVANCED_TONES;
 
 export function ComposeWorkflow({ 
   composeState = {}, 
@@ -216,6 +204,7 @@ export function ComposeWorkflow({
         userSubject: subject,
         recipient: recipText,
         hasAttachment: !!selectedFile,
+        customTone: tone && tone !== 'Professional' ? tone : null,
         senderName: localStorage.getItem('userName') || ''
       });
 
@@ -223,7 +212,7 @@ export function ComposeWorkflow({
         emailType: localResult.category,
         detectedCategory: localResult.category,
         situation: localResult.situation,
-        tone: localResult.tone,
+        tone: localResult.tone || tone,
         priority: localResult.priority,
         importance: localResult.priority,
         urgency: localResult.urgency,
@@ -353,7 +342,8 @@ export function ComposeWorkflow({
 
     updateState({
       situationSource: 'manual',
-      tone: newTone,
+      tone: reGen.tone || newTone,
+      subject: reGen.subject || subject,
       body: reGen.body || body
     });
   };
@@ -696,6 +686,50 @@ export function ComposeWorkflow({
               />
             </div>
 
+            {/* Tone & Style Selector */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[#ECE8E1] flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#D4A373]" />
+                  <span>Communication Tone & Style</span>
+                  <span className="text-[10px] text-[#D4A373] bg-[#D4A373]/10 px-2 py-0.5 rounded-full border border-[#D4A373]/30 font-semibold">
+                    12 Advanced Tones
+                  </span>
+                </label>
+                <span className="text-[11px] text-[#99958F]">
+                  Auto-adapts to situation or select preferred style
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {AVAILABLE_TONES.map(t => {
+                  const isSelected = tone && (tone.toLowerCase().includes(t.id) || tone.toLowerCase().includes(t.name.toLowerCase()));
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => updateState({ tone: t.name })}
+                      className={`p-2.5 rounded-2xl border text-left transition-all flex flex-col justify-between cursor-pointer group hover:scale-[1.01] ${
+                        isSelected 
+                          ? 'border-[#D4A373] bg-[#D4A373]/12 shadow-sm shadow-[#D4A373]/20 ring-1 ring-[#D4A373]/40' 
+                          : 'border-[#2E2D2B] bg-[#161514] hover:border-[#D4A373]/40 hover:bg-[#1C1B19]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-sm">{t.icon}</span>
+                        <span className={`text-[11px] font-bold truncate ${isSelected ? 'text-[#D4A373]' : 'text-[#ECE8E1] group-hover:text-[#F5F3EF]'}`}>
+                          {t.name}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-[#99958F] line-clamp-2 leading-tight">
+                        {t.tagline}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Optional Attachment */}
             <div>
               <label className="text-xs font-semibold text-[#ECE8E1] block mb-1 flex items-center gap-1.5">
@@ -864,16 +898,16 @@ export function ComposeWorkflow({
                   ))}
                 </select>
 
-                {/* Tone Dropdown (12 tones) */}
+                {/* Tone Dropdown (12 Advanced Tones) */}
                 <select
-                  value={AVAILABLE_TONES.find(t => tone.includes(t)) || ''}
+                  value={AVAILABLE_TONES.find(t => tone && (tone.toLowerCase().includes(t.id) || tone.toLowerCase().includes(t.name.toLowerCase())))?.name || tone}
                   onChange={(e) => handleManualToneChange(e.target.value)}
                   className="px-3 py-1.5 rounded-xl bg-[#22211F] text-[11px] font-bold text-[#ECE8E1] border border-[#2E2D2B] cursor-pointer"
                 >
                   <option value="" disabled>Change Tone ▼</option>
                   {AVAILABLE_TONES.map(t => (
-                    <option key={t} value={t}>
-                      {t}
+                    <option key={t.id} value={t.name}>
+                      {t.icon} {t.name}
                     </option>
                   ))}
                 </select>

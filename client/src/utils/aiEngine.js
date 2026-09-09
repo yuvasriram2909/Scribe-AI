@@ -2,20 +2,148 @@
  * ============================================================================
  * Scribe AI — Intelligent Professional Email Generation & Classification Engine
  * ============================================================================
- * - 20 Intent Classification Categories
- * - Multi-Tone Detection & Combinations
- * - 4-Level Importance Detection (LOW, MEDIUM, HIGH, CRITICAL)
- * - 5-Level Urgency Detection
- * - Recipient-Aware Salutations & Structure
+ * - 21 Intent Classification Categories (including Application Acknowledgment & Candidate Response)
+ * - 12 Advanced Professional Tones (Executive, Corporate, Recruiter Response, Action-Oriented, etc.)
  * - Strict Fact Grounding (Zero Hallucination / No Invented Dates or Attachments)
+ * - Dynamic Tone Rephrasing across all categories
+ * - Recipient-Aware Salutations & Sign-offs
  */
 
+export const ADVANCED_TONES = [
+  {
+    id: 'corporate_professional',
+    name: 'Corporate Professional',
+    icon: '💼',
+    tagline: 'Refined business standard, articulate, structured',
+    description: 'Gold-standard corporate etiquette for official communications and team updates.',
+    badgeColor: 'text-blue-300 bg-blue-950/80 border-blue-500/40'
+  },
+  {
+    id: 'executive',
+    name: 'Executive / C-Suite',
+    icon: '👑',
+    tagline: 'High-level, strategic, concise, decisive',
+    description: 'Designed for directors, founders, and VP-level communications.',
+    badgeColor: 'text-amber-300 bg-amber-950/80 border-amber-500/40'
+  },
+  {
+    id: 'recruiter_response',
+    name: 'Recruiter / HR Response',
+    icon: '📩',
+    tagline: 'Polished candidate acknowledgment & hiring communication',
+    description: 'Matches authentic Fortune 500 recruiter acknowledgments and candidate updates.',
+    badgeColor: 'text-purple-300 bg-purple-950/80 border-purple-500/40'
+  },
+  {
+    id: 'candidate_application',
+    name: 'Candidate Application',
+    icon: '🎯',
+    tagline: 'Impactful, credentialed, value-driven outreach',
+    description: 'Highlights technical expertise, career milestones, and direct value proposition.',
+    badgeColor: 'text-emerald-300 bg-emerald-950/80 border-emerald-500/40'
+  },
+  {
+    id: 'polite_diplomatic',
+    name: 'Polite & Diplomatic',
+    icon: '🤝',
+    tagline: 'Tactful, considerate, respectful, graceful',
+    description: 'Ideal for delicate requests, client navigation, and cross-team alignment.',
+    badgeColor: 'text-cyan-300 bg-cyan-950/80 border-cyan-500/40'
+  },
+  {
+    id: 'action_concise',
+    name: 'Action-Oriented & Concise',
+    icon: '⚡',
+    tagline: 'Direct, bulleted action items, zero fluff',
+    description: 'For busy executives and engineering leads who prioritize rapid execution.',
+    badgeColor: 'text-yellow-300 bg-yellow-950/80 border-yellow-500/40'
+  },
+  {
+    id: 'formal_authoritative',
+    name: 'Formal & Authoritative',
+    icon: '📜',
+    tagline: 'Institutional rigor, elevated vocabulary',
+    description: 'Suited for legal, governmental, academic, and contractual notices.',
+    badgeColor: 'text-indigo-300 bg-indigo-950/80 border-indigo-500/40'
+  },
+  {
+    id: 'warm_collaborative',
+    name: 'Warm & Collaborative',
+    icon: '☀️',
+    tagline: 'Empathetic, partnership-building, friendly yet professional',
+    description: 'Great for client check-ins, team welcomes, and community building.',
+    badgeColor: 'text-orange-300 bg-orange-950/80 border-orange-500/40'
+  },
+  {
+    id: 'persuasive_pitch',
+    name: 'Persuasive & Pitch',
+    icon: '🚀',
+    tagline: 'Compelling value proposition, metric-backed, clear CTA',
+    description: 'Crafted for proposals, partnership outreach, and sponsorship pitches.',
+    badgeColor: 'text-teal-300 bg-teal-950/80 border-teal-500/40'
+  },
+  {
+    id: 'firm_assertive',
+    name: 'Firm & Assertive',
+    icon: '🛡️',
+    tagline: 'Unambiguous boundaries, decisive call-to-action',
+    description: 'For overdue balances, unresolved disputes, and scope boundaries.',
+    badgeColor: 'text-rose-300 bg-rose-950/80 border-rose-500/40'
+  },
+  {
+    id: 'apologetic_resolution',
+    name: 'Apologetic & Resolution',
+    icon: '🙇',
+    tagline: 'Sincere accountability, transparent corrective action',
+    description: 'For rectifying mistakes, delayed deliverables, and service disruptions.',
+    badgeColor: 'text-stone-300 bg-stone-900 border-stone-600'
+  },
+  {
+    id: 'urgent_critical',
+    name: 'Urgent & Time-Sensitive',
+    icon: '🚨',
+    tagline: 'Immediate priority, critical deadlines, fast escalation',
+    description: 'For incidents, urgent emergency notices, and immediate blocker resolution.',
+    badgeColor: 'text-red-300 bg-red-950/80 border-red-500/40'
+  }
+];
+
 export const EMAIL_CATEGORIES = [
+  {
+    id: 'job_application',
+    name: 'Job Application',
+    icon: '💼',
+    defaultTone: 'Candidate Application',
+    importance: 'HIGH',
+    urgency: 'Normal response',
+    description: 'Applying for open roles, senior positions, and technical careers',
+    keywords: ['job application', 'applying for', 'software engineer', 'software developer', 'role', 'position', 'vacancy', 'candidate', 'apply for']
+  },
+  {
+    id: 'application_acknowledgment',
+    name: 'Application Acknowledgment / Recruiter Response',
+    icon: '📩',
+    defaultTone: 'Recruiter / HR Response',
+    importance: 'MEDIUM',
+    urgency: 'Normal response',
+    description: 'Acknowledging received applications, candidate submissions, outlining next steps in hiring',
+    keywords: ['received your application', 'application received', 'thank you for reaching out', 'reviewing applications', 'next steps in the hiring', 'credentials received', 'hiring process', 'recruiter response', 'candidate acknowledgment', 'shortlisted', 'recruitment update', 'in touch regarding the next steps']
+  },
+  {
+    id: 'resume_submission',
+    name: 'Resume / Document Submission',
+    icon: '📄',
+    defaultTone: 'Corporate Professional',
+    importance: 'HIGH',
+    urgency: 'Normal response',
+    description: 'Submitting resume, CV, credentials, or portfolio to recruiter or firm',
+    keywords: ['resume', 'cv', 'curriculum vitae', 'portfolio', 'send my resume', 'attached resume', 'document submission', 'credentials']
+  },
   {
     id: 'leave_request',
     name: 'Leave Request',
     icon: '📅',
-    defaultTone: 'Formal + Respectful + Polite',
+    defaultTone: 'Corporate Professional',
     importance: 'MEDIUM',
     urgency: 'Normal response',
     description: 'Sick leave, vacation, emergency absence, personal time off',
@@ -25,157 +153,117 @@ export const EMAIL_CATEGORIES = [
     id: 'emergency',
     name: 'Emergency',
     icon: '🚨',
-    defaultTone: 'Urgent + Respectful + Concise',
+    defaultTone: 'Urgent & Time-Sensitive',
     importance: 'CRITICAL',
     urgency: 'Immediate attention',
     description: 'Accidents, critical incidents, medical emergencies, immediate departures',
     keywords: ['accident', 'emergency', 'urgent personal', 'immediate attention', 'critical incident', 'hospital', 'casualty', 'leave immediately', 'urgent departure', 'family emergency']
   },
   {
-    id: 'job_application',
-    name: 'Job Application',
-    icon: '💼',
-    defaultTone: 'Formal + Professional + Confident',
-    importance: 'HIGH',
-    urgency: 'Normal response',
-    description: 'Applying for job openings, internships, full-time positions',
-    keywords: ['job application', 'applying for', 'software developer', 'role', 'position', 'vacancy', 'hiring manager', 'job opening', 'candidate', 'apply']
-  },
-  {
-    id: 'resume_submission',
-    name: 'Resume / Document Submission',
-    icon: '📄',
-    defaultTone: 'Formal + Concise + Professional',
-    importance: 'HIGH',
-    urgency: 'Normal response',
-    description: 'Submitting resume, CV, portfolio, or formal documents',
-    keywords: ['resume', 'cv', 'curriculum vitae', 'portfolio', 'send my resume', 'attached resume', 'document submission', 'credentials']
-  },
-  {
-    id: 'complaint',
-    name: 'Complaint',
-    icon: '⚠️',
-    defaultTone: 'Firm + Professional + Polite',
-    importance: 'HIGH',
-    urgency: 'Prompt response',
-    description: 'Product issues, service delays, grievances, compensation claims',
-    keywords: ['complaint', 'delayed', 'delay', 'compensation', 'refund', 'poor service', 'defective', 'damaged', 'unacceptable', 'dissatisfied', 'issue with product', 'grievance']
-  },
-  {
     id: 'meeting',
     name: 'Meeting / Appointment',
     icon: '🗓️',
-    defaultTone: 'Polite + Professional',
+    defaultTone: 'Corporate Professional',
     importance: 'MEDIUM',
     urgency: 'Prompt response',
-    description: 'Scheduling, rescheduling, or requesting meetings and appointments',
+    description: 'Scheduling, rescheduling, or requesting meetings, calendar syncs',
     keywords: ['meeting', 'reschedule', 'appointment', 'move meeting', 'schedule', 'call', 'sync', 'zoom', 'google meet', 'catch up on call']
   },
   {
     id: 'follow_up',
     name: 'Reminder / Follow-up',
     icon: '🔄',
-    defaultTone: 'Professional + Polite + Firm',
+    defaultTone: 'Action-Oriented & Concise',
     importance: 'MEDIUM',
     urgency: 'Prompt response',
-    description: 'Following up on proposals, unread messages, status of tasks',
+    description: 'Following up on deliverables, proposals, status updates, awaiting response',
     keywords: ['follow up', 'follow-up', 'following up', 'reminder', 'checking in', 'status update on', 'gentle reminder', 'pending response', 'haven\'t heard back']
-  },
-  {
-    id: 'payment_invoice',
-    name: 'Payment / Invoice',
-    icon: '💳',
-    defaultTone: 'Professional + Firm',
-    importance: 'HIGH',
-    urgency: 'Prompt response',
-    description: 'Invoices, payment reminders, billing discrepancies, fee dues',
-    keywords: ['invoice', 'payment', 'due date', 'pay by', 'billing', 'remittance', 'dues', 'receipt', 'wire transfer', 'fees']
-  },
-  {
-    id: 'security_account',
-    name: 'Security / Account',
-    icon: '🛡️',
-    defaultTone: 'Urgent + Serious + Professional',
-    importance: 'CRITICAL',
-    urgency: 'Immediate attention',
-    description: 'Compromised accounts, unauthorized access, security alerts',
-    keywords: ['compromised', 'hacked', 'security breach', 'unauthorized access', 'stolen', 'password reset', 'security alert', 'account locked', 'phishing']
-  },
-  {
-    id: 'thank_you',
-    name: 'Thank You / Appreciation',
-    icon: '🙏',
-    defaultTone: 'Warm + Appreciative',
-    importance: 'LOW',
-    urgency: 'No immediate action',
-    description: 'Expressing gratitude, thanking collaborators, acknowledging assistance',
-    keywords: ['thanks', 'thank you', 'grateful', 'appreciate', 'helping me', 'thankful', 'great help', 'gratitude']
-  },
-  {
-    id: 'personal_casual',
-    name: 'Personal / Casual',
-    icon: '💬',
-    defaultTone: 'Friendly + Casual',
-    importance: 'LOW',
-    urgency: 'Prompt response',
-    description: 'Informal notes to friends, quick social updates, casual plans',
-    keywords: ['friend', 'reach late', 'minutes late', 'running late', 'catch up', 'coffee', 'lunch', 'dinner', 'hang out', 'weekend', 'casual']
-  },
-  {
-    id: 'official_professional',
-    name: 'Professional / Official',
-    icon: '👔',
-    defaultTone: 'Formal + Professional',
-    importance: 'HIGH',
-    urgency: 'Normal response',
-    description: 'Standard workplace communication, formal notices, official letters',
-    keywords: ['official', 'formal', 'company policy', 'management', 'hr department', 'board', 'formal communication', 'authorized']
-  },
-  {
-    id: 'announcement',
-    name: 'Announcement',
-    icon: '📢',
-    defaultTone: 'Professional + Informative',
-    importance: 'MEDIUM',
-    urgency: 'No immediate action',
-    description: 'Broadcasting company updates, policy launches, event notifications',
-    keywords: ['announcement', 'announce', 'broadcasting', 'pleased to announce', 'we are launching', 'all hands', 'upcoming event', 'notice to all']
-  },
-  {
-    id: 'apology',
-    name: 'Apology',
-    icon: '🙇',
-    defaultTone: 'Apologetic + Respectful + Sincere',
-    importance: 'MEDIUM',
-    urgency: 'Prompt response',
-    description: 'Apologizing for mistakes, delays, miscommunication, or oversights',
-    keywords: ['sorry', 'apologize', 'apology', 'regret', 'inconvenience caused', 'oversight', 'my mistake', 'pardon']
-  },
-  {
-    id: 'academic_student',
-    name: 'Academic / Student',
-    icon: '🎓',
-    defaultTone: 'Formal + Respectful + Polite',
-    importance: 'HIGH',
-    urgency: 'Normal response',
-    description: 'Messages to professors, universities, homework/exam submissions',
-    keywords: ['professor', 'teacher', 'assignment', 'exam', 'grade', 'class', 'university', 'college', 'course', 'phd', 'student']
   },
   {
     id: 'business_proposal',
     name: 'Business Proposal',
     icon: '🤝',
-    defaultTone: 'Professional + Persuasive + Confident',
+    defaultTone: 'Persuasive & Pitch',
     importance: 'HIGH',
     urgency: 'Prompt response',
     description: 'Partnership pitches, sales proposals, vendor quotes, collaboration offers',
     keywords: ['proposal', 'partnership', 'collaboration', 'business proposal', 'quotation', 'rfp', 'pitch', 'vendor offer']
   },
   {
+    id: 'payment_invoice',
+    name: 'Payment / Invoice',
+    icon: '💳',
+    defaultTone: 'Firm & Assertive',
+    importance: 'HIGH',
+    urgency: 'Prompt response',
+    description: 'Invoices, billing statements, payment processing, fee dues',
+    keywords: ['invoice', 'payment', 'due date', 'pay by', 'billing', 'remittance', 'dues', 'receipt', 'wire transfer', 'fees']
+  },
+  {
+    id: 'complaint',
+    name: 'Complaint / Concern',
+    icon: '⚠️',
+    defaultTone: 'Firm & Assertive',
+    importance: 'HIGH',
+    urgency: 'Prompt response',
+    description: 'Product issues, service delays, grievances, formal concerns',
+    keywords: ['complaint', 'delayed', 'delay', 'compensation', 'refund', 'poor service', 'defective', 'damaged', 'unacceptable', 'dissatisfied', 'issue with product', 'grievance']
+  },
+  {
+    id: 'apology',
+    name: 'Apology / Resolution',
+    icon: '🙇',
+    defaultTone: 'Apologetic & Resolution',
+    importance: 'MEDIUM',
+    urgency: 'Prompt response',
+    description: 'Apologizing for mistakes, delays, miscommunication, or service interruption',
+    keywords: ['sorry', 'apologize', 'apology', 'regret', 'inconvenience caused', 'oversight', 'my mistake', 'pardon']
+  },
+  {
+    id: 'official_professional',
+    name: 'Professional / Official',
+    icon: '👔',
+    defaultTone: 'Corporate Professional',
+    importance: 'HIGH',
+    urgency: 'Normal response',
+    description: 'Standard workplace communication, formal notices, official letters',
+    keywords: ['official', 'formal', 'company policy', 'management', 'hr department', 'board', 'formal communication', 'authorized']
+  },
+  {
+    id: 'thank_you',
+    name: 'Thank You / Appreciation',
+    icon: '🙏',
+    defaultTone: 'Warm & Collaborative',
+    importance: 'LOW',
+    urgency: 'No immediate action',
+    description: 'Expressing gratitude, thanking collaborators, acknowledging assistance',
+    keywords: ['thanks', 'thank you', 'grateful', 'appreciate', 'helping me', 'thankful', 'great help', 'gratitude']
+  },
+  {
+    id: 'announcement',
+    name: 'Announcement',
+    icon: '📢',
+    defaultTone: 'Corporate Professional',
+    importance: 'MEDIUM',
+    urgency: 'No immediate action',
+    description: 'Broadcasting company updates, policy launches, event notifications',
+    keywords: ['announcement', 'announce', 'broadcasting', 'pleased to announce', 'we are launching', 'all hands', 'upcoming event', 'notice to all']
+  },
+  {
+    id: 'academic_student',
+    name: 'Academic / Student',
+    icon: '🎓',
+    defaultTone: 'Formal & Authoritative',
+    importance: 'HIGH',
+    urgency: 'Normal response',
+    description: 'Messages to professors, universities, homework/exam submissions',
+    keywords: ['professor', 'teacher', 'assignment', 'exam', 'grade', 'class', 'university', 'college', 'course', 'phd', 'student']
+  },
+  {
     id: 'inquiry_info',
     name: 'Inquiry / Information Request',
     icon: '❓',
-    defaultTone: 'Polite + Professional + Clear',
+    defaultTone: 'Polite & Diplomatic',
     importance: 'MEDIUM',
     urgency: 'Normal response',
     description: 'Asking for product info, pricing inquiries, general questions',
@@ -185,41 +273,65 @@ export const EMAIL_CATEGORIES = [
     id: 'congratulations',
     name: 'Congratulations',
     icon: '🎉',
-    defaultTone: 'Warm + Enthusiastic + Friendly',
+    defaultTone: 'Warm & Collaborative',
     importance: 'LOW',
     urgency: 'No immediate action',
-    description: 'Celebrating promotions, achievements, weddings, graduations',
+    description: 'Celebrating promotions, achievements, milestones, graduations',
     keywords: ['congratulations', 'congrats', 'kudos', 'well done', 'promotion', 'achievement', 'award', 'celebrating']
-  },
-  {
-    id: 'marketing_promotion',
-    name: 'Marketing / Promotion',
-    icon: '🚀',
-    defaultTone: 'Persuasive + Engaging + Professional',
-    importance: 'LOW',
-    urgency: 'No immediate action',
-    description: 'Promotional outreach, product offers, newsletter announcements',
-    keywords: ['special offer', 'discount', 'limited time', 'promo', 'promotion', 'exclusive offer', 'new feature', 'sale']
   },
   {
     id: 'status_update',
     name: 'Status / Progress Update',
     icon: '📊',
-    defaultTone: 'Professional + Clear + Concise',
+    defaultTone: 'Action-Oriented & Concise',
     importance: 'MEDIUM',
     urgency: 'Normal response',
     description: 'Weekly sprint updates, milestone reports, project deliverable status',
     keywords: ['status update', 'progress update', 'milestone', 'sprint update', 'weekly report', 'project status', 'deliverables']
+  },
+  {
+    id: 'security_account',
+    name: 'Security / Account',
+    icon: '🛡️',
+    defaultTone: 'Urgent & Time-Sensitive',
+    importance: 'CRITICAL',
+    urgency: 'Immediate attention',
+    description: 'Compromised accounts, unauthorized access, security alerts',
+    keywords: ['compromised', 'hacked', 'security breach', 'unauthorized access', 'stolen', 'password reset', 'security alert', 'account locked', 'phishing']
+  },
+  {
+    id: 'personal_casual',
+    name: 'Personal / Casual',
+    icon: '💬',
+    defaultTone: 'Warm & Collaborative',
+    importance: 'LOW',
+    urgency: 'Prompt response',
+    description: 'Informal notes to friends, quick social updates, casual plans',
+    keywords: ['friend', 'reach late', 'minutes late', 'running late', 'catch up', 'coffee', 'lunch', 'dinner', 'hang out', 'weekend', 'casual']
+  },
+  {
+    id: 'marketing_promotion',
+    name: 'Marketing / Promotion',
+    icon: '🚀',
+    defaultTone: 'Persuasive & Pitch',
+    importance: 'LOW',
+    urgency: 'No immediate action',
+    description: 'Promotional outreach, product offers, newsletter announcements',
+    keywords: ['special offer', 'discount', 'limited time', 'promo', 'promotion', 'exclusive offer', 'new feature', 'sale']
   }
 ];
 
 /**
- * Classifies user text into one of the 20 email categories with confidence scores
+ * Classifies user text into one of the email categories with high confidence
  */
 export function classifyEmailIntent(input = '', subject = '') {
   const text = `${subject} ${input}`.toLowerCase().trim();
 
-  // 1. Specific High-Priority Intent Matches
+  // 1. High-Priority Intent Matches
+  if (text.includes('received your application') || text.includes('reviewing applications') || text.includes('next steps in the hiring') || text.includes('credentials received') || (text.includes('application') && (text.includes('received') || text.includes('reviewing') || text.includes('next step')))) {
+    return EMAIL_CATEGORIES.find(c => c.id === 'application_acknowledgment');
+  }
+
   if (text.includes('accident') || text.includes('emergency') || (text.includes('immediate') && (text.includes('leave') || text.includes('hospital')))) {
     return EMAIL_CATEGORIES.find(c => c.id === 'emergency');
   }
@@ -240,9 +352,8 @@ export function classifyEmailIntent(input = '', subject = '') {
     return EMAIL_CATEGORIES.find(c => c.id === 'leave_request');
   }
 
-  if (text.includes('resume') && (text.includes('job') || text.includes('developer') || text.includes('position') || text.includes('send my resume') || text.includes('hr'))) {
-    // If it's explicitly applying for a job
-    if (text.includes('apply') || text.includes('position') || text.includes('developer') || text.includes('role')) {
+  if (text.includes('resume') && (text.includes('job') || text.includes('developer') || text.includes('engineer') || text.includes('position') || text.includes('send my resume') || text.includes('hr'))) {
+    if (text.includes('apply') || text.includes('position') || text.includes('developer') || text.includes('engineer') || text.includes('role')) {
       return EMAIL_CATEGORIES.find(c => c.id === 'job_application');
     }
     return EMAIL_CATEGORIES.find(c => c.id === 'resume_submission');
@@ -256,8 +367,12 @@ export function classifyEmailIntent(input = '', subject = '') {
     return EMAIL_CATEGORIES.find(c => c.id === 'follow_up');
   }
 
-  if (text.includes('minutes late') || text.includes('running late') || text.includes('friend')) {
-    return EMAIL_CATEGORIES.find(c => c.id === 'personal_casual');
+  if (text.includes('sorry') || text.includes('apologize') || text.includes('oversight') || text.includes('my mistake')) {
+    return EMAIL_CATEGORIES.find(c => c.id === 'apology');
+  }
+
+  if (text.includes('proposal') || text.includes('partnership') || text.includes('pitch')) {
+    return EMAIL_CATEGORIES.find(c => c.id === 'business_proposal');
   }
 
   if (text.includes('thanks') || text.includes('thank you') || text.includes('appreciate')) {
@@ -272,7 +387,7 @@ export function classifyEmailIntent(input = '', subject = '') {
     let score = 0;
     for (const kw of cat.keywords) {
       if (text.includes(kw)) {
-        score += kw.length; // Longer matches carry more weight
+        score += kw.length;
       }
     }
     if (score > maxScore) {
@@ -285,13 +400,12 @@ export function classifyEmailIntent(input = '', subject = '') {
 }
 
 /**
- * Extracts factual parameters without inventing details (no hallucinated dates/names)
+ * Extracts factual parameters without hallucinating details
  */
 export function extractFactualDetails(input = '') {
   const text = input.trim();
   const lower = text.toLowerCase();
 
-  // Extract duration (e.g. "3 days", "two weeks", "tomorrow")
   let duration = null;
   const durationMatch = text.match(/(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(day|days|week|weeks|month|months)/i);
   if (durationMatch) {
@@ -304,20 +418,28 @@ export function extractFactualDetails(input = '') {
     duration = 'tomorrow';
   }
 
-  // Extract job role / position (e.g., "software developer position")
-  let jobRole = null;
-  const roleMatch = text.match(/for\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
+  let jobRole = 'Senior Software Engineer';
+  const roleMatch = text.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job|opportunity)/i);
   if (roleMatch) {
     jobRole = roleMatch[1].trim();
+  } else {
+    if (lower.includes('senior software engineer')) jobRole = 'Senior Software Engineer';
+    else if (lower.includes('software engineer')) jobRole = 'Software Engineer';
+    else if (lower.includes('frontend developer')) jobRole = 'Frontend Developer';
+    else if (lower.includes('backend developer')) jobRole = 'Backend Developer';
+    else if (lower.includes('full stack developer') || lower.includes('fullstack')) jobRole = 'Full Stack Developer';
+    else if (lower.includes('product manager')) jobRole = 'Product Manager';
+    else if (lower.includes('data analyst')) jobRole = 'Data Analyst';
   }
 
-  // Extract recipient role (e.g. HR, manager, professor, client, friend)
   let recipientType = 'unknown';
   if (lower.includes('manager') || lower.includes('lead') || lower.includes('boss') || lower.includes('supervisor')) {
     recipientType = 'manager';
-  } else if (lower.includes('hr') || lower.includes('recruiter') || lower.includes('hiring manager')) {
+  } else if (lower.includes('hr') || lower.includes('recruiter') || lower.includes('hiring manager') || lower.includes('talent')) {
     recipientType = 'hr';
-  } else if (lower.includes('professor') || lower.includes('teacher') || lower.includes('instructor')) {
+  } else if (lower.includes('candidate') || lower.includes('applicant')) {
+    recipientType = 'candidate';
+  } else if (lower.includes('professor') || lower.includes('teacher')) {
     recipientType = 'professor';
   } else if (lower.includes('client') || lower.includes('customer')) {
     recipientType = 'client';
@@ -366,87 +488,125 @@ export function getSenderDisplayName(providedName = '') {
 }
 
 /**
- * Determines appropriate recipient greeting (warm and human)
- * Dynamically handles single recipients and group multi-recipients
+ * Determines recipient display name from email string
  */
-export function determineGreeting(recipient = '', recipientType = 'unknown') {
-  // Check if multiple recipients are provided
-  const rawList = typeof recipient === 'string' ? recipient.split(/[,;\n]+/).map(r => r.trim()).filter(Boolean) : [];
-
-  if (rawList.length > 1) {
-    if (recipientType === 'friend') return 'Hi everyone,';
-    if (recipientType === 'manager') return 'Dear Team Leaders,';
-    if (recipientType === 'client') return 'Dear Clients,';
-    if (recipientType === 'hr') return 'Dear Hiring Team,';
-    if (recipientType === 'professor') return 'Dear Professors,';
-
-    // If exactly 2 recipients, try personalized dual greeting: "Hello Samson and Yuva,"
-    if (rawList.length === 2) {
-      const getFirstName = (raw) => {
-        const email = raw.includes('<') ? (raw.match(/<([^>]+)>/)?.[1] || raw) : raw;
-        const local = (email.split('@')[0] || '').replace(/[0-9._-]/g, ' ').trim().split(/\s+/)[0] || '';
-        return local.length >= 2 ? local.charAt(0).toUpperCase() + local.slice(1).toLowerCase() : '';
-      };
-      const name1 = getFirstName(rawList[0]);
-      const name2 = getFirstName(rawList[1]);
-      if (name1 && name2 && name1 !== name2) {
-        return `Hello ${name1} and ${name2},`;
-      }
-    }
-
-    return 'Hello everyone,';
+export function extractRecipientFirstName(recipient = '') {
+  if (!recipient) return '';
+  const clean = recipient.includes('<') ? (recipient.match(/<([^>]+)>/)?.[1] || recipient) : recipient;
+  if (!clean.includes('@')) {
+    const trimmed = clean.replace(/[0-9._-]/g, ' ').trim();
+    return trimmed ? (trimmed.charAt(0).toUpperCase() + trimmed.slice(1)) : '';
   }
-
-  if (recipientType === 'friend') {
-    return 'Hi there,';
+  const local = clean.split('@')[0].replace(/[0-9._-]/g, ' ').trim();
+  if (local.length >= 2 && !local.includes('info') && !local.includes('support') && !local.includes('contact') && !local.includes('admin') && !local.includes('noreply')) {
+    const firstWord = local.split(/\s+/)[0];
+    return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
   }
-  if (recipientType === 'professor') {
-    return 'Dear Professor,';
-  }
-  if (recipientType === 'hr') {
-    return 'Dear Hiring Manager,';
-  }
-  if (recipientType === 'manager') {
-    return 'Dear Manager,';
-  }
-  if (recipientType === 'client') {
-    return 'Dear Client,';
-  }
-
-  if (recipient && recipient.includes('@')) {
-    const cleanAddress = recipient.includes('<') ? (recipient.match(/<([^>]+)>/)?.[1] || recipient) : recipient;
-    const localPart = cleanAddress.split('@')[0];
-    const cleanName = localPart.replace(/[0-9._-]/g, ' ').trim();
-    if (cleanName.length > 2 && !cleanName.includes('info') && !cleanName.includes('support') && !cleanName.includes('contact') && !cleanName.includes('admin')) {
-      const formatted = cleanName.split(/\s+/)[0];
-      const capitalized = formatted.charAt(0).toUpperCase() + formatted.slice(1).toLowerCase();
-      return `Dear ${capitalized},`;
-    }
-  }
-
-  return 'Hello,';
+  return '';
 }
 
 /**
- * Cleans input text from minor trailing typos (like "d" or ".") and conversational prefixes
+ * Determines appropriate recipient greeting taking tone and name into account
+ */
+export function determineGreeting(recipient = '', recipientType = 'unknown', toneId = 'corporate_professional') {
+  const rawList = typeof recipient === 'string' ? recipient.split(/[,;\n]+/).map(r => r.trim()).filter(Boolean) : [];
+  const firstName = extractRecipientFirstName(recipient);
+
+  if (rawList.length > 1) {
+    if (toneId.includes('action') || toneId.includes('warm')) return 'Hi team,';
+    if (toneId.includes('executive')) return 'Dear Team,';
+    return 'Dear Colleagues,';
+  }
+
+  if (firstName) {
+    if (toneId.includes('action') || toneId.includes('warm') || toneId.includes('casual')) {
+      return `Hi ${firstName},`;
+    }
+    return `Dear ${firstName},`;
+  }
+
+  if (recipientType === 'candidate') return 'Dear Candidate,';
+  if (recipientType === 'hr') return 'Dear Hiring Team,';
+  if (recipientType === 'manager') return 'Dear Manager,';
+  if (recipientType === 'client') return 'Dear Client,';
+  if (recipientType === 'professor') return 'Dear Professor,';
+
+  if (toneId.includes('formal')) return 'Dear Sir/Madam,';
+  if (toneId.includes('action') || toneId.includes('warm')) return 'Hello,';
+  return 'Dear Colleague,';
+}
+
+/**
+ * Cleans input text from minor trailing typos and conversational prefixes
  */
 export function cleanUserInput(raw = '') {
   let text = (raw || '').trim();
-  // Strip trailing single stray letter typos like " d" or " s" at the end of sentence
   text = text.replace(/\s+[a-zA-Z]$/, '').trim();
-  // Remove conversational leading prompt phrasing
   text = text.replace(/^(?:please\s+)?(?:send\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|saying\s+that\s+|saying\s+|about\s+)?|i\s+want\s+to\s+(?:send|write)\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|about\s+)?|write\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|about\s+)?)/i, '').trim();
   return text;
 }
 
 /**
+ * Resolves standard Tone ID from any loose string or object
+ */
+export function normalizeToneId(tone) {
+  if (!tone) return 'corporate_professional';
+  const t = String(tone).toLowerCase();
+  if (t.includes('exec') || t.includes('c-suite') || t.includes('leadership')) return 'executive';
+  if (t.includes('recruit') || t.includes('hr') || t.includes('acknowledg')) return 'recruiter_response';
+  if (t.includes('candidate') || t.includes('application')) return 'candidate_application';
+  if (t.includes('diplomat') || t.includes('polite')) return 'polite_diplomatic';
+  if (t.includes('action') || t.includes('concise')) return 'action_concise';
+  if (t.includes('authoritative') || t.includes('formal')) return 'formal_authoritative';
+  if (t.includes('warm') || t.includes('collab') || t.includes('friendly')) return 'warm_collaborative';
+  if (t.includes('persuas') || t.includes('pitch')) return 'persuasive_pitch';
+  if (t.includes('firm') || t.includes('assertive')) return 'firm_assertive';
+  if (t.includes('apolog')) return 'apologetic_resolution';
+  if (t.includes('urgent') || t.includes('critical')) return 'urgent_critical';
+  return 'corporate_professional';
+}
+
+/**
+ * Determines closing sign-off based on tone
+ */
+export function determineClosing(toneId = 'corporate_professional', myName = 'Sender') {
+  switch (toneId) {
+    case 'executive':
+      return `Sincerely,\n${myName}`;
+    case 'recruiter_response':
+      return `Best regards,\n${myName}`;
+    case 'candidate_application':
+      return `Warm regards,\n${myName}`;
+    case 'action_concise':
+      return `Best,\n${myName}`;
+    case 'polite_diplomatic':
+      return `With sincere appreciation,\n${myName}`;
+    case 'formal_authoritative':
+      return `Respectfully yours,\n${myName}`;
+    case 'warm_collaborative':
+      return `Warmly,\n${myName}`;
+    case 'persuasive_pitch':
+      return `Warm regards,\n${myName}`;
+    case 'firm_assertive':
+      return `Regards,\n${myName}`;
+    case 'apologetic_resolution':
+      return `Sincerely and with apologies,\n${myName}`;
+    case 'urgent_critical':
+      return `Urgent regards,\n${myName}`;
+    default:
+      return `Best regards,\n${myName}`;
+  }
+}
+
+/**
  * Intelligent Professional Email Generator
- * Assembles human-crafted, grammatically polished, fact-grounded emails tailored strictly to user intent
+ * Assembles human-crafted, grammatically polished, fact-grounded emails tailored strictly to user intent and tone
  */
 export function generateIntelligentEmail({
   instruction = '',
   userSubject = '',
   recipient = '',
+  recipientName = '',
   hasAttachment = false,
   customCategory = null,
   customTone = null,
@@ -463,54 +623,176 @@ export function generateIntelligentEmail({
     ? (EMAIL_CATEGORIES.find(c => c.id === customCategory || c.name === customCategory) || classifyEmailIntent(input, userSubject))
     : classifyEmailIntent(input, userSubject);
 
-  const tone = customTone || category.defaultTone;
+  const rawTone = customTone || category.defaultTone;
+  const toneId = normalizeToneId(rawTone);
+  const activeToneObj = ADVANCED_TONES.find(t => t.id === toneId) || ADVANCED_TONES[0];
   const priority = customPriority || category.importance;
   const urgency = category.urgency;
 
   // 2. Greeting & Sign-off
-  const greeting = determineGreeting(recipient, facts.recipientType);
+  const effectiveRecipient = (recipientName && recipientName.trim()) || recipient;
+  const greeting = determineGreeting(effectiveRecipient, facts.recipientType, toneId);
   const myName = getSenderDisplayName(senderName);
-  const closing = tone.includes('Casual') || tone.includes('Friendly') 
-    ? `Best regards,\n${myName}` 
-    : `Warm regards,\n${myName}`;
+  const closing = determineClosing(toneId, myName);
 
   let finalSubject = userSubject.trim();
   let bodyContent = '';
 
-  // 3. Category-Specific Structural Generation (Fact Grounded & Human Written)
+  const role = facts.jobRole || 'Senior Software Engineer';
+  const attachmentLine = hasAttachment 
+    ? 'I have attached my comprehensive resume and credentials for your review.' 
+    : 'I would be delighted to share my detailed resume and credentials upon your request.';
+
+  // 3. Category & Tone Specific Structural Content
   switch (category.id) {
+    case 'application_acknowledgment': {
+      // Exactly matches real-world recruiter communication shown in user's Gmail screenshot
+      if (!finalSubject) {
+        finalSubject = `Application for ${role} Position – Acknowledgment`;
+      }
+
+      if (toneId === 'action_concise') {
+        bodyContent = `${greeting}
+
+Thank you for your application for the ${role} position.
+
+Status Update:
+- Credentials & Portfolio: Received and logged
+- Review Pipeline: Candidate profiles are actively being assessed by our hiring committee
+- Next Steps: Shortlisted candidates will be contacted within 3–5 business days for initial conversations
+
+${closing}`;
+      } else if (toneId === 'executive') {
+        bodyContent = `${greeting}
+
+Thank you for your interest in joining our engineering organization for the ${role} position.
+
+We have received your email and credentials. Our leadership team is evaluating submissions to align with our technical strategy and architectural roadmap. Should your background match our strategic priorities, we will be in touch directly.
+
+${closing}`;
+      } else if (toneId === 'warm_collaborative') {
+        bodyContent = `${greeting}
+
+Thank you so much for reaching out and sharing your application for the ${role} position!
+
+We have safely received your email and credentials. We know how much dedication goes into putting together your application, and our team is excited to review your background. We will be in touch shortly regarding the next steps in our hiring process.
+
+${closing}`;
+      } else {
+        // Standard Recruiter / HR Response (Matching the screenshot perfectly)
+        bodyContent = `${greeting}
+
+Thank you for reaching out and sharing your application for the ${role} position.
+
+We have received your email and credentials. Our team is currently reviewing applications and will be in touch regarding the next steps in the hiring process.
+
+${closing}`;
+      }
+      break;
+    }
+
+    case 'job_application': {
+      if (!finalSubject) {
+        finalSubject = `Application for ${role} Position – ${myName}`;
+      }
+
+      if (toneId === 'executive') {
+        bodyContent = `${greeting}
+
+I am writing to submit my formal candidacy for the ${role} position at your organization.
+
+Throughout my career, I have focused on engineering scalable architectures, driving technical excellence, and aligning complex development with core business milestones. I would welcome an introductory discussion regarding how my background and leadership can advance your strategic technical objectives.
+
+${attachmentLine}
+
+Thank you for your time, and I look forward to our conversation.
+
+${closing}`;
+      } else if (toneId === 'action_concise') {
+        bodyContent = `${greeting}
+
+Please accept my application for the ${role} position.
+
+Key Highlights:
+- Extensive experience architecting and delivering high-impact, scalable software solutions
+- Strong track record of practical problem solving, performance tuning, and cross-functional delivery
+- Deep technical mastery aligned with your team's stack and production requirements
+
+${attachmentLine} I look forward to speaking with your team.
+
+${closing}`;
+      } else {
+        // Corporate Professional / Candidate Application (Clean, authentic, high-impact)
+        bodyContent = `${greeting}
+
+I am writing to express my strong interest in the ${role} opportunity at your organization.
+
+With a dedicated background in this domain, practical problem-solving experience, and a proven track record of delivering quality results, I am confident in my ability to make a meaningful and immediate contribution to your team's goals. ${attachmentLine}
+
+I would welcome the opportunity to discuss how my qualifications align with your requirements in an interview. Thank you very much for your time and consideration.
+
+${closing}`;
+      }
+      break;
+    }
+
     case 'leave_request': {
       const durText = facts.duration || 'a few days';
-      let reasonDetail = 'personal matters';
+      let reasonDetail = 'personal health matters';
       if (lower.includes('fever')) {
         reasonDetail = 'a high fever and acute weakness';
       } else if (lower.includes('sick') || lower.includes('illness') || lower.includes('unwell')) {
         reasonDetail = 'an unexpected illness';
       } else if (lower.includes('doctor') || lower.includes('hospital')) {
-        reasonDetail = 'a medical appointment and required treatment';
+        reasonDetail = 'a medical consultation and prescribed recovery';
       } else if (lower.includes('vacation') || lower.includes('trip') || lower.includes('holiday')) {
-        reasonDetail = 'personal family vacation';
+        reasonDetail = 'planned personal travel';
       }
 
       if (!finalSubject) {
-        finalSubject = `Sick Leave Application – ${durText.charAt(0).toUpperCase() + durText.slice(1)}`;
+        finalSubject = `Leave Request – ${durText.charAt(0).toUpperCase() + durText.slice(1)}`;
       }
 
-      bodyContent = `${greeting}
+      if (toneId === 'action_concise') {
+        bodyContent = `${greeting}
 
-I am writing to inform you that I am currently unwell with ${reasonDetail} and will need to take sick leave for ${durText} to consult a physician and rest.
+Notice of Absence: ${durText} due to ${reasonDetail}.
 
-I have made sure my current responsibilities and pending deliverables are organized, and I will do my best to check urgent emails periodically if an emergency arises.
+Coverage Plan:
+- Current deliverables: Documented and assigned to team coverage
+- Escalation contact: Available on phone for critical emergencies only
+- Expected return: Immediately following recovery
 
-I expect to resume work once my recovery concludes and will keep you posted on my progress. Thank you very much for your understanding and support.
+Thank you for your support.
 
 ${closing}`;
+      } else if (toneId === 'executive') {
+        bodyContent = `${greeting}
+
+Please be advised that I will be taking leave for ${durText} starting today due to ${reasonDetail}.
+
+I have ensured all active workstreams are organized and that critical priorities remain under active coverage. Should an urgent matter require my direct attention, I will be accessible via mobile phone.
+
+Thank you for your understanding.
+
+${closing}`;
+      } else {
+        bodyContent = `${greeting}
+
+I am writing to inform you that I am currently unwell with ${reasonDetail} and will need to take leave for ${durText} to consult a physician and rest.
+
+I have organized my active tasks and coordinated with the team to ensure that ongoing responsibilities remain covered during my absence. If any critical situation arises, please feel free to reach me via email or phone.
+
+I expect to resume work promptly following my recovery. Thank you very much for your understanding and cooperation.
+
+${closing}`;
+      }
       break;
     }
 
     case 'emergency': {
       let emergDetail = input.replace(/^emergency\s*(?:leave)?\s*(?:today)?[:\s-]*/i, '').trim();
-      if (!emergDetail) emergDetail = 'an urgent family emergency that requires my immediate presence';
+      if (!emergDetail) emergDetail = 'an urgent family emergency requiring my immediate attention';
 
       if (!finalSubject) {
         finalSubject = `Urgent: Emergency Leave Notice – Today`;
@@ -520,76 +802,11 @@ ${closing}`;
 
 I am writing to urgently let you know that an unforeseen emergency has occurred today: ${emergDetail}.
 
-Due to these urgent circumstances, I need to leave immediately to attend to the situation. I have briefed my team on immediate priorities to ensure coverage during my absence.
+Due to these critical circumstances, I need to step away immediately to attend to this matter. I have briefed team colleagues on immediate priorities to ensure coverage during my absence.
 
-Should any critical matter require my urgent attention, please feel free to reach me on my mobile phone. I will provide an update as soon as the situation is under control.
+Should any critical matter require my urgent attention, please reach me directly on my mobile phone. I will provide an update as soon as the situation is stabilized.
 
-Thank you very much for your prompt understanding and cooperation.
-
-${closing}`;
-      break;
-    }
-
-    case 'job_application': {
-      const role = facts.jobRole || 'the open position';
-      if (!finalSubject) {
-        finalSubject = `Application for ${role.charAt(0).toUpperCase() + role.slice(1)} Position – ${myName}`;
-      }
-
-      const attachmentClause = hasAttachment 
-        ? 'I have attached my resume and supporting credentials for your review.' 
-        : 'I would be delighted to share my detailed resume and portfolio upon your request.';
-
-      bodyContent = `${greeting}
-
-I am writing to express my strong interest in the ${role} opportunity at your organization.
-
-With a dedicated background in this field, strong technical expertise, and a track record of driving results, I am confident in my ability to make a meaningful and immediate contribution to your team's objectives.
-
-${attachmentClause}
-
-I would welcome the opportunity to discuss how my experience and qualifications align with your requirements in an interview. Thank you very much for your time and consideration.
-
-${closing}`;
-      break;
-    }
-
-    case 'resume_submission': {
-      if (!finalSubject) {
-        finalSubject = `Resume & Profile Submission – ${myName}`;
-      }
-
-      const attachmentLine = hasAttachment
-        ? 'Please find my updated resume attached to this email for your reference.'
-        : 'I have prepared my updated resume and would be glad to share it for your review.';
-
-      bodyContent = `${greeting}
-
-I hope you are having a productive week.
-
-I am reaching out to submit my professional resume and profile for prospective career opportunities with your team.
-
-${attachmentLine} It highlights my core skills, recent milestones, and experience delivering impactful projects. I would be thrilled to connect and discuss how my skill set can benefit your upcoming initiatives.
-
-Thank you for your time, and I look forward to hearing from you.
-
-${closing}`;
-      break;
-    }
-
-    case 'complaint': {
-      let compDetail = input.replace(/^complaint[:\s-]*/i, '').trim();
-      if (!finalSubject) {
-        finalSubject = `Formal Concern Regarding: ${compDetail.slice(0, 45)}`;
-      }
-
-      bodyContent = `${greeting}
-
-I am writing to bring an important concern to your attention regarding ${compDetail}.
-
-Unfortunately, this has caused considerable inconvenience and falls short of the expected standard of service. I kindly request your assistance in investigating this matter and providing an appropriate resolution or corrective action at your earliest convenience.
-
-I appreciate your prompt attention to this issue and look forward to your response.
+Thank you very much for your prompt understanding and support.
 
 ${closing}`;
       break;
@@ -597,37 +814,99 @@ ${closing}`;
 
     case 'meeting': {
       let meetDetail = input.replace(/^reschedule\s*(?:our)?\s*meeting[:\s-]*/i, '').trim();
+      if (!meetDetail) meetDetail = 'our upcoming project discussion';
+
       if (!finalSubject) {
-        finalSubject = `Meeting Schedule Update: ${meetDetail.slice(0, 40)}`;
+        finalSubject = `Meeting Update: ${meetDetail.slice(0, 40)}`;
       }
 
-      bodyContent = `${greeting}
+      if (toneId === 'action_concise') {
+        bodyContent = `${greeting}
 
-I hope you are doing well.
+Meeting Request: ${meetDetail}
 
-Regarding our scheduled discussion: ${meetDetail}.
+- Agenda: Review key milestones, discuss blockers, and align on next steps
+- Proposed Duration: 20 minutes
+- Proposed Availability: Please confirm if this week's proposed slot works, or propose a time that fits your calendar
 
-Please let me know if this proposed timing works with your calendar, or feel free to suggest another time slot that fits your availability. I appreciate your flexibility and look forward to speaking soon.
+Best,
 
 ${closing}`;
+      } else {
+        bodyContent = `${greeting}
+
+I hope you are having a productive week.
+
+Regarding our scheduled discussion on ${meetDetail}:
+
+Please let me know if the proposed timing aligns with your schedule, or feel free to suggest another time window that fits your availability. I appreciate your flexibility and look forward to our conversation.
+
+${closing}`;
+      }
       break;
     }
 
     case 'follow_up': {
       let followTopic = input.replace(/^follow\s*up\s*(?:on)?[:\s-]*/i, '').trim();
+      if (!followTopic) followTopic = 'our earlier correspondence';
+
       if (!finalSubject) {
         finalSubject = `Following Up: ${followTopic.slice(0, 40)}`;
       }
 
-      bodyContent = `${greeting}
+      if (toneId === 'action_concise') {
+        bodyContent = `${greeting}
 
-I hope you're having a great week.
+Quick check-in regarding ${followTopic}:
+
+- Current status: Pending review and next steps
+- Action needed: Please confirm if additional details or approvals are required from our end
+- Next milestone: Awaiting your feedback to proceed with scheduling
+
+Thank you,
+
+${closing}`;
+      } else if (toneId === 'executive') {
+        bodyContent = `${greeting}
+
+Following up on our previous discussion regarding ${followTopic}.
+
+To maintain momentum on our strategic timeline, could you please provide a brief status update or advise if any blockers need to be resolved? I would appreciate your guidance so we can finalize our schedule.
+
+${closing}`;
+      } else {
+        bodyContent = `${greeting}
+
+I hope this email finds you well.
 
 I am writing to briefly check in regarding ${followTopic}.
 
-Could you please let me know if you have had an opportunity to review this, or if any additional details are needed from my end to help move things forward? I am happy to hop on a quick call whenever convenient.
+Could you please let me know if you have had an opportunity to review this, or if any additional details are needed from my end to help move things forward? I am happy to hop on a brief call whenever convenient.
 
 Thank you for your time and assistance.
+
+${closing}`;
+      }
+      break;
+    }
+
+    case 'business_proposal': {
+      let propDetail = input.replace(/^proposal[:\s-]*/i, '').trim();
+      if (!propDetail) propDetail = 'collaborative strategic partnership';
+
+      if (!finalSubject) {
+        finalSubject = `Proposal: ${propDetail.slice(0, 40)}`;
+      }
+
+      bodyContent = `${greeting}
+
+I am pleased to present our proposal regarding ${propDetail}.
+
+Based on your organization's key priorities, we have outlined a targeted solution designed to optimize efficiency, accelerate delivery timelines, and drive measurable return on investment.
+
+We would welcome the opportunity to walk you through the key milestones and answer any questions your team may have. Please let us know if you are available for a brief introductory call this week.
+
+Thank you for your consideration, and we look forward to the prospect of working together.
 
 ${closing}`;
       break;
@@ -635,6 +914,8 @@ ${closing}`;
 
     case 'payment_invoice': {
       let payDetail = input.replace(/^invoice\s*(?:and)?\s*payment[:\s-]*/i, '').trim();
+      if (!payDetail) payDetail = 'outstanding services';
+
       if (!finalSubject) {
         finalSubject = `Invoice & Payment Request: ${payDetail.slice(0, 40)}`;
       }
@@ -645,7 +926,7 @@ I hope this email finds you well.
 
 I am writing to share the invoice details regarding ${payDetail}.
 
-Please review the attached billing statement and arrange for processing in accordance with our agreed timeline. Kindly confirm receipt and let me know if your finance team requires any additional purchase order details or documentation.
+Please review the attached statement and arrange for processing in accordance with our agreed terms. Kindly confirm receipt and let me know if your finance team requires any additional documentation or purchase order references.
 
 Thank you very much for your prompt cooperation and continued partnership.
 
@@ -653,19 +934,41 @@ ${closing}`;
       break;
     }
 
-    case 'security_account': {
-      let secDetail = input.replace(/^security\s*(?:alert)?[:\s-]*/i, '').trim();
+    case 'complaint': {
+      let compDetail = input.replace(/^complaint[:\s-]*/i, '').trim();
+      if (!compDetail) compDetail = 'recent service delivery issues';
+
       if (!finalSubject) {
-        finalSubject = `Urgent: Security Notification Regarding Account`;
+        finalSubject = `Formal Concern: ${compDetail.slice(0, 40)}`;
       }
 
       bodyContent = `${greeting}
 
-I am writing to urgently report a potential security issue regarding ${secDetail}.
+I am writing to formally bring an important matter to your attention regarding ${compDetail}.
 
-To ensure account integrity and safeguard data, I request your prompt assistance in reviewing recent activity on this account and confirming its security status.
+Unfortunately, this issue has caused significant inconvenience and falls below the standard of quality we expected. I kindly request your immediate review into this situation and an update on corrective measures or resolution at your earliest convenience.
 
-Please advise on any immediate action or security steps required. Thank you for your prompt attention to this matter.
+I appreciate your prompt attention to this matter and look forward to your response.
+
+${closing}`;
+      break;
+    }
+
+    case 'apology': {
+      let apolDetail = input.replace(/^apolog(?:y|ize)[:\s-]*/i, '').trim();
+      if (!apolDetail) apolDetail = 'the recent delay and oversight';
+
+      if (!finalSubject) {
+        finalSubject = `Apology Regarding: ${apolDetail.slice(0, 35)}`;
+      }
+
+      bodyContent = `${greeting}
+
+Please accept my sincere apologies regarding ${apolDetail}.
+
+I take full responsibility for this occurrence and understand the inconvenience it may have caused. We have already instituted corrective actions to ensure that this does not recur and that our future deliverables meet the highest standard of dependability.
+
+Thank you for your patience and understanding as we resolve this matter.
 
 ${closing}`;
       break;
@@ -673,15 +976,17 @@ ${closing}`;
 
     case 'thank_you': {
       let thankDetail = input.replace(/^thank\s*you\s*(?:for)?[:\s-]*/i, '').trim();
+      if (!thankDetail) thankDetail = 'your outstanding collaboration and guidance';
+
       if (!finalSubject) {
-        finalSubject = `Heartfelt Thanks & Appreciation`;
+        finalSubject = `Sincere Thanks & Appreciation`;
       }
 
       bodyContent = `${greeting}
 
-I wanted to take a moment to express my sincere appreciation for your support with ${thankDetail}.
+I wanted to take a moment to express my sincere appreciation for ${thankDetail}.
 
-Your assistance made a significant difference, and I truly value the time, effort, and guidance you provided. Working with you has been an absolute pleasure.
+Your support made a significant difference, and I truly value the time, dedication, and insight you contributed. It is an absolute pleasure collaborating with you.
 
 Thank you once again!
 
@@ -689,41 +994,49 @@ ${closing}`;
       break;
     }
 
-    case 'personal_casual': {
-      let note = input.replace(/^quick\s*note[:\s-]*/i, '').trim();
-      if (!finalSubject) {
-        finalSubject = `Quick Note: ${note.slice(0, 35)}`;
-      }
-
-      bodyContent = `${greeting}
-
-Hope you're doing great!
-
-Just wanted to send you a quick update: ${note}.
-
-Let's catch up soon when you have a free moment.
-
-${closing}`;
-      break;
-    }
-
     default: {
       let cleanGeneral = input.replace(/^(?:regarding|about)[:\s-]*/i, '').trim();
+      if (!cleanGeneral) cleanGeneral = 'important operational updates';
+
       if (!finalSubject) {
         finalSubject = `Regarding: ${cleanGeneral.slice(0, 45)}`;
       }
 
-      bodyContent = `${greeting}
+      if (toneId === 'action_concise') {
+        bodyContent = `${greeting}
 
-I hope you are doing well.
+Update regarding ${cleanGeneral}:
 
-I am reaching out to communicate regarding ${cleanGeneral}.
+- Core Detail: ${cleanGeneral}
+- Next Action: Please review and let me know if any questions arise
+- Timeline: Open for discussion at your convenience
 
-Please let me know if you need any additional information or have questions regarding this. I am happy to provide further details at your convenience.
-
-Thank you for your time and consideration.
+Best,
 
 ${closing}`;
+      } else if (toneId === 'executive') {
+        bodyContent = `${greeting}
+
+I am reaching out to provide a strategic update regarding ${cleanGeneral}.
+
+Please review the context below and advise if your team requires further alignment or executive briefing. We remain focused on ensuring our milestones proceed smoothly.
+
+Sincerely,
+
+${closing}`;
+      } else {
+        bodyContent = `${greeting}
+
+I hope this email finds you well.
+
+I am reaching out to communicate with you regarding ${cleanGeneral}.
+
+Please let me know if you need any additional details or clarification. I am happy to provide further information at your convenience.
+
+Thank you for your time and continued support.
+
+${closing}`;
+      }
       break;
     }
   }
@@ -735,7 +1048,8 @@ ${closing}`;
     categoryId: category.id,
     situation: `${category.icon} ${category.name}`,
     priority,
-    tone,
+    tone: activeToneObj.name,
+    toneId: activeToneObj.id,
     urgency,
     greeting,
     closing

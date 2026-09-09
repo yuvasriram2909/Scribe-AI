@@ -41,6 +41,15 @@ export const SUPPORTED_SITUATIONS = [
     keywords: ['leave', 'vacation', 'holiday', 'sick leave', 'casual leave', 'day off', 'permission', 'out of office', 'family function', 'sick', 'illness']
   },
   {
+    id: '📥 Application Acknowledgment',
+    name: '📥 Application Acknowledgment',
+    category: 'Recruiter Response',
+    priority: 'Normal',
+    tone: 'Corporate Professional',
+    badgeClass: 'bg-teal-500/20 text-teal-300 border-teal-500/40',
+    keywords: ['received your application', 'reviewing applications', 'next steps in the hiring', 'credentials received', 'application received', 'recruiter response', 'hiring process']
+  },
+  {
     id: '📄 Resume / Job Application',
     name: '📄 Resume / Job Application',
     category: 'Resume/Job Application',
@@ -78,9 +87,13 @@ export const SUPPORTED_SITUATIONS = [
   }
 ];
 
+export function getSituation(id) {
+  return SUPPORTED_SITUATIONS.find(s => s.id.includes(id) || s.category.toLowerCase().includes(id.toLowerCase())) || SUPPORTED_SITUATIONS[2];
+}
+
 export function detectSituation(instruction) {
   if (!instruction || typeof instruction !== 'string') {
-    return SUPPORTED_SITUATIONS[2]; // Default to Official / Professional
+    return getSituation('Official');
   }
 
   const lower = instruction.toLowerCase().trim();
@@ -96,10 +109,21 @@ export function detectSituation(instruction) {
     lower.includes('unexpected absence') || 
     lower.includes('urgent situation')
   ) {
-    return SUPPORTED_SITUATIONS[0]; // 🚨 Emergency
+    return getSituation('Emergency');
   }
 
-  // 2. Resume / Job Application
+  // 2. Recruiter Response / Application Acknowledgment
+  if (
+    lower.includes('received your application') || 
+    lower.includes('reviewing applications') || 
+    lower.includes('next steps in the hiring') || 
+    lower.includes('credentials received') || 
+    (lower.includes('application') && (lower.includes('received') || lower.includes('reviewing') || lower.includes('next step')))
+  ) {
+    return getSituation('Application Acknowledgment');
+  }
+
+  // 3. Resume / Job Application
   if (
     lower.includes('resume') || 
     lower.includes('cv') || 
@@ -109,10 +133,10 @@ export function detectSituation(instruction) {
     lower.includes('position') ||
     lower.includes('job vacancy')
   ) {
-    return SUPPORTED_SITUATIONS[4]; // 📄 Resume / Job Application
+    return getSituation('Resume');
   }
 
-  // 3. Follow-up / Reminders / Payment
+  // 4. Follow-up / Reminders / Payment
   if (
     lower.includes('follow-up') || 
     lower.includes('follow up') || 
@@ -120,10 +144,10 @@ export function detectSituation(instruction) {
     lower.includes('reminder') ||
     lower.includes('payment')
   ) {
-    return SUPPORTED_SITUATIONS[5]; // 🔄 Follow-up
+    return getSituation('Follow-up');
   }
 
-  // 4. Celebration / Occasion
+  // 5. Celebration / Occasion
   if (
     lower.includes('birthday') || 
     lower.includes('congratulat') || 
@@ -132,10 +156,10 @@ export function detectSituation(instruction) {
     lower.includes('farewell') || 
     lower.includes('welcome')
   ) {
-    return SUPPORTED_SITUATIONS[7]; // 🎉 Celebration / Occasion
+    return getSituation('Celebration');
   }
 
-  // 5. Leave / Holiday (Non-emergency leave)
+  // 6. Leave / Holiday (Non-emergency leave)
   if (
     lower.includes('leave') || 
     lower.includes('vacation') || 
@@ -146,10 +170,10 @@ export function detectSituation(instruction) {
     lower.includes('family function') ||
     lower.includes('wedding')
   ) {
-    return SUPPORTED_SITUATIONS[3]; // 📅 Leave / Holiday
+    return getSituation('Leave');
   }
 
-  // 6. Casual
+  // 7. Casual
   if (
     lower.includes('casual') || 
     lower.includes('hey') || 
@@ -157,21 +181,21 @@ export function detectSituation(instruction) {
     lower.includes('catch up') || 
     lower.includes('informal')
   ) {
-    return SUPPORTED_SITUATIONS[6]; // 💬 Casual
+    return getSituation('Casual');
   }
 
-  // 7. Important / Urgent Action
+  // 8. Important / Urgent Action
   if (
     lower.includes('important') || 
     lower.includes('required action') || 
     lower.includes('time-sensitive') || 
     lower.includes('required approval')
   ) {
-    return SUPPORTED_SITUATIONS[1]; // ⚠️ Important / Necessary
+    return getSituation('Important');
   }
 
-  // 8. Official / Professional (Default)
-  return SUPPORTED_SITUATIONS[2]; // 💼 Official / Professional
+  // 9. Official / Professional (Default)
+  return getSituation('Official');
 }
 
 export function formatNaturalSubject(instruction, situationObj, providedSubject = '') {
@@ -231,6 +255,14 @@ export function formatNaturalSubject(instruction, situationObj, providedSubject 
   // Salary Revision
   if (lower.includes('salary') || lower.includes('compensation')) {
     return 'Request for Discussion Regarding Salary Revision';
+  }
+
+  // Application Acknowledgment / Recruiter Response
+  if (lower.includes('received your application') || lower.includes('reviewing applications') || lower.includes('credentials received') || (lower.includes('application') && (lower.includes('received') || lower.includes('reviewing') || lower.includes('next step')))) {
+    let role = 'Senior Software Engineer';
+    const roleMatch = instruction.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job|opportunity)/i);
+    if (roleMatch) role = roleMatch[1].trim();
+    return `Application for ${role} Position – Acknowledgment`;
   }
 
   // Job Application
@@ -380,7 +412,17 @@ export function buildNaturalBody({ instruction, situationObj, recipientName, use
     paragraphs.push(`Thank you for your time, guidance, and consideration.`);
   }
 
-  // Scenario H: Resume / Job Application
+  // Scenario H: Application Acknowledgment / Recruiter Response (Matching screenshot)
+  else if (sitName.includes('Acknowledgment') || lower.includes('received your application') || lower.includes('reviewing applications') || lower.includes('credentials received') || (lower.includes('application') && (lower.includes('received') || lower.includes('reviewing') || lower.includes('next step')))) {
+    let role = 'Senior Software Engineer';
+    const roleMatch = instruction.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job|opportunity)/i);
+    if (roleMatch) role = roleMatch[1].trim();
+
+    paragraphs.push(`Thank you for reaching out and sharing your application for the ${role} position.`);
+    paragraphs.push(`We have received your email and credentials. Our team is currently reviewing applications and will be in touch regarding the next steps in the hiring process.`);
+  }
+
+  // Scenario I: Resume / Job Application
   else if (sitName.includes('Resume') || lower.includes('resume') || lower.includes('job application')) {
     paragraphs.push(`I am writing to express my strong interest in applying for the [Job Title / Position] role at [Company Name].`);
     paragraphs.push(`With relevant experience in software development and project execution, I have developed technical skills and practical expertise that align with your team's objectives. I have attached my updated resume for your review.`);
