@@ -353,12 +353,15 @@ export default function App() {
   const handleStartCompose = (data = {}) => {
     setComposeState(prev => ({
       ...prev,
+      id: data.id || data.scribeDraftId || data.scribe_draft_id || null,
+      scribeDraftId: data.scribe_draft_id || data.scribeDraftId || data.id || null,
+      gmailDraftId: data.gmail_draft_id || data.gmailDraftId || null,
       instruction: data.instruction !== undefined ? data.instruction : prev.instruction,
-      recipient: data.recipient !== undefined ? data.recipient : prev.recipient,
+      recipient: data.recipient !== undefined ? data.recipient : (data.recipient_email || prev.recipient),
       cc: data.cc !== undefined ? data.cc : prev.cc,
       bcc: data.bcc !== undefined ? data.bcc : prev.bcc,
       subject: data.subject !== undefined ? data.subject : prev.subject,
-      body: data.body !== undefined ? data.body : prev.body,
+      body: data.body !== undefined ? data.body : (data.body_text || prev.body),
       selectedFile: data.selectedFile !== undefined ? data.selectedFile : prev.selectedFile,
       autoGenerate: !!data.autoGenerate,
       step: data.autoGenerate ? 2 : (data.step || prev.step || 1),
@@ -892,6 +895,26 @@ export default function App() {
           {activeTab === 'history' && (
             <EmailHistory 
               onStartCompose={handleStartCompose}
+              onReuseEmail={(email) => handleStartCompose({
+                subject: email.subject,
+                body: email.body || email.body_text,
+                recipient: email.recipient || email.recipient_email,
+                cc: email.cc,
+                bcc: email.bcc,
+                step: 3
+              })}
+              onEditDraft={(draft) => handleStartCompose({
+                id: draft.id || draft.scribe_draft_id || draft.scribeDraftId,
+                scribe_draft_id: draft.scribe_draft_id || draft.scribeDraftId || draft.id,
+                gmail_draft_id: draft.gmail_draft_id || draft.gmailDraftId,
+                gmailDraftId: draft.gmail_draft_id || draft.gmailDraftId,
+                subject: draft.subject,
+                body: draft.body || draft.body_text,
+                recipient: draft.recipient || draft.recipient_email,
+                cc: draft.cc,
+                bcc: draft.bcc,
+                step: 3
+              })}
             />
           )}
           {activeTab === 'contacts' && (

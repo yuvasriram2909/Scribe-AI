@@ -568,14 +568,16 @@ export function Dashboard({
       }
 
       // Compute local metric fallbacks directly from loaded emails
-      const listDrafts = emailList.filter(e => (e.status || '').toLowerCase() === 'draft').length;
+      const listDrafts = emailList.filter(e => e.isDraft || e.is_draft || (e.direction || '').toLowerCase() === 'draft' || (e.status || '').toLowerCase() === 'draft').length;
       const listSent = emailList.filter(e => {
         const st = (e.status || '').toLowerCase();
-        return (st === 'sent' || st === 'delivered' || e.isSent === true || e.direction === 'sent') && st !== 'draft' && !e.isReceived && !e.isSpam;
+        const dir = (e.direction || '').toLowerCase();
+        return (st === 'sent' || st === 'delivered' || st === 'outgoing' || e.isSent === true || dir === 'sent' || dir === 'outgoing') && st !== 'draft' && !e.isDraft && !e.is_draft && !e.isReceived && !e.isSpam;
       }).length;
       const listReceived = emailList.filter(e => {
         const st = (e.status || '').toLowerCase();
-        return (st === 'received' || e.isReceived === true || e.direction === 'received') && st !== 'draft' && !e.isSpam && !e.isSent;
+        const dir = (e.direction || '').toLowerCase();
+        return (st === 'received' || st === 'incoming' || e.isReceived === true || dir === 'received' || dir === 'incoming') && st !== 'draft' && !e.isDraft && !e.is_draft && !e.isSpam && !e.isSent;
       }).length;
       const listScheduled = emailList.filter(e => ['scheduled', 'sending'].includes((e.status || '').toLowerCase())).length;
       const listEmergency = emailList.filter(e => {
@@ -1468,7 +1470,7 @@ export function Dashboard({
                           {em.subject || '(No Subject)'}
                         </h4>
                         <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold ${
-                          em.direction === 'sent' || em.isSent
+                          em.direction === 'sent' || em.direction === 'outgoing' || em.isSent
                             ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
                             : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                         }`}>
@@ -1719,7 +1721,7 @@ export function Dashboard({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-[#161514] p-3.5 rounded-2xl border border-[#2E2D2B]">
               <div>
                 <span className="text-[#99958F] block text-[10px] uppercase font-bold">
-                  {detailModalEmail.direction === 'sent' || detailModalEmail.isSent ? 'To' : 'From'}
+                  {detailModalEmail.direction === 'sent' || detailModalEmail.direction === 'outgoing' || detailModalEmail.isSent ? 'To' : 'From'}
                 </span>
                 <span className="font-mono text-[#ECE8E1] truncate block mt-0.5" title={detailModalEmail.recipient || detailModalEmail.sender}>
                   {detailModalEmail.recipient || detailModalEmail.sender || 'Unknown'}

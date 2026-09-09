@@ -70,7 +70,8 @@ export function ComposeWorkflow({
   const errorMessage = composeState.errorMessage || '';
   const sentResult = composeState.sentResult || null;
 
-  const gmailDraftId = composeState.gmailDraftId || initialData.gmailDraftId || null;
+  const gmailDraftId = composeState.gmailDraftId || initialData.gmail_draft_id || initialData.gmailDraftId || null;
+  const scribeDraftId = composeState.scribeDraftId || composeState.id || initialData.scribe_draft_id || initialData.scribeDraftId || initialData.id || null;
 
   const [aiLoading, setAiLoading] = useState(false);
   const [showCcBcc, setShowCcBcc] = useState(Boolean(composeState.cc || composeState.bcc || initialData.cc || initialData.bcc));
@@ -95,6 +96,8 @@ export function ComposeWorkflow({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipient,
+          cc,
+          bcc,
           subject,
           body,
           category: detectedCategory,
@@ -112,10 +115,12 @@ export function ComposeWorkflow({
       return;
     }
     try {
+      const activeDraftId = composeState.scribeDraftId || composeState.id || initialData.scribe_draft_id || initialData.id || null;
       const res = await apiFetch('/api/emails/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: activeDraftId,
           recipient,
           cc,
           bcc,
@@ -132,6 +137,9 @@ export function ComposeWorkflow({
         const data = await res.json();
         if (data?.gmailDraftId) {
           updateState({ gmailDraftId: data.gmailDraftId });
+        }
+        if (data?.email?.id) {
+          updateState({ id: data.email.id, scribeDraftId: data.email.id });
         }
         setDraftToast('✓ Saved as Gmail Draft & synchronized with mailbox!');
         setTimeout(() => setDraftToast(''), 4000);
@@ -414,6 +422,14 @@ export function ComposeWorkflow({
       formData.append('priority', priority);
       formData.append('tone', tone);
       formData.append('confirmToken', 'CONFIRMED');
+
+      const activeDraftId = composeState.scribeDraftId || composeState.id || initialData.scribe_draft_id || initialData.id;
+      if (activeDraftId) {
+        formData.append('draftId', activeDraftId);
+      }
+      if (gmailDraftId) {
+        formData.append('gmailDraftId', gmailDraftId);
+      }
 
       if (selectedFile) {
         formData.append('attachments', selectedFile);

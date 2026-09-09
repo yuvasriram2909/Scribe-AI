@@ -299,7 +299,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
         </span>
       );
     }
-    const isDraft = email.isDraft || email.direction === 'draft' || (email.status || '').toLowerCase() === 'draft';
+    const isDraft = email.isDraft || email.is_draft || email.direction === 'draft' || (email.status || '').toLowerCase() === 'draft';
     if (isDraft) {
       return (
         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-300 bg-purple-950/80 border border-purple-500/40 px-2.5 py-0.5 rounded-full shadow-sm">
@@ -308,7 +308,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
         </span>
       );
     }
-    const isReceived = email.isReceived || email.direction === 'received' || (email.status || '').toLowerCase() === 'received';
+    const isReceived = email.isReceived || email.direction === 'received' || email.direction === 'incoming' || (email.status || '').toLowerCase() === 'received' || (email.status || '').toLowerCase() === 'incoming';
     if (isReceived) {
       return (
         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-300 bg-blue-950/80 border border-blue-500/40 px-2.5 py-0.5 rounded-full shadow-sm">
@@ -317,7 +317,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
         </span>
       );
     }
-    const isSent = email.isSent || email.direction === 'sent' || (email.status || '').toLowerCase() === 'sent' || (email.status || '').toLowerCase() === 'delivered';
+    const isSent = email.isSent || email.direction === 'sent' || email.direction === 'outgoing' || (email.status || '').toLowerCase() === 'sent' || (email.status || '').toLowerCase() === 'outgoing' || (email.status || '').toLowerCase() === 'delivered';
     if (isSent) {
       return (
         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-0.5 rounded-full shadow-sm">
@@ -464,8 +464,8 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {emails.map(email => {
-            const isDraft = email.isDraft || email.direction === 'draft' || (email.status || '').toLowerCase() === 'draft';
-            const isReceived = !isDraft && (email.isReceived || email.direction === 'received' || email.status === 'Received');
+            const isDraft = email.isDraft || email.is_draft || email.direction === 'draft' || (email.status || '').toLowerCase() === 'draft';
+            const isReceived = !isDraft && (email.isReceived || email.direction === 'received' || email.direction === 'incoming' || email.status === 'Received' || email.status === 'incoming');
             const cat = email.category || email.email_type || 'General';
             const tone = email.tone || 'Professional';
             const priority = email.priority || email.importance || 'Normal';
@@ -745,7 +745,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
               {/* Right action buttons */}
               <div className="flex items-center gap-2">
                 {/* If draft: show Edit in Compose */}
-                {(selectedEmail.isDraft || selectedEmail.direction === 'draft' || (selectedEmail.status || '').toLowerCase() === 'draft') && (
+                {(selectedEmail.isDraft || selectedEmail.is_draft || selectedEmail.direction === 'draft' || (selectedEmail.status || '').toLowerCase() === 'draft') && (
                   <button
                     onClick={() => handleEditDraftAction(selectedEmail)}
                     className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all cursor-pointer shadow-md flex items-center gap-2"
@@ -756,7 +756,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
                 )}
 
                 {/* Reuse as Template */}
-                {onReuseEmail && !(selectedEmail.isDraft || selectedEmail.direction === 'draft' || (selectedEmail.status || '').toLowerCase() === 'draft') && (
+                {onReuseEmail && !(selectedEmail.isDraft || selectedEmail.is_draft || selectedEmail.direction === 'draft' || (selectedEmail.status || '').toLowerCase() === 'draft') && (
                   <button
                     onClick={() => {
                       onReuseEmail(selectedEmail);

@@ -490,6 +490,10 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       ? (Array.isArray(payload.labels) ? payload.labels : payload.labels.split(',').map((s: string) => s.trim())) 
       : [];
 
+    const isDraftVal = isDraft || status === "draft" || !!payload.gmailDraftId || !!payload.gmail_draft_id;
+    const sourceVal = payload.source || (direction === "sent" && !payload.gmailMessageId && !payload.gmail_message_id ? "scribe_ai" : "gmail");
+    const normalizedDir = isDraftVal ? "draft" : (direction === "received" || direction === "incoming") ? "incoming" : "outgoing";
+
     const canonicalPayload = {
       id: emailId,
       user_id: payload.userId,
@@ -500,8 +504,11 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       sender_email: senderEmailVal,
       sender_name: senderNameVal,
       sender: senderVal,
+      from_email: senderEmailVal,
+      from_name: senderNameVal,
       recipient_email: recipientEmails[0] || payload.recipient || payload.recipient_email || '',
       recipient_emails: recipientEmails,
+      to_emails: recipientEmails,
       cc_emails: ccEmails,
       bcc_emails: bccEmails,
       cc: ccEmails,
@@ -515,18 +522,21 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       tone: payload.tone || 'Professional',
       importance: payload.priority || payload.importance || 'Normal',
       status: status,
-      direction: direction,
+      direction: normalizedDir,
       spam_status: isSpam ? 'spam' : 'clean',
       is_read: payload.isRead !== undefined ? !!payload.isRead : (payload.is_read !== undefined ? !!payload.is_read : true),
       is_starred: !!payload.isStarred || !!payload.is_starred,
       is_important: !!payload.isImportant || !!payload.is_important,
       is_archived: !!payload.isArchived || !!payload.is_archived,
+      is_draft: isDraftVal,
       is_spam: isSpam,
       is_trash: isTrash,
+      source: sourceVal,
+      attachments_metadata: payload.attachments_metadata || payload.attachments || [],
       labels: labelsArray,
       history_id: payload.historyId || payload.history_id || null,
-      sent_at: payload.sentAt || payload.sent_at || (direction === 'sent' ? now : null),
-      received_at: payload.receivedAt || payload.received_at || (direction === 'received' ? now : null),
+      sent_at: payload.sentAt || payload.sent_at || (normalizedDir === 'outgoing' || direction === 'sent' ? now : null),
+      received_at: payload.receivedAt || payload.received_at || (normalizedDir === 'incoming' || direction === 'received' ? now : null),
       created_at: payload.createdAt || payload.created_at || now,
       updated_at: now,
     };
@@ -562,6 +572,32 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       }
     }
 
+    // Upsert into dedicated email_drafts table if this is a draft
+    if (isDraftVal || canonicalPayload.gmail_draft_id) {
+      try {
+        await supabase.from("email_drafts").upsert({
+          user_id: payload.userId,
+          scribe_draft_id: emailId,
+          gmail_draft_id: canonicalPayload.gmail_draft_id,
+          gmail_message_id: canonicalPayload.gmail_message_id,
+          to_emails: recipientEmails,
+          cc_emails: ccEmails,
+          bcc_emails: bccEmails,
+          subject: canonicalPayload.subject,
+          body_text: canonicalPayload.body_text,
+          body_html: canonicalPayload.body_html,
+          snippet: canonicalPayload.snippet,
+          instruction: payload.instruction || null,
+          category: canonicalPayload.email_type,
+          tone: canonicalPayload.tone,
+          priority: canonicalPayload.importance,
+          updated_at: now,
+        }, { onConflict: "scribe_draft_id" });
+      } catch (dErr: any) {
+        console.warn("email_drafts upsert notice:", dErr?.message);
+      }
+    }
+
     // 2. Insert into Canonical "email_analytics" table
     const analyticsPayload = {
       id: crypto.randomUUID(),
@@ -572,7 +608,7 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       importance: canonicalPayload.importance,
       status: canonicalPayload.status,
       is_spam: isSpam,
-      direction: direction,
+      direction: normalizedDir,
       created_at: now,
     };
 
@@ -1105,16 +1141,20 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
       }
     }
 
-    // 4. Update email_sync_state with final results and release sync lock
+    // 4. Update email_sync_state and gmail_connections with final results and release sync lock
     const totalSynced = newReceived + newSent + newSpam + newDrafts;
     try {
       await supabase.from("email_sync_state").upsert({
         user_id: user.id,
+        gmail_address: accountEmail,
         history_id: latestHistoryId || profileHistoryId,
         last_synced_at: nowIso,
+        last_full_sync_at: incrementalSucceeded ? (existingSyncState?.last_full_sync_at || nowIso) : nowIso,
+        last_incremental_sync_at: incrementalSucceeded ? nowIso : (existingSyncState?.last_incremental_sync_at || null),
         sync_status: "success",
         sync_locked_until: null,
         sync_error: null,
+        last_error: null,
         messages_synced: (existingSyncState?.messages_synced || 0) + totalSynced,
         new_messages: totalSynced,
         updated_messages: updatedCount,
@@ -1122,6 +1162,18 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
       }, { onConflict: "user_id" });
     } catch (sErr) {
       console.warn("[Gmail Sync] Sync state update note:", sErr);
+    }
+
+    try {
+      await supabase.from("gmail_connections").update({
+        last_sync_at: nowIso,
+        sync_status: "synced",
+        sync_error: null,
+        gmail_address: accountEmail,
+        updated_at: nowIso,
+      }).eq("user_id", user.id);
+    } catch (gcErr) {
+      console.warn("[Gmail Sync] gmail_connections update note:", gcErr);
     }
 
     return {
@@ -1143,8 +1195,15 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
         sync_status: "error",
         sync_locked_until: null,
         sync_error: err.message || "Sync failed",
+        last_error: err.message || "Sync failed",
         updated_at: nowIso,
       }, { onConflict: "user_id" });
+
+      await supabase.from("gmail_connections").update({
+        sync_status: "error",
+        sync_error: err.message || "Sync failed",
+        updated_at: nowIso,
+      }).eq("user_id", user.id);
     } catch (_) {}
 
     return { error: err.message || "Failed to sync Gmail" };
@@ -1942,7 +2001,7 @@ serve(async (req: Request) => {
         return errorResponse("Google Client ID is not configured in Supabase Edge Function Secrets.", 400);
       }
 
-      // Explicitly request Gmail Modify, Send, and Readonly scopes along with profile and email
+      // Explicitly request Gmail Modify, Send, Compose, and Readonly scopes along with profile and email
       const scopes = [
         "openid",
         "https://www.googleapis.com/auth/userinfo.email",
@@ -1950,6 +2009,7 @@ serve(async (req: Request) => {
         "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/gmail.send",
         "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.compose",
       ].join(" ");
 
       const user = await getAuthUser(req, supabase);
@@ -2498,19 +2558,29 @@ serve(async (req: Request) => {
         gmail_connection_id: connection.id || null,
         sender_email: connectedEmail,
         sender: user.name || connectedEmail,
+        from_email: connectedEmail,
+        from_name: user.name || connectedEmail,
         recipient_email: recipient,
         recipient_emails: toList,
+        to_emails: toList,
+        cc_emails: ccList,
+        bcc_emails: bccList,
         cc: ccList,
         bcc: bccList,
         subject,
         body: emailBody,
+        body_text: emailBody,
         email_type: (category || situation || "other").toLowerCase().replace(/[^a-z0-9_]/g, "_"),
         tone: (tone || "professional").toLowerCase(),
         importance: (priority || "normal").toLowerCase(),
         status: "sent",
-        direction: "sent",
+        direction: "outgoing",
+        source: "scribe_ai",
         spam_status: "clean",
+        is_draft: false,
+        is_read: true,
         gmail_message_id: sendData.id,
+        gmail_thread_id: sendData.threadId || null,
         thread_id: sendData.threadId || null,
         sent_at: now,
         created_at: now,
@@ -2520,6 +2590,39 @@ serve(async (req: Request) => {
         await supabase.from("emails").upsert(canonicalEmail, { onConflict: "id" });
       } catch (e: any) {
         console.warn("Canonical emails insert notice:", e);
+      }
+
+      // Upsert into email_threads
+      if (sendData.threadId) {
+        try {
+          await supabase.from("email_threads").upsert({
+            user_id: user.id,
+            gmail_thread_id: sendData.threadId,
+            snippet: emailBody.slice(0, 160),
+            last_message_at: now,
+            updated_at: now,
+          }, { onConflict: "user_id,gmail_thread_id" });
+        } catch (_) {}
+      }
+
+      // Clean up draft if this email was converted from a draft
+      const draftIdToRemove = body.draftId || body.scribeDraftId || body.id;
+      const gmailDraftIdToRemove = body.gmailDraftId || body.gmail_draft_id;
+      if (draftIdToRemove) {
+        try {
+          await supabase.from("email_drafts").delete().eq("user_id", user.id).eq("scribe_draft_id", draftIdToRemove);
+        } catch (_) {}
+      }
+      if (gmailDraftIdToRemove) {
+        try {
+          await supabase.from("email_drafts").delete().eq("user_id", user.id).eq("gmail_draft_id", gmailDraftIdToRemove);
+          if (accessToken) {
+            await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/drafts/${gmailDraftIdToRemove}`, {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${accessToken}` },
+            }).catch(() => {});
+          }
+        } catch (_) {}
       }
 
       // 2. Canonical email_events record
@@ -2561,6 +2664,8 @@ serve(async (req: Request) => {
         isSent: true,
         isReceived: false,
         isSpam: false,
+        source: "scribe_ai",
+        direction: "outgoing",
         gmailMessageId: sendData.id,
         gmailThreadId: sendData.threadId || null,
         sentAt: now,
@@ -2947,19 +3052,22 @@ HUMAN-WRITTEN WRITING GUIDELINES:
 
         const rawStatus = (ce.status || "").toLowerCase();
         const rawDir = (ce.direction || "").toLowerCase();
-        const isDraft = rawStatus === "draft" || rawDir === "draft";
-        const isReceived = !isDraft && (rawDir === "received" || rawStatus === "received");
-        const isSent = !isDraft && (rawDir === "sent" || rawStatus === "sent" || rawStatus === "delivered");
+        const isDraft = rawStatus === "draft" || rawDir === "draft" || Boolean(ce.is_draft);
+        const isReceived = !isDraft && (rawDir === "received" || rawDir === "incoming" || rawStatus === "received" || rawStatus === "incoming");
+        const isSent = !isDraft && (rawDir === "sent" || rawDir === "outgoing" || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered");
         const direction = isDraft ? "draft" : isReceived ? "received" : isSent ? "sent" : "other";
         const status = isDraft ? "Draft" : ce.status ? (ce.status.charAt(0).toUpperCase() + ce.status.slice(1).toLowerCase()) : (isReceived ? "Received" : "Sent");
 
         combined.push({
           id: ce.id,
           userId: ce.user_id,
-          sender: ce.sender || ce.sender_email || "",
-          sender_email: ce.sender_email || ce.sender || "",
-          recipient: ce.recipient_email || "",
-          recipient_email: ce.recipient_email || "",
+          sender: ce.sender || ce.sender_email || ce.from_email || "",
+          sender_email: ce.sender_email || ce.sender || ce.from_email || "",
+          from_email: ce.from_email || ce.sender_email || ce.sender || "",
+          from_name: ce.from_name || "",
+          recipient: ce.recipient_email || (Array.isArray(ce.to_emails) ? ce.to_emails.join(", ") : ""),
+          recipient_email: ce.recipient_email || (Array.isArray(ce.to_emails) ? ce.to_emails[0] : ""),
+          to_emails: Array.isArray(ce.to_emails) ? ce.to_emails : (ce.recipient_email ? [ce.recipient_email] : []),
           cc: ce.cc,
           bcc: ce.bcc,
           subject: ce.subject || "(No Subject)",
@@ -2977,6 +3085,9 @@ HUMAN-WRITTEN WRITING GUIDELINES:
           isSent,
           isReceived,
           isDraft,
+          is_draft: isDraft,
+          source: ce.source || (ce.gmail_message_id ? "gmail" : "scribe_ai"),
+          scribe_draft_id: ce.scribe_draft_id || null,
           isRead: ce.is_read !== false,
           isStarred: Boolean(ce.is_starred),
           isImportant: Boolean(ce.is_important),
@@ -3040,8 +3151,8 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       if (folderQuery && folderQuery !== "all") {
         const fQ = folderQuery.toLowerCase().trim();
         result = result.filter((e: any) => {
-          if (fQ === "inbox") return !e.isDraft && !e.isTrash && !e.isSpam && !e.isArchived && (e.isReceived || (e.status || "").toLowerCase() === "received");
-          if (fQ === "sent") return !e.isDraft && !e.isTrash && (e.isSent || (e.direction || "").toLowerCase() === "sent");
+          if (fQ === "inbox") return !e.isDraft && !e.isTrash && !e.isSpam && !e.isArchived && (e.isReceived || (e.status || "").toLowerCase() === "received" || (e.status || "").toLowerCase() === "incoming" || (e.direction || "").toLowerCase() === "incoming");
+          if (fQ === "sent") return !e.isDraft && !e.isTrash && (e.isSent || (e.direction || "").toLowerCase() === "sent" || (e.direction || "").toLowerCase() === "outgoing" || (e.status || "").toLowerCase() === "sent" || (e.status || "").toLowerCase() === "outgoing");
           if (fQ === "drafts" || fQ === "draft") return e.isDraft || (e.direction || "").toLowerCase() === "draft" || (e.status || "").toLowerCase() === "draft";
           if (fQ === "starred") return !e.isTrash && Boolean(e.isStarred);
           if (fQ === "archive" || fQ === "archived") return !e.isTrash && !e.isSpam && !e.isDraft && Boolean(e.isArchived);
@@ -3057,8 +3168,8 @@ HUMAN-WRITTEN WRITING GUIDELINES:
         result = result.filter((e: any) => {
           const s = (e.status || "").toLowerCase();
           if (stQ === "draft") return e.isDraft || s === "draft";
-          if (stQ === "sent") return !e.isDraft && (s === "sent" || s === "delivered");
-          if (stQ === "received") return !e.isDraft && s === "received";
+          if (stQ === "sent") return !e.isDraft && (s === "sent" || s === "outgoing" || s === "delivered");
+          if (stQ === "received") return !e.isDraft && (s === "received" || s === "incoming");
           if (stQ === "spam") return e.isSpam || s === "spam";
           return s === stQ;
         });
@@ -3086,10 +3197,10 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       // Direction Filter
       if (directionQuery && directionQuery !== "All") {
         const dirQ = directionQuery.toLowerCase().trim();
-        if (dirQ === "sent") {
-          result = result.filter((e: any) => !e.isDraft && (e.status || "").toLowerCase() !== "draft" && (e.isSent || (e.direction || "").toLowerCase() === "sent"));
-        } else if (dirQ === "received") {
-          result = result.filter((e: any) => !e.isDraft && (e.status || "").toLowerCase() !== "draft" && (e.isReceived || (e.direction || "").toLowerCase() === "received"));
+        if (dirQ === "sent" || dirQ === "outgoing") {
+          result = result.filter((e: any) => !e.isDraft && (e.status || "").toLowerCase() !== "draft" && (e.isSent || (e.direction || "").toLowerCase() === "sent" || (e.direction || "").toLowerCase() === "outgoing"));
+        } else if (dirQ === "received" || dirQ === "incoming") {
+          result = result.filter((e: any) => !e.isDraft && (e.status || "").toLowerCase() !== "draft" && (e.isReceived || (e.direction || "").toLowerCase() === "received" || (e.direction || "").toLowerCase() === "incoming"));
         } else if (dirQ === "draft" || dirQ === "drafts") {
           result = result.filter((e: any) => e.isDraft || (e.direction || "").toLowerCase() === "draft" || (e.status || "").toLowerCase() === "draft");
         }
@@ -3216,13 +3327,22 @@ HUMAN-WRITTEN WRITING GUIDELINES:
         }
       }
 
+      const rawStatus = (emailRecord.status || "").toLowerCase();
+      const rawDir = (emailRecord.direction || "").toLowerCase();
+      const isDraft = rawStatus === "draft" || rawDir === "draft" || Boolean(emailRecord.is_draft);
+      const isReceived = !isDraft && (rawDir === "received" || rawDir === "incoming" || rawStatus === "received" || rawStatus === "incoming" || Boolean(emailRecord.isReceived));
+      const isSent = !isDraft && (rawDir === "sent" || rawDir === "outgoing" || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered" || Boolean(emailRecord.isSent));
+
       return jsonResponse({
         id: emailRecord.id,
         userId: emailRecord.user_id || emailRecord.userId,
-        sender: emailRecord.sender || emailRecord.sender_email || "",
-        sender_email: emailRecord.sender_email || emailRecord.sender || "",
-        recipient: emailRecord.recipient || emailRecord.recipient_email || "",
-        recipient_email: emailRecord.recipient_email || emailRecord.recipient || "",
+        sender: emailRecord.sender || emailRecord.sender_email || emailRecord.from_email || "",
+        sender_email: emailRecord.sender_email || emailRecord.sender || emailRecord.from_email || "",
+        from_email: emailRecord.from_email || emailRecord.sender_email || emailRecord.sender || "",
+        from_name: emailRecord.from_name || "",
+        recipient: emailRecord.recipient_email || emailRecord.recipient || (Array.isArray(emailRecord.to_emails) ? emailRecord.to_emails.join(", ") : ""),
+        recipient_email: emailRecord.recipient_email || emailRecord.recipient || (Array.isArray(emailRecord.to_emails) ? emailRecord.to_emails[0] : ""),
+        to_emails: Array.isArray(emailRecord.to_emails) ? emailRecord.to_emails : (emailRecord.recipient_email ? [emailRecord.recipient_email] : (emailRecord.recipient ? [emailRecord.recipient] : [])),
         subject: emailRecord.subject || "(No Subject)",
         body: emailRecord.body || emailRecord.body_text || "",
         body_text: emailRecord.body_text || emailRecord.body || "",
@@ -3232,8 +3352,14 @@ HUMAN-WRITTEN WRITING GUIDELINES:
         situation: emailRecord.situation || emailRecord.email_type || "💼 Official / Professional",
         tone: emailRecord.tone || "Professional",
         priority: emailRecord.priority || emailRecord.importance || "Normal",
-        status: emailRecord.status,
-        direction: emailRecord.direction,
+        status: isDraft ? "Draft" : emailRecord.status,
+        direction: isDraft ? "draft" : (isReceived ? "received" : (isSent ? "sent" : emailRecord.direction)),
+        isSent,
+        isReceived,
+        isDraft,
+        is_draft: isDraft,
+        source: emailRecord.source || (msgId ? "gmail" : "scribe_ai"),
+        scribe_draft_id: emailRecord.scribe_draft_id || null,
         isRead: emailRecord.is_read !== false && emailRecord.isRead !== false,
         isStarred: Boolean(emailRecord.is_starred || emailRecord.isStarred),
         isArchived: Boolean(emailRecord.is_archived || emailRecord.isArchived),
@@ -3896,8 +4022,18 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       const emailBody = body.body || "";
 
       // If Gmail draft ID exists, update it in Gmail
-      if (connection && (body.gmailDraftId || draftId)) {
-        const targetDraftId = body.gmailDraftId || draftId;
+      let targetDraftId = body.gmailDraftId || draftId;
+      if (!body.gmailDraftId) {
+        const { data: dData } = await supabase.from("emails").select("gmail_draft_id").or(`id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id).maybeSingle();
+        if (dData?.gmail_draft_id) {
+          targetDraftId = dData.gmail_draft_id;
+        } else {
+          const { data: edData } = await supabase.from("email_drafts").select("gmail_draft_id").or(`scribe_draft_id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id).maybeSingle();
+          if (edData?.gmail_draft_id) targetDraftId = edData.gmail_draft_id;
+        }
+      }
+
+      if (connection && targetDraftId) {
         const accessToken = await getValidAccessToken(connection, supabase);
         if (accessToken) {
           try {
@@ -3941,7 +4077,16 @@ HUMAN-WRITTEN WRITING GUIDELINES:
         body: emailBody,
         body_text: emailBody,
         updated_at: now,
-      }).eq("id", draftId).eq("user_id", user.id);
+      }).or(`id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id);
+
+      try {
+        await supabase.from("email_drafts").update({
+          to_emails: recipient ? [recipient] : [],
+          subject,
+          body_text: emailBody,
+          updated_at: now,
+        }).or(`scribe_draft_id.eq.${draftId},id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id);
+      } catch (_) {}
 
       try {
         await supabase.from("Email").update({
@@ -3958,14 +4103,21 @@ HUMAN-WRITTEN WRITING GUIDELINES:
     if (path.startsWith("/emails/draft/") && method === "DELETE") {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
-      const draftId = path.split("/")[3];
+      let targetDraftId = draftId;
+      const { data: dData } = await supabase.from("emails").select("gmail_draft_id").or(`id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id).maybeSingle();
+      if (dData?.gmail_draft_id) {
+        targetDraftId = dData.gmail_draft_id;
+      } else {
+        const { data: edData } = await supabase.from("email_drafts").select("gmail_draft_id").or(`scribe_draft_id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id).maybeSingle();
+        if (edData?.gmail_draft_id) targetDraftId = edData.gmail_draft_id;
+      }
 
       const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
-      if (connection) {
+      if (connection && targetDraftId) {
         const accessToken = await getValidAccessToken(connection, supabase);
         if (accessToken) {
           try {
-            await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}`, {
+            await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/drafts/${targetDraftId}`, {
               method: "DELETE",
               headers: { Authorization: `Bearer ${accessToken}` },
             });
@@ -3976,6 +4128,9 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       }
 
       await supabase.from("emails").delete().or(`id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id);
+      try {
+        await supabase.from("email_drafts").delete().or(`scribe_draft_id.eq.${draftId},id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id);
+      } catch (_) {}
       await supabase.from("Email").delete().or(`id.eq.${draftId},"gmailDraftId".eq.${draftId}`).eq("userId", user.id);
       return jsonResponse({ success: true, message: "Draft deleted." });
     }
@@ -4122,11 +4277,16 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       for (const ce of (canonicalEmails || [])) {
         if (ce.id) seenIds.add(ce.id);
         if (ce.gmail_message_id) seenGmailIds.add(ce.gmail_message_id);
-        const isReceived = ce.direction === "received" || (ce.status || "").toLowerCase() === "received";
-        const isSent = ce.direction === "sent" || (ce.status || "").toLowerCase() === "sent" || (ce.status || "").toLowerCase() === "delivered";
+        const rawStatus = (ce.status || "").toLowerCase();
+        const rawDir = (ce.direction || "").toLowerCase();
+        const isDraft = rawStatus === "draft" || rawDir === "draft" || Boolean(ce.is_draft);
+        const isReceived = !isDraft && (rawDir === "received" || rawDir === "incoming" || rawStatus === "received" || rawStatus === "incoming");
+        const isSent = !isDraft && (rawDir === "sent" || rawDir === "outgoing" || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered");
         unifiedList.push({
           ...ce,
-          status: ce.status || (isReceived ? "received" : "sent"),
+          status: isDraft ? "draft" : ce.status || (isReceived ? "received" : "sent"),
+          direction: isDraft ? "draft" : isReceived ? "received" : isSent ? "sent" : "other",
+          isDraft,
           isSent,
           isReceived,
           isSpam: ce.spam_status === "spam" || (ce.status || "").toLowerCase() === "spam",
@@ -4142,15 +4302,19 @@ HUMAN-WRITTEN WRITING GUIDELINES:
         seenIds.add(le.id);
         if (le.gmailMessageId) seenGmailIds.add(le.gmailMessageId);
 
-        const isReceived = le.isReceived || (le.status || "").toLowerCase() === "received" || le.direction === "received";
-        const isSent = le.isSent || (le.status || "").toLowerCase() === "sent" || (le.status || "").toLowerCase() === "delivered" || le.direction === "sent";
+        const rawStatus = (le.status || "").toLowerCase();
+        const rawDir = (le.direction || "").toLowerCase();
+        const isDraft = rawStatus === "draft" || rawDir === "draft" || Boolean(le.isDraft);
+        const isReceived = !isDraft && (le.isReceived || rawStatus === "received" || rawStatus === "incoming" || rawDir === "received" || rawDir === "incoming");
+        const isSent = !isDraft && (le.isSent || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered" || rawDir === "sent" || rawDir === "outgoing");
 
         unifiedList.push({
           ...le,
-          status: le.status || (isReceived ? "Received" : "Sent"),
+          status: isDraft ? "draft" : le.status || (isReceived ? "Received" : "Sent"),
+          direction: isDraft ? "draft" : isReceived ? "received" : isSent ? "sent" : "other",
+          isDraft,
           isSent,
           isReceived,
-          direction: isReceived ? "received" : "sent",
         });
       }
 
@@ -4196,18 +4360,20 @@ HUMAN-WRITTEN WRITING GUIDELINES:
 
       const sent = list.filter((e: any) => {
         const st = (e.status || "").toLowerCase();
-        return (st === "sent" || st === "delivered" || e.isSent === true || e.direction === "sent") &&
-          st !== "draft" && !e.isSpam && !e.isReceived && st !== "failed";
+        const dir = (e.direction || "").toLowerCase();
+        return (st === "sent" || st === "delivered" || st === "outgoing" || e.isSent === true || dir === "sent" || dir === "outgoing") &&
+          st !== "draft" && !e.isDraft && !e.isSpam && !e.isReceived && st !== "failed";
       }).length;
 
       const received = list.filter((e: any) => {
         const st = (e.status || "").toLowerCase();
-        return (st === "received" || e.isReceived === true || e.direction === "received") &&
-          st !== "draft" && !e.isSpam && !e.isSent;
+        const dir = (e.direction || "").toLowerCase();
+        return (st === "received" || st === "incoming" || e.isReceived === true || dir === "received" || dir === "incoming") &&
+          st !== "draft" && !e.isDraft && !e.isSpam && !e.isSent;
       }).length;
 
       const drafts = list.filter((e: any) => 
-        (e.status || "").toLowerCase() === "draft"
+        (e.status || "").toLowerCase() === "draft" || (e.direction || "").toLowerCase() === "draft" || Boolean(e.is_draft) || Boolean(e.isDraft)
       ).length;
 
       const scheduled = list.filter((e: any) => {
