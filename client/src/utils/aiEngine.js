@@ -606,7 +606,6 @@ export function generateIntelligentEmail({
   instruction = '',
   userSubject = '',
   recipient = '',
-  recipientName = '',
   hasAttachment = false,
   customCategory = null,
   customTone = null,
@@ -630,8 +629,7 @@ export function generateIntelligentEmail({
   const urgency = category.urgency;
 
   // 2. Greeting & Sign-off
-  const effectiveRecipient = (recipientName && recipientName.trim()) || recipient;
-  const greeting = determineGreeting(effectiveRecipient, facts.recipientType, toneId);
+  const greeting = determineGreeting(recipient, facts.recipientType, toneId);
   const myName = getSenderDisplayName(senderName);
   const closing = determineClosing(toneId, myName);
 

@@ -8,7 +8,6 @@ import { apiFetch, safeParseResponse } from '../utils/api';
 import { signInWithGoogle } from '../utils/supabaseClient';
 import { 
   EMAIL_CATEGORIES, 
-  ADVANCED_TONES,
   classifyEmailIntent, 
   generateIntelligentEmail 
 } from '../utils/aiEngine';
@@ -18,7 +17,20 @@ import {
   formatEmailList 
 } from '../utils/emailValidation';
 
-const AVAILABLE_TONES = ADVANCED_TONES;
+const AVAILABLE_TONES = [
+  'Formal',
+  'Professional',
+  'Polite',
+  'Friendly',
+  'Casual',
+  'Warm',
+  'Persuasive',
+  'Apologetic',
+  'Urgent',
+  'Firm',
+  'Respectful',
+  'Concise'
+];
 
 export function ComposeWorkflow({ 
   composeState = {}, 
@@ -60,6 +72,7 @@ export function ComposeWorkflow({
 
   const gmailDraftId = composeState.gmailDraftId || initialData.gmail_draft_id || initialData.gmailDraftId || null;
   const scribeDraftId = composeState.scribeDraftId || composeState.id || initialData.scribe_draft_id || initialData.scribeDraftId || initialData.id || null;
+  const sendIndividually = composeState.sendIndividually !== undefined ? composeState.sendIndividually : true;
 
   const [aiLoading, setAiLoading] = useState(false);
   const [showCcBcc, setShowCcBcc] = useState(Boolean(composeState.cc || composeState.bcc || initialData.cc || initialData.bcc));
@@ -204,7 +217,6 @@ export function ComposeWorkflow({
         userSubject: subject,
         recipient: recipText,
         hasAttachment: !!selectedFile,
-        customTone: tone && tone !== 'Professional' ? tone : null,
         senderName: localStorage.getItem('userName') || ''
       });
 
@@ -212,7 +224,7 @@ export function ComposeWorkflow({
         emailType: localResult.category,
         detectedCategory: localResult.category,
         situation: localResult.situation,
-        tone: localResult.tone || tone,
+        tone: localResult.tone,
         priority: localResult.priority,
         importance: localResult.priority,
         urgency: localResult.urgency,
@@ -342,8 +354,7 @@ export function ComposeWorkflow({
 
     updateState({
       situationSource: 'manual',
-      tone: reGen.tone || newTone,
-      subject: reGen.subject || subject,
+      tone: newTone,
       body: reGen.body || body
     });
   };
@@ -412,6 +423,7 @@ export function ComposeWorkflow({
       formData.append('priority', priority);
       formData.append('tone', tone);
       formData.append('confirmToken', 'CONFIRMED');
+      formData.append('sendIndividually', String(sendIndividually));
 
       const activeDraftId = composeState.scribeDraftId || composeState.id || initialData.scribe_draft_id || initialData.id;
       if (activeDraftId) {
@@ -433,19 +445,21 @@ export function ComposeWorkflow({
       const data = await safeParseResponse(res);
       if (!res.ok || data.error) throw new Error(data.error || 'Failed to send email.');
 
+      const sentCount = data?.count || (parsedRecipients.length > 1 && sendIndividually ? parsedRecipients.length : 1);
+
       // Instant optimistic increment for stats cache in localStorage (0ms latency)
       try {
         const cachedRaw = localStorage.getItem('scribe_stats_cache');
         const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
         if (cached) {
-          cached.sent = (Number(cached.sent) || 0) + 1;
-          cached.sentToday = (Number(cached.sentToday) || 0) + 1;
-          cached.total = (Number(cached.total) || 0) + 1;
+          cached.sent = (Number(cached.sent) || 0) + sentCount;
+          cached.sentToday = (Number(cached.sentToday) || 0) + sentCount;
+          cached.total = (Number(cached.total) || 0) + sentCount;
           if (cached.categories) {
             const catKey = (detectedCategory || '').toLowerCase();
             for (const k of Object.keys(cached.categories)) {
               if (catKey.includes(k.toLowerCase())) {
-                cached.categories[k] = (cached.categories[k] || 0) + 1;
+                cached.categories[k] = (cached.categories[k] || 0) + sentCount;
                 break;
               }
             }
@@ -609,6 +623,72 @@ export function ComposeWorkflow({
                 </div>
               )}
 
+              {parsedRecipients.length > 1 && (
+                <div className="p-4 rounded-2xl bg-[#1C1B19] border border-[#D4A373]/30 space-y-3 animate-fadeIn shadow-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-[#D4A373]" />
+                      <span className="text-xs font-bold text-[#F5F3EF]">Multi-Recipient Privacy Mode</span>
+                    </div>
+                    <span className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
+                      sendIndividually
+                        ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40'
+                        : 'bg-amber-950/80 text-amber-400 border-amber-500/40'
+                    }`}>
+                      {sendIndividually ? '🔒 Separate Emails (Private)' : '👥 Group Thread'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div
+                      onClick={() => updateState({ sendIndividually: true })}
+                      className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        sendIndividually
+                          ? 'bg-[#22211F] border-[#D4A373] text-[#F5F3EF] shadow-sm'
+                          : 'bg-[#161514] border-[#2E2D2B] text-[#99958F] hover:border-[#3E3D3B]'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="deliveryMode"
+                        checked={sendIndividually}
+                        onChange={() => updateState({ sendIndividually: true })}
+                        className="mt-0.5 text-[#D4A373] focus:ring-[#D4A373] cursor-pointer"
+                      />
+                      <div>
+                        <span className="font-bold block text-[#ECE8E1]">Send Individually (Recommended)</span>
+                        <span className="text-[11px] text-[#99958F] block leading-snug mt-0.5">
+                          Each person receives their own separate email. Recipients cannot see each other's addresses.
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      onClick={() => updateState({ sendIndividually: false })}
+                      className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        !sendIndividually
+                          ? 'bg-[#22211F] border-[#D4A373] text-[#F5F3EF] shadow-sm'
+                          : 'bg-[#161514] border-[#2E2D2B] text-[#99958F] hover:border-[#3E3D3B]'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="deliveryMode"
+                        checked={!sendIndividually}
+                        onChange={() => updateState({ sendIndividually: false })}
+                        className="mt-0.5 text-[#D4A373] focus:ring-[#D4A373] cursor-pointer"
+                      />
+                      <div>
+                        <span className="font-bold block text-[#ECE8E1]">Send as Group</span>
+                        <span className="text-[11px] text-[#99958F] block leading-snug mt-0.5">
+                          Single email thread with all recipients visible together in the To field.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {showCcBcc && (
                 <div className="p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] space-y-3 animate-fadeIn">
                   <div className="flex items-center justify-between">
@@ -684,50 +764,6 @@ export function ComposeWorkflow({
                 onChange={(e) => updateState({ instruction: e.target.value, errorMessage: '' })}
                 className="w-full px-4 py-3 rounded-2xl glass-input text-xs text-[#F5F3EF] leading-relaxed placeholder-[#99958F]"
               />
-            </div>
-
-            {/* Tone & Style Selector */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-[#ECE8E1] flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-[#D4A373]" />
-                  <span>Communication Tone & Style</span>
-                  <span className="text-[10px] text-[#D4A373] bg-[#D4A373]/10 px-2 py-0.5 rounded-full border border-[#D4A373]/30 font-semibold">
-                    12 Advanced Tones
-                  </span>
-                </label>
-                <span className="text-[11px] text-[#99958F]">
-                  Auto-adapts to situation or select preferred style
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {AVAILABLE_TONES.map(t => {
-                  const isSelected = tone && (tone.toLowerCase().includes(t.id) || tone.toLowerCase().includes(t.name.toLowerCase()));
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => updateState({ tone: t.name })}
-                      className={`p-2.5 rounded-2xl border text-left transition-all flex flex-col justify-between cursor-pointer group hover:scale-[1.01] ${
-                        isSelected 
-                          ? 'border-[#D4A373] bg-[#D4A373]/12 shadow-sm shadow-[#D4A373]/20 ring-1 ring-[#D4A373]/40' 
-                          : 'border-[#2E2D2B] bg-[#161514] hover:border-[#D4A373]/40 hover:bg-[#1C1B19]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-sm">{t.icon}</span>
-                        <span className={`text-[11px] font-bold truncate ${isSelected ? 'text-[#D4A373]' : 'text-[#ECE8E1] group-hover:text-[#F5F3EF]'}`}>
-                          {t.name}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-[#99958F] line-clamp-2 leading-tight">
-                        {t.tagline}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
             {/* Optional Attachment */}
@@ -898,16 +934,16 @@ export function ComposeWorkflow({
                   ))}
                 </select>
 
-                {/* Tone Dropdown (12 Advanced Tones) */}
+                {/* Tone Dropdown (12 tones) */}
                 <select
-                  value={AVAILABLE_TONES.find(t => tone && (tone.toLowerCase().includes(t.id) || tone.toLowerCase().includes(t.name.toLowerCase())))?.name || tone}
+                  value={AVAILABLE_TONES.find(t => tone.includes(t)) || ''}
                   onChange={(e) => handleManualToneChange(e.target.value)}
                   className="px-3 py-1.5 rounded-xl bg-[#22211F] text-[11px] font-bold text-[#ECE8E1] border border-[#2E2D2B] cursor-pointer"
                 >
                   <option value="" disabled>Change Tone ▼</option>
                   {AVAILABLE_TONES.map(t => (
-                    <option key={t.id} value={t.name}>
-                      {t.icon} {t.name}
+                    <option key={t} value={t}>
+                      {t}
                     </option>
                   ))}
                 </select>
@@ -988,6 +1024,32 @@ export function ComposeWorkflow({
                     </button>
                   )}
                 </div>
+
+                {parsedRecipients.length > 1 && (
+                  <div className="flex items-center justify-between text-[11px] p-2.5 rounded-xl bg-[#1C1B19] border border-[#D4A373]/30 animate-fadeIn">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className={`w-4 h-4 shrink-0 ${sendIndividually ? 'text-emerald-400' : 'text-amber-400'}`} />
+                      <span className="text-[#ECE8E1]">
+                        {sendIndividually ? (
+                          <>
+                            <strong className="text-emerald-400 font-bold">Private Delivery Active:</strong> {parsedRecipients.length} separate emails will be sent. Each recipient sees only their own email address.
+                          </>
+                        ) : (
+                          <>
+                            <strong className="text-amber-400 font-bold">Group Email Active:</strong> All {parsedRecipients.length} recipients will see each other in a shared thread.
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => updateState({ sendIndividually: !sendIndividually })}
+                      className="text-[10px] font-bold text-[#D4A373] hover:underline cursor-pointer shrink-0 ml-2"
+                    >
+                      {sendIndividually ? 'Switch to Group' : 'Switch to Private'}
+                    </button>
+                  </div>
+                )}
 
                 {/* CC (Carbon Copy) */}
                 {(isEditing || showCcBcc || cc) && (
@@ -1224,11 +1286,23 @@ export function ComposeWorkflow({
                 <span className="text-[#99958F]">Subject:</span>
                 <span className="font-bold text-[#F5F3EF] truncate max-w-[200px]">{subject}</span>
               </div>
+              {parsedRecipients.length > 1 && (
+                <div className="flex items-center justify-between pt-1 border-t border-[#2E2D2B]">
+                  <span className="text-[#99958F]">Delivery Mode:</span>
+                  <span className={`font-bold flex items-center gap-1 ${sendIndividually ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {sendIndividually ? `🔒 ${parsedRecipients.length} Separate Private Emails` : '👥 Group Email Thread'}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="p-3 rounded-xl bg-[#22211F] border border-[#D4A373]/30 text-[#D4A373] text-[11px] flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-[#D4A373] shrink-0" />
-              <span>Clicking "Authorize & Send Now" will transmit this message directly to the recipient via your Gmail API credentials.</span>
+              {parsedRecipients.length > 1 && sendIndividually ? (
+                <span>Clicking "Authorize & Send" will transmit <strong>{parsedRecipients.length} separate private emails</strong> via Gmail. Each recipient will receive their own email and cannot see the other recipients.</span>
+              ) : (
+                <span>Clicking "Authorize & Send Now" will transmit this message directly to the recipient via your Gmail API credentials.</span>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">
@@ -1243,7 +1317,9 @@ export function ComposeWorkflow({
                 className="px-6 py-2.5 rounded-xl gold-btn text-[#121211] font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] transition-transform cursor-pointer"
               >
                 <Send className="w-4 h-4" />
-                Authorize & Send Now
+                {parsedRecipients.length > 1 && sendIndividually
+                  ? `Authorize & Send ${parsedRecipients.length} Private Emails`
+                  : 'Authorize & Send Now'}
               </button>
             </div>
           </div>
@@ -1277,7 +1353,7 @@ export function ComposeWorkflow({
             <h3 className="text-2xl font-extrabold text-[#F5F3EF]">Email Sent Successfully!</h3>
             <p className="text-[#99958F] text-xs max-w-md mx-auto">
               {parsedRecipients.length > 1 ? (
-                <>Your email was successfully delivered to <strong className="text-[#D4A373]">{parsedRecipients.length} recipients</strong> (<span className="font-mono text-[#D4A373]">{recipient}</span>) and recorded in your account email history.</>
+                <>Your email was successfully delivered to <strong className="text-[#D4A373]">{parsedRecipients.length} recipients</strong> {sendIndividually ? 'as separate private emails (each recipient received an isolated copy without seeing others)' : 'in a shared email thread'} and recorded in your account email history.</>
               ) : (
                 <>Your email was successfully delivered to <strong className="text-[#D4A373] font-mono">{recipient}</strong> and recorded in your account email history.</>
               )}

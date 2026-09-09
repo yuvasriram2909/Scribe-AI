@@ -875,69 +875,93 @@ const handleSendEmail = async (req, res) => {
       size: file.size
     }));
 
-    // Send email through Gmail API or SMTP using user's credentials
-    let sendResult;
-    try {
-      sendResult = await sendGmailMessage({
-        senderEmail: gmailAccount.gmailEmail,
-        appPassword: gmailAccount.appPassword || (gmailAccount.encryptedRefreshToken?.startsWith('APPPASSWORD:') ? gmailAccount.encryptedRefreshToken.substring(12) : null),
-        accessToken: gmailAccount.encryptedAccessToken,
-        refreshToken: gmailAccount.encryptedRefreshToken,
-        to: recipient,
-        cc,
-        bcc,
-        subject,
-        body,
-        attachments
-      });
-    } catch (sendErr) {
-      if (sendErr.isRevoked) {
+    const toList = (Array.isArray(recipient) ? recipient : String(recipient).split(/[,;\n\r]+/))
+      .map(e => e.trim())
+      .filter(Boolean);
+
+    const shouldSendIndividually = req.body.sendIndividually === true ||
+      req.body.sendIndividually === 'true' ||
+      (req.body.sendIndividually !== false && req.body.sendIndividually !== 'false' && toList.length > 1);
+
+    const dispatchTargets = (shouldSendIndividually && toList.length > 1)
+      ? toList.map(r => ({ toHeader: r, recipientEmail: r }))
+      : [{ toHeader: toList.join(', '), recipientEmail: toList[0] || recipient }];
+
+    const sentRecords = [];
+
+    for (const target of dispatchTargets) {
+      let sendResult;
+      try {
+        sendResult = await sendGmailMessage({
+          senderEmail: gmailAccount.gmailEmail,
+          appPassword: gmailAccount.appPassword || (gmailAccount.encryptedRefreshToken?.startsWith('APPPASSWORD:') ? gmailAccount.encryptedRefreshToken.substring(12) : null),
+          accessToken: gmailAccount.encryptedAccessToken,
+          refreshToken: gmailAccount.encryptedRefreshToken,
+          to: target.toHeader,
+          cc,
+          bcc,
+          subject,
+          body,
+          attachments
+        });
+      } catch (sendErr) {
+        if (sendErr.isRevoked) {
+          await prisma.gmailAccount.update({
+            where: { id: gmailAccount.id },
+            data: { status: 'DISCONNECTED' }
+          }).catch(() => {});
+        }
+        if (dispatchTargets.length === 1) throw sendErr;
+        console.warn(`Failed to send to ${target.recipientEmail}:`, sendErr.message);
+        continue;
+      }
+
+      // If new access token was generated during refresh, update database
+      if (sendResult.newAccessToken) {
         await prisma.gmailAccount.update({
           where: { id: gmailAccount.id },
-          data: { status: 'DISCONNECTED' }
-        }).catch(() => {});
+          data: {
+            encryptedAccessToken: sendResult.newAccessToken,
+            tokenExpiry: new Date(Date.now() + 3500 * 1000)
+          }
+        }).catch(e => console.warn('Token update notice:', e.message));
       }
-      throw sendErr;
-    }
 
-    // If new access token was generated during refresh, update database
-    if (sendResult.newAccessToken) {
-      await prisma.gmailAccount.update({
-        where: { id: gmailAccount.id },
+      // Store sent email record in database linked to user
+      const emailRecord = await prisma.email.create({
         data: {
-          encryptedAccessToken: sendResult.newAccessToken,
-          tokenExpiry: new Date(Date.now() + 3500 * 1000)
-        }
-      }).catch(e => console.warn('Token update notice:', e.message));
+          userId: user.id,
+          recipient: target.toHeader,
+          cc: cc || null,
+          bcc: bcc || null,
+          subject,
+          body,
+          category,
+          situation,
+          situationSource,
+          priority,
+          tone,
+          status: 'Sent',
+          sentAt: sendResult.sentAt || new Date(),
+          gmailMessageId: sendResult.gmailMessageId || null,
+          attachments: {
+            create: attachments.map(att => ({
+              filename: att.originalname,
+              fileUrl: `/uploads/${att.filename}`,
+              fileType: att.mimetype || 'application/octet-stream'
+            }))
+          }
+        },
+        include: { attachments: true }
+      });
+      sentRecords.push(emailRecord);
     }
 
-    // Store sent email record in database linked to user
-    const emailRecord = await prisma.email.create({
-      data: {
-        userId: user.id,
-        recipient,
-        cc: cc || null,
-        bcc: bcc || null,
-        subject,
-        body,
-        category,
-        situation,
-        situationSource,
-        priority,
-        tone,
-        status: 'Sent',
-        sentAt: sendResult.sentAt || new Date(),
-        gmailMessageId: sendResult.gmailMessageId || null,
-        attachments: {
-          create: attachments.map(att => ({
-            filename: att.originalname,
-            fileUrl: `/uploads/${att.filename}`,
-            fileType: att.mimetype || 'application/octet-stream'
-          }))
-        }
-      },
-      include: { attachments: true }
-    });
+    if (sentRecords.length === 0) {
+      return res.status(500).json({ error: 'Failed to send email to any recipient.' });
+    }
+
+    const emailRecord = sentRecords[0];
 
     // Create in-app notification receipt
     await prisma.notification.create({

@@ -1448,9 +1448,8 @@ function generateNaturalEmailContent(params: {
   recipientName?: string;
   senderName?: string;
   situationObj?: SituationConfig;
-  tone?: string;
 }) {
-  const { instruction, subject, recipient, recipientName, senderName, situationObj, tone } = params;
+  const { instruction, subject, recipient, recipientName, senderName, situationObj } = params;
   const sit = situationObj || detectSituationEngine(instruction || subject || "");
   
   // Clean trailing stray letters (e.g. "d" or ".") and conversational prefixes
@@ -1470,21 +1469,7 @@ function generateNaturalEmailContent(params: {
   }
 
   const myName = senderName && !senderName.includes("[Your Name]") ? senderName : "Sender";
-  let closing = `Best regards,\n${myName}`;
-  const tLower = (tone || "").toLowerCase();
-  if (tLower.includes("exec") || tLower.includes("c-suite")) {
-    closing = `Sincerely,\n${myName}`;
-  } else if (tLower.includes("formal") || tLower.includes("authoritative")) {
-    closing = `Respectfully yours,\n${myName}`;
-  } else if (tLower.includes("action") || tLower.includes("concise")) {
-    closing = `Best,\n${myName}`;
-  } else if (tLower.includes("polite") || tLower.includes("diplomat")) {
-    closing = `With sincere appreciation,\n${myName}`;
-  } else if (tLower.includes("warm") || tLower.includes("collab")) {
-    closing = `Warmly,\n${myName}`;
-  } else if (tLower.includes("candidate") || tLower.includes("application")) {
-    closing = `Warm regards,\n${myName}`;
-  }
+  const closing = `Warm regards,\n${myName}`;
 
   let outSubject = subject ? subject.trim() : "";
   let outBody = "";
@@ -1543,47 +1528,7 @@ Thank you very much for your prompt understanding and cooperation.
 
 ${closing}`;
   }
-  // 3. Recruiter Response / Application Acknowledgment (Matching authentic recruiter communications)
-  else if (lower.includes("received your application") || lower.includes("reviewing applications") || lower.includes("next steps in the hiring") || lower.includes("credentials received") || (lower.includes("application") && (lower.includes("received") || lower.includes("reviewing") || lower.includes("next step")))) {
-    let role = "Senior Software Engineer";
-    const roleMatch = cleanInput.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job|opportunity)/i);
-    if (roleMatch) role = roleMatch[1].trim();
-
-    if (!outSubject) {
-      outSubject = `Application for ${role} Position – Acknowledgment`;
-    }
-
-    if (tLower.includes("action") || tLower.includes("concise")) {
-      outBody = `${greeting}
-
-Thank you for your application for the ${role} position.
-
-Status Update:
-- Credentials & Portfolio: Received and logged
-- Review Pipeline: Candidate profiles are actively being assessed by our hiring team
-- Next Steps: Shortlisted candidates will be contacted within 3–5 business days
-
-${closing}`;
-    } else if (tLower.includes("exec")) {
-      outBody = `${greeting}
-
-Thank you for your interest in joining our organization for the ${role} position.
-
-We have received your email and credentials. Our leadership team is evaluating submissions to align with our technical strategy and architectural roadmap. Should your background match our strategic priorities, we will be in touch directly.
-
-${closing}`;
-    } else {
-      // Standard Recruiter / HR Response (Exact authentic phrasing from user's Gmail screenshot)
-      outBody = `${greeting}
-
-Thank you for reaching out and sharing your application for the ${role} position.
-
-We have received your email and credentials. Our team is currently reviewing applications and will be in touch regarding the next steps in the hiring process.
-
-${closing}`;
-    }
-  }
-  // 4. Resume / Job Application
+  // 3. Resume / Job Application
   else if (sit.category === "Resume/Job Application" || lower.includes("resume") || lower.includes("job") || lower.includes("apply")) {
     let role = "Software Developer";
     const roleMatch = cleanInput.match(/for\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
@@ -2529,135 +2474,335 @@ serve(async (req: Request) => {
         }
       }
 
-      // Encode RFC 2822 MIME Email
-      const emailLines = [
-        `From: ${connectedEmail}`,
-        `To: ${recipient}`,
-        formattedCc ? `Cc: ${formattedCc}` : "",
-        formattedBcc ? `Bcc: ${formattedBcc}` : "",
-        `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
-        "MIME-Version: 1.0",
-        "Content-Type: text/plain; charset=UTF-8",
-        "Content-Transfer-Encoding: 7bit",
-        "",
-        emailBody,
-      ].filter(Boolean).join("\r\n");
+      const sendIndividually = body.sendIndividually === true ||
+        body.sendIndividually === "true" ||
+        (body.sendIndividually !== false && body.sendIndividually !== "false" && toList.length > 1);
 
-      const rawBase64 = btoa(unescape(encodeURIComponent(emailLines)))
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
+      // Determine dispatch targets:
+      // If sendIndividually is true and there are multiple recipients, each recipient receives their own isolated email.
+      // If sendIndividually is false (or single recipient), one email is sent with all recipients in the To header.
+      const dispatchTargets = (sendIndividually && toList.length > 1)
+        ? toList.map((r: string) => ({ toHeader: r, recipientEmail: r, toEmails: [r] }))
+        : [{ toHeader: recipient, recipientEmail: toList[0] || recipient, toEmails: toList }];
 
-      const sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ raw: rawBase64 }),
-      });
+      const sentResults: any[] = [];
+      const failedTargets: any[] = [];
 
-      const sendData = await sendRes.json();
-      if (!sendRes.ok || sendData.error) {
-        const errorMsg = sendData.error?.message || "Failed to send email through Gmail API";
-        let userSafeError = "Email was generated, but Gmail could not send it.";
-        if (sendRes.status === 403 && (errorMsg.includes("insufficient") || errorMsg.includes("scope") || errorMsg.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT"))) {
-          userSafeError = "Gmail authorization is missing the required send permission.";
-        } else if (sendRes.status === 401 || errorMsg.includes("invalid_grant") || errorMsg.includes("Token has been expired")) {
-          userSafeError = "Your Gmail connection has expired. Please reconnect Gmail.";
+      for (const target of dispatchTargets) {
+        // Encode RFC 2822 MIME Email for this specific target
+        const emailLines = [
+          `From: ${connectedEmail}`,
+          `To: ${target.toHeader}`,
+          formattedCc ? `Cc: ${formattedCc}` : "",
+          formattedBcc ? `Bcc: ${formattedBcc}` : "",
+          `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+          "MIME-Version: 1.0",
+          "Content-Type: text/plain; charset=UTF-8",
+          "Content-Transfer-Encoding: 7bit",
+          "",
+          emailBody,
+        ].filter(Boolean).join("\r\n");
+
+        const rawBase64 = btoa(unescape(encodeURIComponent(emailLines)))
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
+
+        const sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ raw: rawBase64 }),
+        });
+
+        const sendData = await sendRes.json();
+        if (!sendRes.ok || sendData.error) {
+          const errorMsg = sendData.error?.message || "Failed to send email through Gmail API";
+          let userSafeError = "Email was generated, but Gmail could not send it.";
+          if (sendRes.status === 403 && (errorMsg.includes("insufficient") || errorMsg.includes("scope") || errorMsg.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT"))) {
+            userSafeError = "Gmail authorization is missing the required send permission.";
+          } else if (sendRes.status === 401 || errorMsg.includes("invalid_grant") || errorMsg.includes("Token has been expired")) {
+            userSafeError = "Your Gmail connection has expired. Please reconnect Gmail.";
+          }
+
+          const now = new Date().toISOString();
+          const failedId = crypto.randomUUID();
+          try {
+            await supabase.from("emails").insert({
+              id: failedId,
+              user_id: user.id,
+              recipient_email: target.recipientEmail,
+              to_emails: target.toEmails,
+              subject,
+              body: emailBody,
+              status: "failed",
+              direction: "sent",
+              created_at: now,
+              updated_at: now,
+            });
+          } catch (_) {}
+
+          try {
+            await supabase.from("email_events").insert({
+              id: crypto.randomUUID(),
+              user_id: user.id,
+              email_id: failedId,
+              event_type: "failed",
+              metadata: { recipient: target.recipientEmail, subject, error: userSafeError },
+              created_at: now,
+            });
+          } catch (_) {}
+
+          failedTargets.push({ recipient: target.recipientEmail, error: userSafeError, status: sendRes.status });
+          continue;
         }
 
+        // Record email in database
         const now = new Date().toISOString();
-        const failedId = crypto.randomUUID();
-        // Log failure to emails and email_events
-        try {
-          await supabase.from("emails").insert({
-            id: failedId,
-            user_id: user.id,
-            recipient_email: recipient,
-            subject,
-            body: emailBody,
-            status: "failed",
-            direction: "sent",
-            created_at: now,
-            updated_at: now,
-          });
-        } catch (_) {}
+        const emailId = crypto.randomUUID();
 
+        // 1. Canonical emails record
+        const canonicalEmail = {
+          id: emailId,
+          user_id: user.id,
+          gmail_connection_id: connection.id || null,
+          sender_email: connectedEmail,
+          sender: user.name || connectedEmail,
+          from_email: connectedEmail,
+          from_name: user.name || connectedEmail,
+          recipient_email: target.recipientEmail,
+          recipient_emails: target.toEmails,
+          to_emails: target.toEmails,
+          cc_emails: ccList,
+          bcc_emails: bccList,
+          cc: ccList,
+          bcc: bccList,
+          subject,
+          body: emailBody,
+          body_text: emailBody,
+          email_type: (category || situation || "other").toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+          tone: (tone || "professional").toLowerCase(),
+          importance: (priority || "normal").toLowerCase(),
+          status: "sent",
+          direction: "outgoing",
+          source: "scribe_ai",
+          spam_status: "clean",
+          is_draft: false,
+          is_read: true,
+          gmail_message_id: sendData.id,
+          gmail_thread_id: sendData.threadId || null,
+          thread_id: sendData.threadId || null,
+          sent_at: now,
+          created_at: now,
+          updated_at: now,
+        };
+
+        try {
+          await supabase.from("emails").upsert(canonicalEmail, { onConflict: "id" });
+        } catch (e: any) {
+          console.warn("Canonical emails insert notice:", e);
+        }
+
+        // Upsert into email_threads
+        if (sendData.threadId) {
+          try {
+            await supabase.from("email_threads").upsert({
+              user_id: user.id,
+              gmail_thread_id: sendData.threadId,
+              snippet: emailBody.slice(0, 160),
+              last_message_at: now,
+              updated_at: now,
+            }, { onConflict: "user_id,gmail_thread_id" });
+          } catch (_) {}
+        }
+
+        // 2. Canonical email_events record
         try {
           await supabase.from("email_events").insert({
             id: crypto.randomUUID(),
             user_id: user.id,
-            email_id: failedId,
-            event_type: "failed",
-            metadata: { recipient, subject, error: userSafeError },
+            email_id: emailId,
+            event_type: "sent",
+            metadata: {
+              recipient: target.recipientEmail,
+              recipient_count: target.toEmails.length,
+              subject,
+              gmail_message_id: sendData.id,
+              sender: connectedEmail,
+            },
             created_at: now,
           });
-        } catch (_) {}
+        } catch (e: any) {
+          console.warn("email_events insert notice:", e);
+        }
 
+        // 3. Legacy Email record
+        const emailPayload = {
+          id: emailId,
+          userId: user.id,
+          gmailAccount: connectedEmail,
+          sender: user.name || connectedEmail,
+          recipient: target.toHeader,
+          cc: formattedCc || null,
+          bcc: formattedBcc || null,
+          subject,
+          body: emailBody,
+          category: category || "Official/Professional",
+          situation: situation || "💼 Official / Professional",
+          priority: priority || "Normal",
+          tone: tone || "Professional",
+          status: "Sent",
+          isSent: true,
+          isReceived: false,
+          isSpam: false,
+          source: "scribe_ai",
+          direction: "outgoing",
+          gmailMessageId: sendData.id,
+          gmailThreadId: sendData.threadId || null,
+          sentAt: now,
+          createdAt: now,
+        };
+
+        const { data: emailRecord } = await safeInsertEmail(supabase, emailPayload);
+
+        // 4. In-App Cross-User Received Delivery:
+        const recipientsToDeliver = [...new Set([...target.toEmails, ...ccList].map((r: string) => r.toLowerCase().trim()))];
+        for (const cleanRecipient of recipientsToDeliver) {
+          if (!cleanRecipient || cleanRecipient === (connectedEmail || "").toLowerCase().trim()) continue;
+          let recipientUserId: string | null = null;
+          try {
+            const { data: recProfiles } = await supabase
+              .from("profiles")
+              .select("id, email")
+              .ilike("email", cleanRecipient)
+              .maybeSingle();
+
+            if (recProfiles?.id) {
+              recipientUserId = recProfiles.id;
+            } else {
+              const { data: recConn } = await supabase
+                .from("gmail_connections")
+                .select("user_id")
+                .ilike("gmail_email", cleanRecipient)
+                .maybeSingle();
+              if (recConn?.user_id) {
+                recipientUserId = recConn.user_id;
+              } else {
+                const { data: recAcc } = await supabase
+                  .from("GmailAccount")
+                  .select("userId")
+                  .ilike("gmailEmail", cleanRecipient)
+                  .maybeSingle();
+                if (recAcc?.userId) recipientUserId = recAcc.userId;
+              }
+            }
+          } catch (recErr) {
+            console.warn("Recipient user lookup notice:", recErr);
+          }
+
+          if (recipientUserId && recipientUserId !== user.id) {
+            const receivedEmailId = crypto.randomUUID();
+            const receivedCanonical = {
+              id: receivedEmailId,
+              user_id: recipientUserId,
+              sender_email: connectedEmail,
+              sender: user.name || connectedEmail,
+              recipient_email: cleanRecipient,
+              recipient_emails: target.toEmails,
+              subject,
+              body: emailBody,
+              email_type: (category || situation || "other").toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+              tone: (tone || "professional").toLowerCase(),
+              importance: (priority || "normal").toLowerCase(),
+              status: "received",
+              direction: "received",
+              spam_status: "clean",
+              gmail_message_id: sendData.id,
+              thread_id: sendData.threadId || null,
+              received_at: now,
+              created_at: now,
+              updated_at: now,
+            };
+
+            try {
+              const { error: rUpErr } = await supabase.from("emails").upsert(receivedCanonical, { onConflict: "id" });
+              if (rUpErr && (rUpErr.message?.includes("column") || rUpErr.message?.includes("does not exist"))) {
+                const { sender_email, sender, ...safeCanonical } = receivedCanonical;
+                await supabase.from("emails").upsert(safeCanonical, { onConflict: "id" });
+              }
+            } catch (_) {}
+
+            try {
+              await supabase.from("email_events").insert({
+                id: crypto.randomUUID(),
+                user_id: recipientUserId,
+                email_id: receivedEmailId,
+                event_type: "received",
+                metadata: {
+                  sender: user.name || connectedEmail,
+                  sender_email: connectedEmail,
+                  recipient: cleanRecipient,
+                  subject,
+                  gmail_message_id: sendData.id,
+                },
+                created_at: now,
+              });
+            } catch (_) {}
+
+            try {
+              await supabase.from("Email").insert({
+                id: receivedEmailId,
+                userId: recipientUserId,
+                sender: user.name || connectedEmail,
+                recipient: cleanRecipient,
+                subject,
+                body: emailBody,
+                category: category || "Official/Professional",
+                situation: situation || "💼 Official / Professional",
+                priority: priority || "Normal",
+                tone: tone || "Professional",
+                status: "Received",
+                isSent: false,
+                isReceived: true,
+                isSpam: false,
+                isRead: false,
+                gmailMessageId: sendData.id,
+                gmailThreadId: sendData.threadId || null,
+                receivedAt: now,
+                createdAt: now,
+              });
+            } catch (_) {}
+
+            await safeInsertNotification(supabase, {
+              id: crypto.randomUUID(),
+              userId: recipientUserId,
+              emailId: receivedEmailId,
+              notificationType: category || "General",
+              message: `New email from ${user.name || connectedEmail}: "${subject}"`,
+              read: false,
+              isTrashed: false,
+              createdAt: now,
+            });
+          }
+        }
+
+        sentResults.push({
+          id: emailId,
+          recipient: target.recipientEmail,
+          gmailMessageId: sendData.id,
+          emailRecord: emailRecord || emailPayload,
+        });
+      }
+
+      // If all targets failed, return error
+      if (sentResults.length === 0 && failedTargets.length > 0) {
         return jsonResponse({
           success: false,
-          error: userSafeError,
-          needsReauth: sendRes.status === 401 || sendRes.status === 403,
-        }, sendRes.status || 400);
-      }
-
-      // Record email in database
-      const now = new Date().toISOString();
-      const emailId = crypto.randomUUID();
-
-      // 1. Canonical emails record
-      const canonicalEmail = {
-        id: emailId,
-        user_id: user.id,
-        gmail_connection_id: connection.id || null,
-        sender_email: connectedEmail,
-        sender: user.name || connectedEmail,
-        from_email: connectedEmail,
-        from_name: user.name || connectedEmail,
-        recipient_email: recipient,
-        recipient_emails: toList,
-        to_emails: toList,
-        cc_emails: ccList,
-        bcc_emails: bccList,
-        cc: ccList,
-        bcc: bccList,
-        subject,
-        body: emailBody,
-        body_text: emailBody,
-        email_type: (category || situation || "other").toLowerCase().replace(/[^a-z0-9_]/g, "_"),
-        tone: (tone || "professional").toLowerCase(),
-        importance: (priority || "normal").toLowerCase(),
-        status: "sent",
-        direction: "outgoing",
-        source: "scribe_ai",
-        spam_status: "clean",
-        is_draft: false,
-        is_read: true,
-        gmail_message_id: sendData.id,
-        gmail_thread_id: sendData.threadId || null,
-        thread_id: sendData.threadId || null,
-        sent_at: now,
-        created_at: now,
-        updated_at: now,
-      };
-      try {
-        await supabase.from("emails").upsert(canonicalEmail, { onConflict: "id" });
-      } catch (e: any) {
-        console.warn("Canonical emails insert notice:", e);
-      }
-
-      // Upsert into email_threads
-      if (sendData.threadId) {
-        try {
-          await supabase.from("email_threads").upsert({
-            user_id: user.id,
-            gmail_thread_id: sendData.threadId,
-            snippet: emailBody.slice(0, 160),
-            last_message_at: now,
-            updated_at: now,
-          }, { onConflict: "user_id,gmail_thread_id" });
-        } catch (_) {}
+          error: failedTargets[0].error,
+          needsReauth: failedTargets[0].status === 401 || failedTargets[0].status === 403,
+        }, failedTargets[0].status || 400);
       }
 
       // Clean up draft if this email was converted from a draft
@@ -2680,194 +2825,29 @@ serve(async (req: Request) => {
         } catch (_) {}
       }
 
-      // 2. Canonical email_events record
-      try {
-        await supabase.from("email_events").insert({
-          id: crypto.randomUUID(),
-          user_id: user.id,
-          email_id: emailId,
-          event_type: "sent",
-          metadata: {
-            recipient,
-            recipient_count: toList.length,
-            subject,
-            gmail_message_id: sendData.id,
-            sender: connectedEmail,
-          },
-          created_at: now,
-        });
-      } catch (e: any) {
-        console.warn("email_events insert notice:", e);
-      }
-
-      // 3. Legacy Email record
-      const emailPayload = {
-        id: emailId,
-        userId: user.id,
-        gmailAccount: connectedEmail,
-        sender: user.name || connectedEmail,
-        recipient,
-        cc: formattedCc || null,
-        bcc: formattedBcc || null,
-        subject,
-        body: emailBody,
-        category: category || "Official/Professional",
-        situation: situation || "💼 Official / Professional",
-        priority: priority || "Normal",
-        tone: tone || "Professional",
-        status: "Sent",
-        isSent: true,
-        isReceived: false,
-        isSpam: false,
-        source: "scribe_ai",
-        direction: "outgoing",
-        gmailMessageId: sendData.id,
-        gmailThreadId: sendData.threadId || null,
-        sentAt: now,
-        createdAt: now,
-      };
-
-      const { data: emailRecord } = await safeInsertEmail(supabase, emailPayload);
-
-      // 4. In-App Cross-User Received Delivery:
-      // If any recipient is also a registered user in Scribe AI, immediately deliver it to their Received history!
-      const allRecipientsToDeliver = [...new Set([...toList, ...ccList].map((r: string) => r.toLowerCase().trim()))];
-
-      for (const cleanRecipient of allRecipientsToDeliver) {
-        if (!cleanRecipient || cleanRecipient === (connectedEmail || "").toLowerCase().trim()) continue;
-        let recipientUserId: string | null = null;
-        try {
-          const { data: recProfiles } = await supabase
-            .from("profiles")
-            .select("id, email")
-            .ilike("email", cleanRecipient)
-            .maybeSingle();
-
-          if (recProfiles?.id) {
-            recipientUserId = recProfiles.id;
-          } else {
-            const { data: recConn } = await supabase
-              .from("gmail_connections")
-              .select("user_id")
-              .ilike("gmail_email", cleanRecipient)
-              .maybeSingle();
-            if (recConn?.user_id) {
-              recipientUserId = recConn.user_id;
-            } else {
-              const { data: recAcc } = await supabase
-                .from("GmailAccount")
-                .select("userId")
-                .ilike("gmailEmail", cleanRecipient)
-                .maybeSingle();
-              if (recAcc?.userId) recipientUserId = recAcc.userId;
-            }
-          }
-        } catch (recErr) {
-          console.warn("Recipient user lookup notice:", recErr);
-        }
-
-        if (recipientUserId && recipientUserId !== user.id) {
-          const receivedEmailId = crypto.randomUUID();
-          const receivedCanonical = {
-            id: receivedEmailId,
-            user_id: recipientUserId,
-            sender_email: connectedEmail,
-            sender: user.name || connectedEmail,
-            recipient_email: cleanRecipient,
-            recipient_emails: toList,
-            subject,
-            body: emailBody,
-            email_type: (category || situation || "other").toLowerCase().replace(/[^a-z0-9_]/g, "_"),
-            tone: (tone || "professional").toLowerCase(),
-            importance: (priority || "normal").toLowerCase(),
-            status: "received",
-            direction: "received",
-            spam_status: "clean",
-            gmail_message_id: sendData.id,
-            thread_id: sendData.threadId || null,
-            received_at: now,
-            created_at: now,
-            updated_at: now,
-          };
-
-          try {
-            const { error: rUpErr } = await supabase.from("emails").upsert(receivedCanonical, { onConflict: "id" });
-            if (rUpErr && (rUpErr.message?.includes("column") || rUpErr.message?.includes("does not exist"))) {
-              const { sender_email, sender, ...safeCanonical } = receivedCanonical;
-              await supabase.from("emails").upsert(safeCanonical, { onConflict: "id" });
-            }
-          } catch (_) {}
-
-          try {
-            await supabase.from("email_events").insert({
-              id: crypto.randomUUID(),
-              user_id: recipientUserId,
-              email_id: receivedEmailId,
-              event_type: "received",
-              metadata: {
-                sender: user.name || connectedEmail,
-                sender_email: connectedEmail,
-                recipient: cleanRecipient,
-                subject,
-                gmail_message_id: sendData.id,
-              },
-              created_at: now,
-            });
-          } catch (_) {}
-
-          try {
-            await supabase.from("Email").insert({
-              id: receivedEmailId,
-              userId: recipientUserId,
-              sender: user.name || connectedEmail,
-              recipient: cleanRecipient,
-              subject,
-              body: emailBody,
-              category: category || "Official/Professional",
-              situation: situation || "💼 Official / Professional",
-              priority: priority || "Normal",
-              tone: tone || "Professional",
-              status: "Received",
-              isSent: false,
-              isReceived: true,
-              isSpam: false,
-              isRead: false,
-              gmailMessageId: sendData.id,
-              gmailThreadId: sendData.threadId || null,
-              receivedAt: now,
-              createdAt: now,
-            });
-          } catch (_) {}
-
-          await safeInsertNotification(supabase, {
-            id: crypto.randomUUID(),
-            userId: recipientUserId,
-            emailId: receivedEmailId,
-            notificationType: category || "General",
-            message: `New email from ${user.name || connectedEmail}: "${subject}"`,
-            read: false,
-            isTrashed: false,
-            createdAt: now,
-          });
-        }
-      }
-
       // Create notification for Sender
+      const now = new Date().toISOString();
       await safeInsertNotification(supabase, {
         id: crypto.randomUUID(),
         userId: user.id,
-        emailId: emailRecord?.id || null,
+        emailId: sentResults[0]?.id || null,
         notificationType: category || "General",
-        message: `Email "${subject}" successfully sent to ${recipient} via Gmail.`,
+        message: dispatchTargets.length > 1
+          ? `Email "${subject}" successfully sent to ${sentResults.length} recipients individually via Gmail.`
+          : `Email "${subject}" successfully sent to ${recipient} via Gmail.`,
         createdAt: now,
       });
 
       return jsonResponse({
         success: true,
-        message: "Email sent successfully",
-        gmailMessageId: sendData.id,
-        email: emailRecord || emailPayload,
-        statsIncrement: { sent: 1, sentToday: 1, total: 1 },
+        message: dispatchTargets.length > 1
+          ? `Sent ${sentResults.length} separate private emails successfully.`
+          : "Email sent successfully",
+        gmailMessageId: sentResults[0]?.gmailMessageId,
+        email: sentResults[0]?.emailRecord,
+        emails: sentResults.map(r => r.emailRecord),
+        count: sentResults.length,
+        statsIncrement: { sent: sentResults.length, sentToday: sentResults.length, total: sentResults.length },
       });
     }
 
@@ -2926,7 +2906,6 @@ serve(async (req: Request) => {
         recipientName,
         senderName,
         situationObj: sitObj,
-        tone: tone || generated?.tone,
       });
 
       let finalSubject = generated.subject;
@@ -2936,39 +2915,25 @@ serve(async (req: Request) => {
       const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("AI_API_KEY");
       if (geminiApiKey) {
         try {
-          const geminiPrompt = `You are an elite corporate communications specialist and executive email strategist.
-Write a completely authentic, sophisticated, original professional email tailored precisely to the user's situation and target tone.
-DO NOT sound like an AI, formulaic bot, or generic chatbot. Write with the natural fluency, poise, and elegance of a seasoned corporate leader or tech recruiter.
+          const geminiPrompt = `You are an expert human professional communication assistant.
+Write a completely natural, human-written, warm, and authentic email tailored precisely to the user's situation.
+DO NOT sound like an AI, corporate robot, or generic chatbot. Write like an authentic, thoughtful person.
 
 USER SITUATION / INSTRUCTION: "${input}"
 USER SUBJECT: "${subject || ''}"
-TARGET TONE: "${tone || generated.tone}"
+DESIRED TONE: "${tone || generated.tone}"
 RECIPIENT: "${recipientName || recipient || 'Recipient'}"
 SENDER NAME: "${senderName}"
 
-ADVANCED PROFESSIONAL TONE CRITERIA:
-- "Corporate Professional": Impeccable business etiquette, articulate, well-structured, balanced, and clear.
-- "Executive / C-Suite": High-level, strategic, concise, direct, authoritative yet courteous. Focuses on outcomes and key decisions.
-- "Recruiter / HR Response": Warm, courteous, structured acknowledgment, outlining next steps, perfectly calibrated corporate communication (e.g., "Thank you for reaching out and sharing your application for the [Role] position. We have received your email and credentials. Our team is currently reviewing applications and will be in touch regarding the next steps in the hiring process.").
-- "Candidate Application": Impactful, value-driven, credentialed outreach emphasizing technical competence and achievements.
-- "Polite & Diplomatic": Tactful, considerate, constructive, relationship-preserving phrasing for delicate inquiries.
-- "Action-Oriented & Concise": High efficiency, clear action items/bullet points, zero fluff, clear deadlines.
-- "Formal & Authoritative": Institutional rigor, elevated vocabulary, traditional professional letter standards.
-- "Warm & Collaborative": Empathetic, partnership-focused, friendly yet thoroughly professional.
-- "Persuasive & Pitch": Compelling value proposition, metric-backed, clear call-to-action.
-- "Firm & Assertive": Unambiguous boundaries, decisive call-to-action, resolute tone.
-- "Apologetic & Resolution": Sincere accountability, transparent corrective action, reassuring next steps.
-- "Urgent & Time-Sensitive": Immediate priority, rapid clarity, critical timeline, direct escalation.
-
-STRICT WRITING RULES:
-1. Address the recipient naturally (e.g. "Dear [Name]," or "Hi [Name],").
-2. Get straight to the point with natural corporate phrasing. Avoid generic AI openers like "I hope this email finds you well" unless explicitly fitting.
-3. Incorporate every specific detail from the instruction (dates, durations, roles, symptoms, project names, timelines).
-4. Do NOT hallucinate fake company names, credentials, or amounts if not provided.
+HUMAN-WRITTEN WRITING GUIDELINES:
+1. Address the recipient naturally (e.g. "Hi [Name]," or "Dear [Name],").
+2. Get straight to the point with natural phrasing, without stiff robotic clichés like "I am writing to formally request...".
+3. Incorporate every specific detail from the instruction (duration, reason, role, symptoms, timeline).
+4. Keep the body concise, polite, empathetic, and formatted with clean paragraphs.
 5. Sign off naturally with the sender's real name: "${senderName}".
 6. Return strictly valid JSON:
 {
-  "subject": "Clear, professional, descriptive subject line",
+  "subject": "Concise, descriptive subject line",
   "body": "Full body text formatted with proper line breaks"
 }`;
 
