@@ -166,15 +166,17 @@ async function getAuthUser(req: Request, supabase: any) {
   if (authHeader.startsWith("Bearer ")) {
     const token = authHeader.substring(7).trim();
 
-    // 1. Primary: Verify official Supabase Auth JWT
-    try {
-      const { data: authData, error: authErr } = await supabase.auth.getUser(token);
-      if (!authErr && authData?.user) {
-        supaUser = authData.user;
-        if (supaUser.email) targetEmail = supaUser.email.trim().toLowerCase();
-        if (supaUser.id) targetId = supaUser.id;
-      }
-    } catch (_) {}
+    // 1. Primary: Verify official Supabase Auth JWT (only if it matches JWT format with 3 segments)
+    if (token.split(".").length === 3) {
+      try {
+        const { data: authData, error: authErr } = await supabase.auth.getUser(token);
+        if (!authErr && authData?.user) {
+          supaUser = authData.user;
+          if (supaUser.email) targetEmail = supaUser.email.trim().toLowerCase();
+          if (supaUser.id) targetId = supaUser.id;
+        }
+      } catch (_) {}
+    }
 
     // Fallback: parse JWT payload for email/id
     if (!supaUser) {
@@ -199,33 +201,24 @@ async function getAuthUser(req: Request, supabase: any) {
     return null;
   }
 
-  // Look up profile, auth user, and legacy User records
+  // Look up profile, auth user, and legacy User records in parallel
   let profile: any = null;
   let legacyUser: any = null;
 
-  if (effectiveEmail) {
+  if (effectiveEmail || targetId) {
     try {
-      const { data } = await supabase.from("profiles").select("*").ilike("email", effectiveEmail).maybeSingle();
-      if (data) profile = data;
-    } catch (_) {}
+      const lookups: Promise<any>[] = [];
+      if (effectiveEmail) {
+        lookups.push(supabase.from("profiles").select("*").ilike("email", effectiveEmail).maybeSingle());
+        lookups.push(supabase.from("User").select("*").ilike("email", effectiveEmail).maybeSingle());
+      } else {
+        lookups.push(supabase.from("profiles").select("*").eq("id", targetId).maybeSingle());
+        lookups.push(supabase.from("User").select("*").eq("id", targetId).maybeSingle());
+      }
 
-    try {
-      const { data } = await supabase.from("User").select("*").ilike("email", effectiveEmail).maybeSingle();
-      if (data) legacyUser = data;
-    } catch (_) {}
-  }
-
-  if (targetId && !legacyUser) {
-    try {
-      const { data } = await supabase.from("User").select("*").eq("id", targetId).maybeSingle();
-      if (data) legacyUser = data;
-    } catch (_) {}
-  }
-
-  if (targetId && !profile) {
-    try {
-      const { data } = await supabase.from("profiles").select("*").eq("id", targetId).maybeSingle();
-      if (data) profile = data;
+      const [pRes, uRes] = await Promise.all(lookups);
+      if (pRes?.data) profile = pRes.data;
+      if (uRes?.data) legacyUser = uRes.data;
     } catch (_) {}
   }
 
@@ -270,33 +263,31 @@ async function getAuthUser(req: Request, supabase: any) {
 
   const primaryId = legacyUser?.id || supaUser?.id || profile?.id || userIds[0] || crypto.randomUUID();
 
-  // Fetch connections across all userIds and email
+  // Fetch connections, legacy accounts, and signatures across all userIds and email in parallel
   let connections: any[] = [];
+  let legacyAccounts: any[] = [];
+  let signature: any[] = [];
   try {
-    let q = supabase.from("gmail_connections").select("*");
+    let connQuery = supabase.from("gmail_connections").select("*");
     const orParts: string[] = [];
     for (const uid of userIds) orParts.push(`user_id.eq.${uid}`);
     if (effectiveEmail) orParts.push(`gmail_email.ilike.${effectiveEmail}`);
-    const { data } = await q.or(orParts.join(","));
-    if (data) connections = data;
-  } catch (_) {}
+    if (orParts.length > 0) connQuery = connQuery.or(orParts.join(","));
 
-  // Fetch legacy Gmail accounts across all userIds and email
-  let legacyAccounts: any[] = [];
-  try {
-    let q = supabase.from("GmailAccount").select("*");
-    const orParts: string[] = [];
-    for (const uid of userIds) orParts.push(`userId.eq.${uid}`);
-    if (effectiveEmail) orParts.push(`gmailEmail.ilike.${effectiveEmail}`);
-    const { data } = await q.or(orParts.join(","));
-    if (data) legacyAccounts = data;
-  } catch (_) {}
+    let legQuery = supabase.from("GmailAccount").select("*");
+    const legOrParts: string[] = [];
+    for (const uid of userIds) legOrParts.push(`userId.eq.${uid}`);
+    if (effectiveEmail) legOrParts.push(`gmailEmail.ilike.${effectiveEmail}`);
+    if (legOrParts.length > 0) legQuery = legQuery.or(legOrParts.join(","));
 
-  // Fetch signature across userIds
-  let signature: any[] = [];
-  try {
-    const { data } = await supabase.from("UserSignature").select("*").in("userId", userIds);
-    if (data && data.length > 0) signature = data;
+    const [cRes, lRes, sRes] = await Promise.all([
+      connQuery,
+      legQuery,
+      supabase.from("UserSignature").select("*").in("userId", userIds)
+    ]);
+    if (cRes?.data) connections = cRes.data;
+    if (lRes?.data) legacyAccounts = lRes.data;
+    if (sRes?.data && sRes.data.length > 0) signature = sRes.data;
   } catch (_) {}
 
   const allAccounts = connections.length > 0 ? connections : legacyAccounts;
@@ -2544,6 +2535,7 @@ serve(async (req: Request) => {
         message: "Email sent successfully",
         gmailMessageId: sendData.id,
         email: emailRecord || emailPayload,
+        statsIncrement: { sent: 1, sentToday: 1, total: 1 },
       });
     }
 
@@ -3239,19 +3231,6 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
 
-      // Attempt background Gmail sync if connected
-      let syncAccount: any = null;
-      const { data: conns } = await supabase.from("gmail_connections").select("*").eq("user_id", user.id);
-      if (conns && conns.length > 0) {
-        syncAccount = conns[0];
-      } else {
-        const { data: accounts } = await supabase.from("GmailAccount").select("*").eq("userId", user.id);
-        syncAccount = accounts?.[0];
-      }
-      if (syncAccount && (syncAccount.access_token_encrypted || syncAccount.encryptedAccessToken || syncAccount.refresh_token_encrypted || syncAccount.encryptedRefreshToken)) {
-        syncUserGmail(user, syncAccount, supabase).catch((e) => console.warn("Background sync error:", e));
-      }
-
       // Fetch emails from BOTH canonical emails and legacy Email tables with strict user isolation across all userIds
       const userEmail = (user.email || "").toLowerCase().trim();
       const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
@@ -3268,7 +3247,6 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       if (canonicalOrs.length > 0) {
         canonicalQuery = canonicalQuery.or(canonicalOrs.join(","));
       }
-      const { data: canonicalEmails } = await canonicalQuery;
 
       let legacyQuery = supabase.from("Email").select("*");
       const legacyOrs: string[] = [];
@@ -3283,7 +3261,29 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       if (legacyOrs.length > 0) {
         legacyQuery = legacyQuery.or(legacyOrs.join(","));
       }
-      const { data: legacyEmails } = await legacyQuery;
+
+      // Parallelize execution of canonical, legacy, recent events, and sync state queries
+      const [
+        { data: canonicalEmails },
+        { data: legacyEmails },
+        { data: recentEvents },
+        { data: ss }
+      ] = await Promise.all([
+        canonicalQuery,
+        legacyQuery,
+        supabase
+          .from("email_events")
+          .select("id, email_id, event_type, metadata, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10),
+        supabase
+          .from("email_sync_state")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle()
+      ]);
+      const syncState = ss || null;
 
       // Merge and deduplicate by id and gmail_message_id
       const seenIds = new Set<string>();
@@ -3511,14 +3511,6 @@ HUMAN-WRITTEN WRITING GUIDELINES:
         else importance.normal++;
       }
 
-      // Fetch recent events for real-time activity stream
-      const { data: recentEvents } = await supabase
-        .from("email_events")
-        .select("id, email_id, event_type, metadata, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
       // If email_events has items, use them; otherwise fallback to formatting the top 5 recent emails as activity
       const activityStream = (recentEvents && recentEvents.length > 0)
         ? recentEvents
@@ -3534,7 +3526,7 @@ HUMAN-WRITTEN WRITING GUIDELINES:
             created_at: e.createdAt || e.created_at || new Date().toISOString(),
           }));
 
-      // Check RPC analytics as an optional booster if available
+      // Check RPC analytics only as a fallback when unifiedList is empty
       let finalSent = sent;
       let finalReceived = received;
       let finalDrafts = drafts;
@@ -3544,7 +3536,7 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       let finalPending = pendingReview;
       let finalTotal = total;
 
-      if (dateRangeParam === "all") {
+      if (dateRangeParam === "all" && unifiedList.length === 0) {
         try {
           const { data: rpcStats, error: rpcErr } = await supabase.rpc("get_dashboard_analytics", { p_user_id: user.id });
           if (!rpcErr && rpcStats) {
@@ -3564,17 +3556,6 @@ HUMAN-WRITTEN WRITING GUIDELINES:
           }
         } catch (_) {}
       }
-
-      // Query current sync state for this user
-      let syncState: any = null;
-      try {
-        const { data: ss } = await supabase
-          .from("email_sync_state")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        syncState = ss;
-      } catch (_) {}
 
       return jsonResponse({
         success: true,

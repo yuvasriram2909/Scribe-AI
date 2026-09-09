@@ -38,6 +38,8 @@ export function ComposeWorkflow({
   onResetCompose, 
   initialData = {}, 
   onComplete, 
+  onNavigateToDashboard,
+  onViewHistory,
   onCancel, 
   onNavigateToSettings 
 }) {
@@ -417,6 +419,40 @@ export function ComposeWorkflow({
 
       const data = await safeParseResponse(res);
       if (!res.ok || data.error) throw new Error(data.error || 'Failed to send email.');
+
+      // Instant optimistic increment for stats cache in localStorage (0ms latency)
+      try {
+        const cachedRaw = localStorage.getItem('scribe_stats_cache');
+        const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
+        if (cached) {
+          cached.sent = (Number(cached.sent) || 0) + 1;
+          cached.sentToday = (Number(cached.sentToday) || 0) + 1;
+          cached.total = (Number(cached.total) || 0) + 1;
+          if (cached.categories) {
+            const catKey = (detectedCategory || '').toLowerCase();
+            for (const k of Object.keys(cached.categories)) {
+              if (catKey.includes(k.toLowerCase())) {
+                cached.categories[k] = (cached.categories[k] || 0) + 1;
+                break;
+              }
+            }
+          }
+          localStorage.setItem('scribe_stats_cache', JSON.stringify(cached));
+        }
+      } catch (_) {}
+
+      // Dispatch global real-time event for instant 0ms UI metric reaction across the app
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('scribe-email-sent', {
+          detail: {
+            email: data.email || null,
+            category: detectedCategory || 'Official / Professional',
+            recipient,
+            subject,
+            sentAt: new Date().toISOString()
+          }
+        }));
+      }
 
       updateState({
         sentResult: data,
@@ -1233,15 +1269,28 @@ export function ComposeWorkflow({
               Compose Another Email
             </button>
 
-            {onComplete && (
+            {(onNavigateToDashboard || onComplete) && (
               <button
                 onClick={() => {
                   if (onResetCompose) onResetCompose();
-                  onComplete();
+                  if (onNavigateToDashboard) onNavigateToDashboard();
+                  else if (onComplete) onComplete();
                 }}
-                className="px-6 py-3 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#F5F3EF] border border-[#2E2D2B] font-bold text-xs cursor-pointer"
+                className="px-6 py-3 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#F5F3EF] border border-[#2E2D2B] font-bold text-xs cursor-pointer flex items-center gap-2"
               >
                 Go to Dashboard
+              </button>
+            )}
+
+            {onViewHistory && (
+              <button
+                onClick={() => {
+                  if (onResetCompose) onResetCompose();
+                  onViewHistory();
+                }}
+                className="px-4 py-3 rounded-xl hover:bg-[#22211F] text-[#99958F] hover:text-[#F5F3EF] text-xs font-semibold cursor-pointer transition-colors"
+              >
+                View in History
               </button>
             )}
           </div>

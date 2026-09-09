@@ -882,7 +882,9 @@ export default function App() {
               onUpdateComposeState={handleUpdateComposeState}
               onResetCompose={handleResetCompose}
               initialData={composeInitialData}
-              onComplete={() => setActiveTab('history')}
+              onComplete={() => setActiveTab('dashboard')}
+              onNavigateToDashboard={() => setActiveTab('dashboard')}
+              onViewHistory={() => setActiveTab('history')}
               onCancel={() => setActiveTab('dashboard')}
               onNavigateToSettings={() => setActiveTab('settings')}
             />

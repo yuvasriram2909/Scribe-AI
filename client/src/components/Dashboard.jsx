@@ -164,7 +164,7 @@ export function Dashboard({
 
   const heroGreeting = formatHeroGreeting(authUserName, currentDate);
 
-  const [stats, setStats] = useState({
+  const DEFAULT_STATS = {
     sent: 0,
     received: 0,
     drafts: 0,
@@ -194,7 +194,68 @@ export function Dashboard({
       security: 0,
       other: 0,
     }
+  };
+
+  // Instant 0ms cache-first stats initialization
+  const [stats, setStats] = useState(() => {
+    try {
+      const cached = localStorage.getItem('scribe_stats_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            ...DEFAULT_STATS,
+            ...parsed,
+            categories: { ...DEFAULT_STATS.categories, ...(parsed.categories || {}) }
+          };
+        }
+      }
+    } catch (_) {}
+    return DEFAULT_STATS;
   });
+
+  const [hasCachedStats, setHasCachedStats] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem('scribe_stats_cache'));
+    } catch (_) {
+      return false;
+    }
+  });
+
+  // Listen for instant real-time dispatch events from AI Compose
+  useEffect(() => {
+    const handleEmailSent = (event) => {
+      const detail = event?.detail || {};
+      const catKey = (detail.category || '').toLowerCase();
+
+      setStats((prev) => {
+        const nextCategories = { ...(prev.categories || DEFAULT_STATS.categories) };
+        for (const k of Object.keys(nextCategories)) {
+          if (catKey.includes(k.toLowerCase())) {
+            nextCategories[k] = (nextCategories[k] || 0) + 1;
+            break;
+          }
+        }
+        const updated = {
+          ...prev,
+          sent: (Number(prev.sent) || 0) + 1,
+          sentToday: (Number(prev.sentToday) || 0) + 1,
+          total: (Number(prev.total) || 0) + 1,
+          categories: nextCategories
+        };
+        try {
+          localStorage.setItem('scribe_stats_cache', JSON.stringify(updated));
+        } catch (_) {}
+        return updated;
+      });
+
+      setHasCachedStats(true);
+      fetchDashboardData();
+    };
+
+    window.addEventListener('scribe-email-sent', handleEmailSent);
+    return () => window.removeEventListener('scribe-email-sent', handleEmailSent);
+  }, []);
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncToast, setSyncToast] = useState('');
@@ -208,7 +269,7 @@ export function Dashboard({
 
   const [showPushBanner, setShowPushBanner] = useState(false);
   const [recentEmails, setRecentEmails] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !hasCachedStats);
   const [deletingId, setDeletingId] = useState(null);
   const [retryingId, setRetryingId] = useState(null);
 
@@ -515,7 +576,7 @@ export function Dashboard({
         resolvedCategories[k] = Math.max(sData?.categories?.[k] || 0, emailListCategories[k] || 0);
       }
 
-      setStats({
+      const resolvedStats = {
         sent: Math.max(sData?.sent ?? sData?.totalEmails ?? 0, listSent),
         received: Math.max(sData?.received ?? 0, listReceived),
         drafts: Math.max(sData?.drafts ?? 0, listDrafts),
@@ -526,7 +587,21 @@ export function Dashboard({
         sentToday: sData?.sentToday ?? 0,
         total: Math.max(sData?.total ?? 0, emailList.length),
         categories: resolvedCategories
+      };
+
+      setStats(prev => {
+        const merged = {
+          ...resolvedStats,
+          sent: Math.max(prev.sent, resolvedStats.sent),
+          sentToday: Math.max(prev.sentToday, resolvedStats.sentToday),
+          total: Math.max(prev.total, resolvedStats.total)
+        };
+        try {
+          localStorage.setItem('scribe_stats_cache', JSON.stringify(merged));
+        } catch (_) {}
+        return merged;
       });
+      setHasCachedStats(true);
     } catch (err) {
       console.error('Dashboard data fetch error:', err);
     } finally {
@@ -1059,7 +1134,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.sent ?? 0)}
+              {(loading && !hasCachedStats) ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.sent ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Active dispatch
@@ -1084,7 +1159,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.received ?? 0)}
+              {(loading && !hasCachedStats) ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.received ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Inbox activity
@@ -1109,7 +1184,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.drafts ?? 0)}
+              {(loading && !hasCachedStats) ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.drafts ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Saved drafts
@@ -1134,7 +1209,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.scheduled ?? 0)}
+              {(loading && !hasCachedStats) ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.scheduled ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Queue ready
@@ -1159,7 +1234,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.emergency ?? 0)}
+              {(loading && !hasCachedStats) ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.emergency ?? 0)}
             </div>
             <div className="text-[11px] font-medium mt-0.5 text-rose-400">
               High priority
@@ -1184,7 +1259,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.spam ?? 0)}
+              {(loading && !hasCachedStats) ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.spam ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Filtered messages
@@ -1209,7 +1284,7 @@ export function Dashboard({
           </div>
           <div>
             <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight stat-metric-number transition-all duration-200 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
-              {loading ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.pendingReview ?? 0)}
+              {(loading && !hasCachedStats) ? <span className="text-sm font-normal text-[#99958F] animate-pulse">...</span> : (stats.pendingReview ?? 0)}
             </div>
             <div className={`text-[11px] font-medium mt-0.5 ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
               Awaiting confirmation
