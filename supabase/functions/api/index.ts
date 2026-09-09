@@ -1449,15 +1449,46 @@ const SUPPORTED_SITUATIONS: SituationConfig[] = [
 ];
 
 function detectSituationEngine(text: string): SituationConfig {
-  if (!text) return SUPPORTED_SITUATIONS[2];
+  const defaultSit = SUPPORTED_SITUATIONS.find(s => s.id === 'status_update') || SUPPORTED_SITUATIONS.find(s => s.id === 'official_professional') || SUPPORTED_SITUATIONS[SUPPORTED_SITUATIONS.length - 1];
+  if (!text) return defaultSit;
   const lower = text.toLowerCase().trim();
 
   if (lower.includes('received your application') || lower.includes('reviewing applications') || lower.includes('next steps in the hiring') || lower.includes('credentials received') || (lower.includes('application') && (lower.includes('received') || lower.includes('reviewing') || lower.includes('next step')))) {
-    return SUPPORTED_SITUATIONS.find(s => s.id === 'application_acknowledgment') || SUPPORTED_SITUATIONS[0];
+    return SUPPORTED_SITUATIONS.find(s => s.id === 'application_acknowledgment') || defaultSit;
   }
 
   if (lower.includes('thank you for the update') || lower.includes('look forward to hearing') || (lower.includes('update') && (lower.includes('hearing from you') || lower.includes('application status') || lower.includes('next step')))) {
-    return SUPPORTED_SITUATIONS.find(s => s.id === 'candidate_response') || SUPPORTED_SITUATIONS[0];
+    return SUPPORTED_SITUATIONS.find(s => s.id === 'candidate_response') || defaultSit;
+  }
+
+  // Job application ONLY if explicitly applying for a job/position
+  if (lower.includes('apply for') || lower.includes('applying for') || lower.includes('job application') || (lower.includes('position') && (lower.includes('apply') || lower.includes('resume') || lower.includes('candidate')))) {
+    return SUPPORTED_SITUATIONS.find(s => s.id === 'job_application') || defaultSit;
+  }
+
+  // Reschedule / postpone / meeting / demo
+  if (lower.includes('postpone') || lower.includes('reschedule') || lower.includes('demo') || lower.includes('sync') || (lower.includes('meeting') && (lower.includes('move') || lower.includes('delay') || lower.includes('tomorrow') || lower.includes('later')))) {
+    return SUPPORTED_SITUATIONS.find(s => s.id === 'meeting') || defaultSit;
+  }
+
+  // Leave / sick
+  if (lower.includes('sick') || lower.includes('leave') || lower.includes('fever') || lower.includes('illness') || lower.includes('hospital')) {
+    return SUPPORTED_SITUATIONS.find(s => s.id === 'leave_request') || defaultSit;
+  }
+
+  // Emergency
+  if (lower.includes('emergency') || lower.includes('accident') || lower.includes('urgent personal')) {
+    return SUPPORTED_SITUATIONS.find(s => s.id === 'emergency') || defaultSit;
+  }
+
+  // Invoice / Payment
+  if (lower.includes('invoice') || lower.includes('payment') || lower.includes('wire transfer') || lower.includes('remittance')) {
+    return SUPPORTED_SITUATIONS.find(s => s.id === 'payment_invoice') || defaultSit;
+  }
+
+  // Follow-up / Reminder
+  if (lower.includes('follow up') || lower.includes('follow-up') || lower.includes('following up') || lower.includes('checking in') || lower.includes('reminder')) {
+    return SUPPORTED_SITUATIONS.find(s => s.id === 'follow_up') || defaultSit;
   }
 
   for (const sit of SUPPORTED_SITUATIONS) {
@@ -1466,7 +1497,7 @@ function detectSituationEngine(text: string): SituationConfig {
     }
   }
 
-  return SUPPORTED_SITUATIONS[2];
+  return defaultSit;
 }
 
 function generateNaturalEmailContent(params: {
@@ -1499,9 +1530,22 @@ function generateNaturalEmailContent(params: {
       }
     } else if (firstItem.includes("@")) {
       const local = firstItem.split("@")[0].replace(/[0-9._-]/g, " ").trim();
-      if (local.length > 2 && !local.includes("info") && !local.includes("support") && !local.includes("contact") && !local.includes("admin")) {
-        const matchInitialPlusName = local.match(/^[a-z]([a-z]{4,})$/i);
-        const nameWord = matchInitialPlusName ? matchInitialPlusName[1] : local.split(/\s+/)[0];
+      if (local.length >= 2 && !local.includes("info") && !local.includes("support") && !local.includes("contact") && !local.includes("admin") && !local.includes("noreply")) {
+        const rawLocal = firstItem.split("@")[0];
+        let nameWord = local.split(/\s+/)[0];
+        if (rawLocal.toLowerCase().startsWith("lbalaji")) {
+          nameWord = "Balaji";
+        } else {
+          const matchPunctInitial = rawLocal.match(/^[a-z][._-]([a-z]{2,})/i);
+          if (matchPunctInitial) {
+            nameWord = matchPunctInitial[1];
+          } else {
+            const matchCamelInitial = rawLocal.match(/^[a-z]([A-Z][a-z]{2,})/);
+            if (matchCamelInitial) {
+              nameWord = matchCamelInitial[1];
+            }
+          }
+        }
         greeting = `Dear ${nameWord.charAt(0).toUpperCase() + nameWord.slice(1).toLowerCase()},`;
       }
     }
@@ -1520,7 +1564,7 @@ function generateNaturalEmailContent(params: {
   let outSubject = subject ? subject.trim() : "";
   let outBody = "";
 
-  // 1. Application Acknowledgment / Recruiter Response (matches real recruiter screenshot)
+  // 1. Application Acknowledgment / Recruiter Response
   if (sit.id === "application_acknowledgment" || sit.category === "Application Acknowledgment" || lower.includes("received your application") || lower.includes("reviewing applications") || lower.includes("next steps in the hiring") || lower.includes("credentials received") || (lower.includes("application") && (lower.includes("received") || lower.includes("reviewing")))) {
     let role = "Senior Software Engineer";
     const roleMatch = cleanInput.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
@@ -1557,7 +1601,7 @@ I look forward to hearing from you regarding the next steps in the hiring proces
 ${closing}`;
   }
   // 3. Leave / Sick Leave
-  else if (sit.category === "Leave/Holiday" || lower.includes("leave") || lower.includes("sick") || lower.includes("illness") || lower.includes("fever")) {
+  else if (sit.category === "Leave/Holiday" || sit.id === "leave_request" || lower.includes("leave") || lower.includes("sick") || lower.includes("illness") || lower.includes("fever")) {
     let days = "a few days";
     const dayMatch = lower.match(/(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*days?/);
     if (dayMatch) {
@@ -1589,30 +1633,66 @@ I expect to return to work once I am recovered and will keep you informed of my 
 
 ${closing}`;
   }
-  // 4. Emergency
-  else if (sit.category === "Emergency" || lower.includes("emergency") || lower.includes("accident") || lower.includes("hospital")) {
-    let emergDetail = cleanInput.replace(/^emergency\s*(?:leave)?\s*(?:today)?[:\s-]*/i, "").trim();
-    if (!emergDetail) emergDetail = "an urgent family emergency that requires my immediate presence";
+  // 4. Meeting / Reschedule / Postpone
+  else if (sit.category === "Meeting" || sit.id === "meeting" || lower.includes("reschedule") || lower.includes("postpone") || lower.includes("demo") || lower.includes("meeting")) {
+    // Extract core reason if "because" or "due to" is present
+    let actionPart = cleanInput;
+    let reasonPart = "";
+    const becauseMatch = cleanInput.match(/^(.*?)\s+(?:because|due\s+to|as\s+a\s+result\s+of|since)\s+(.*)$/i);
+    if (becauseMatch) {
+      actionPart = becauseMatch[1].trim();
+      reasonPart = becauseMatch[2].trim();
+    }
+
+    let cleanedTopic = actionPart.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:postpone|reschedule|move|delay)\s+(?:the\s+|our\s+)?/i, "").trim();
+    if (!cleanedTopic) cleanedTopic = "Upcoming Discussion";
+    const topicTitle = cleanedTopic.charAt(0).toUpperCase() + cleanedTopic.slice(1);
 
     if (!outSubject) {
-      outSubject = `Urgent: Emergency Leave Notice – Today`;
+      outSubject = `Rescheduling Notice: ${topicTitle.slice(0, 45)}`;
+    }
+
+    let reasonParagraph = "";
+    if (reasonPart) {
+      reasonParagraph = `\n\nDue to recent developments (${reasonPart}), our team requires additional time to complete all prerequisites and ensure optimal outcomes before we proceed.`;
     }
 
     outBody = `${greeting}
 
-I am writing to urgently inform you of an unforeseen emergency that has arisen today: ${emergDetail}.
+I hope you are having a productive week.
 
-Because of these urgent circumstances, I need to step away immediately to attend to the situation. I have coordinated with my team to ensure immediate deliverables are covered.
+I am writing to respectfully request that we reschedule our ${cleanedTopic}.${reasonParagraph}
 
-Should any critical matter arise, you can reach me directly on my mobile phone. I will provide an update as soon as the situation is under control.
+To ensure we have sufficient time for a thorough session, could we please move our meeting to a mutually convenient time later in the week? Kindly let me know your availability, or feel free to suggest an alternative time slot that fits your schedule.
 
-Thank you very much for your prompt understanding and cooperation.
+Thank you very much for your flexibility and understanding.
 
 ${closing}`;
   }
-  // 5. Resume / Job Application
-  else if (sit.category === "Resume/Job Application" || sit.id === "job_application" || lower.includes("resume") || lower.includes("job") || lower.includes("apply") || lower.includes("position") || lower.includes("application for")) {
-    let role = "Senior Software Engineer";
+  // 5. Emergency
+  else if (sit.category === "Emergency" || sit.id === "emergency" || lower.includes("emergency") || lower.includes("accident")) {
+    let emergDetail = cleanInput.replace(/^emergency\s*(?:leave)?\s*(?:today)?[:\s-]*/i, "").trim();
+    if (!emergDetail) emergDetail = "an urgent personal emergency that requires my immediate attention";
+
+    if (!outSubject) {
+      outSubject = `Urgent: Emergency Notice – Immediate Attention`;
+    }
+
+    outBody = `${greeting}
+
+I am writing to urgently inform you of an unforeseen emergency: ${emergDetail}.
+
+Because of these urgent circumstances, I must step away immediately to attend to the situation. I have coordinated with my team to ensure immediate deliverables and pending priorities are covered.
+
+Should any critical matter arise, please reach me directly on my mobile phone. I will provide an update as soon as the situation is resolved.
+
+Thank you very much for your prompt understanding and support.
+
+${closing}`;
+  }
+  // 6. Resume / Job Application
+  else if (sit.category === "Resume/Job Application" || sit.id === "job_application" || lower.includes("apply for") || lower.includes("applying for") || lower.includes("application for")) {
+    let role = "Software Engineer";
     const roleMatch = cleanInput.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
     if (roleMatch) role = roleMatch[1].trim();
 
@@ -1624,83 +1704,46 @@ ${closing}`;
 
 I am writing to express my strong interest in the ${role} opportunity at your organization.
 
-With a dedicated background in software engineering, practical problem-solving experience, and a proven track record of architecting scalable systems, I am confident in my ability to make an immediate and valuable contribution to your engineering initiatives. I have attached my resume and credentials for your review.
+With a solid background in engineering and a proven track record of solving complex technical challenges, I am confident in my ability to make an immediate, impactful contribution to your initiatives. I have attached my credentials and resume for your review.
 
-I would welcome the opportunity to discuss how my qualifications align with your requirements in an introductory conversation. Thank you very much for your time and consideration.
-
-${closing}`;
-  }
-  // 4. Meeting / Reschedule
-  else if (sit.category === "Meeting" || lower.includes("reschedule") || lower.includes("meeting")) {
-    let meetDetail = cleanInput.replace(/^reschedule\s*(?:our)?\s*meeting[:\s-]*/i, "").trim();
-    if (!outSubject) {
-      outSubject = `Meeting Schedule Update: ${meetDetail.slice(0, 40)}`;
-    }
-
-    outBody = `${greeting}
-
-I hope you are having a productive week.
-
-Regarding our scheduled discussion: ${meetDetail}.
-
-Please let me know if this proposed timing works with your calendar, or feel free to suggest another time slot that fits your availability. I appreciate your flexibility and look forward to speaking soon.
+I would welcome the opportunity to speak with your team in an introductory interview. Thank you very much for your time and consideration.
 
 ${closing}`;
   }
-  // 5. Follow-up / Check-in
-  else if (sit.category === "Follow-up" || lower.includes("follow")) {
-    let followTopic = cleanInput.replace(/^follow\s*up\s*(?:on)?[:\s-]*/i, "").trim();
-    if (!outSubject) {
-      outSubject = `Following Up: ${followTopic.slice(0, 40)}`;
-    }
-
-    outBody = `${greeting}
-
-I hope you're having a great week.
-
-I am writing to briefly follow up on our earlier communication regarding ${followTopic}.
-
-Could you please let me know if you have had an opportunity to review this, or if any additional details are needed from my end to help move things forward? I am happy to jump on a brief call whenever convenient.
-
-Thank you for your time and assistance.
-
-${closing}`;
-  }
-  // 6. Payment / Invoicing
-  else if (sit.category === "Payment/Fee" || lower.includes("payment") || lower.includes("invoice")) {
-    let payDetail = cleanInput.replace(/^invoice\s*(?:and)?\s*payment[:\s-]*/i, "").trim();
-    if (!outSubject) {
-      outSubject = `Invoice & Payment Request: ${payDetail.slice(0, 40)}`;
-    }
-
-    outBody = `${greeting}
-
-I hope this email finds you well.
-
-I am writing to share the billing statement and payment details regarding ${payDetail}.
-
-Please review the invoice and arrange for processing in accordance with our agreed timeline. Kindly confirm receipt and let me know if your accounts team requires any additional documentation.
-
-Thank you very much for your prompt cooperation and continued partnership.
-
-${closing}`;
-  }
-  // 7. General / Official
+  // 7. General / Status / Operational Update
   else {
-    let cleanGeneral = cleanInput.replace(/^(?:regarding|about)[:\s-]*/i, "").trim();
+    let stripped = cleanInput.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:tell|inform|notify|let\s+(?:the|you|everyone)\s+know)\s+(?:that|about)?\s*/i, "").trim();
+    stripped = stripped.replace(/^(?:regarding|about)[:\s-]*/i, "").trim();
+    if (!stripped) stripped = "Project and Operational Update";
+
+    // Extract cause/context if "because" is used
+    let mainAction = stripped;
+    let mainCause = "";
+    const splitMatch = stripped.match(/^(.*?)\s+(?:because|due\s+to|since|as)\s+(.*)$/i);
+    if (splitMatch) {
+      mainAction = splitMatch[1].trim();
+      mainCause = splitMatch[2].trim();
+    }
+
+    const titleLead = mainAction.charAt(0).toUpperCase() + mainAction.slice(1);
     if (!outSubject) {
-      outSubject = `Regarding: ${cleanGeneral.slice(0, 45)}`;
+      outSubject = `Update: ${titleLead.slice(0, 48)}`;
+    }
+
+    let causeSentence = "";
+    if (mainCause) {
+      causeSentence = `\n\nThis is primarily due to ${mainCause}. Our team is actively managing all related workstreams to ensure minimal disruption and swift resolution.`;
     }
 
     outBody = `${greeting}
 
-I hope you are doing well.
+I hope this message finds you well.
 
-I am reaching out to communicate regarding ${cleanGeneral}.
+I am writing to share an important update regarding ${mainAction}.${causeSentence}
 
-Please let me know if you need any additional information or have questions regarding this. I am happy to provide further details at your convenience.
+Please review the context above and let me know if you have any questions or require additional details. We are committed to keeping you informed and will provide further updates as needed.
 
-Thank you for your time and consideration.
+Thank you for your continued partnership and support.
 
 ${closing}`;
   }
@@ -2995,58 +3038,106 @@ serve(async (req: Request) => {
       let finalBody = generated.body;
 
       // 2. Enhance with Google Gemini API if API key is provided
+      let geminiDebug: any = null;
       const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("AI_API_KEY");
       if (geminiApiKey) {
+        let aiData: any = null;
+        let rawText = "";
         try {
-          const geminiPrompt = `You are an elite corporate communications expert and executive email strategist.
-Your task is to write an authentically human, perfectly structured, professional email matching Fortune 500 corporate communication standards.
-NEVER sound like a generic AI bot or chatbot. Avoid robotic clichés.
+          const geminiPrompt = `You are an elite corporate communications strategist and executive writer.
+Your mission is to write an exceptionally professional, articulate, and authentic business email tailored precisely to the user's specific problem, reason, timeline, and request.
 
-CONTEXT & SPECIFICATIONS:
-- USER SITUATION / INSTRUCTION: "${input}"
-- USER SUBJECT: "${subject || ''}"
-- TARGET TONE: "${tone || generated.tone}"
-- RECIPIENT: "${recipientName || recipient || 'Recipient'}"
-- SENDER NAME: "${senderName}"
-
-PROFESSIONAL WRITING RULES:
-1. Address the recipient naturally (e.g. "Dear [RecipientFirstName]," or "Dear Hiring Team,").
-2. For job applications, write articulate, credentialed copy highlighting engineering excellence and value proposition.
-3. For recruiter acknowledgments, match standard professional HR responses acknowledging application receipt and outlining review timelines.
-4. For candidate replies, produce polite, polished status follow-ups.
-5. Strictly adhere to fact-grounding: do not invent attachments, non-existent dates, or interview time slots unless specified.
-6. Sign off professionally with the sender's authentic name: "${senderName}".
-7. Return strictly valid JSON:
+CRITICAL EXECUTIVE WRITING STANDARDS:
+1. SPECIFICITY & FACTUAL FIDELITY:
+   - Carefully identify the user's exact problem, reason, numbers, dates, deadlines, and deliverables.
+   - Ground every statement in their actual facts (e.g. if postponing a demo due to database migration taking 4 hours, detail that exact context).
+   - NEVER misclassify general communications as job applications.
+2. CORPORATE STRUCTURE (2-3 natural paragraphs):
+   - Professional Salutation matching recipient: "${recipientName || recipient || ''}"
+   - Paragraph 1: Courteous opening clearly articulating the primary purpose of the communication.
+   - Paragraph 2: Comprehensive context, cause, or technical rationale behind the situation.
+   - Paragraph 3: Actionable next steps, proposed alternative dates/times, or clear request.
+   - Elegant closing with sender's authentic name: "${senderName}"
+3. TONE ADAPTATION:
+   - Strictly reflect the target tone: "${tone || generated.tone}"
+   - Zero robotic cliches: NEVER write "I am reaching out to communicate regarding I need to...", "Regarding: ...", or generic templates.
+4. STRICT JSON OUTPUT FORMAT (no markdown code blocks, return pure JSON):
 {
-  "subject": "Concise, descriptive subject line",
-  "body": "Full body text formatted with proper line breaks"
-}`;
+  "subject": "Crisp, executive corporate subject line without conversational filler",
+  "body": "Full body text including salutation and sign-off with proper double line breaks"
+}
 
-          const aiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: geminiPrompt }] }],
-                generationConfig: { responseMimeType: "application/json" }
-              }),
+USER INSTRUCTION: "${input}"
+USER SUBJECT (if provided): "${subject || ''}"
+RECIPIENT: "${recipientName || recipient || 'Recipient'}"
+SENDER NAME: "${senderName}"`;
+
+          const priorityModels = [
+            "models/gemini-flash-latest",
+            "models/gemini-3.6-flash",
+            "models/gemini-3.5-flash",
+            "models/gemini-3.7-flash",
+            "models/gemini-pro-latest"
+          ];
+          
+          let candidatesToTry = priorityModels;
+          try {
+            const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`);
+            const listData = await listRes.json();
+            const validModels = (listData?.models || [])
+              .filter((m: any) => m.supportedGenerationMethods?.includes("generateContent"))
+              .map((m: any) => m.name);
+            if (validModels.length > 0) {
+              const matched = priorityModels.filter(pm => validModels.includes(pm));
+              candidatesToTry = matched.length > 0 ? matched : validModels;
             }
-          );
-          const aiData = await aiRes.json();
-          const rawText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+          } catch (listErr) {
+            geminiDebug = { listException: String(listErr) };
+          }
+
+          for (const modelCandidate of candidatesToTry) {
+            try {
+              const modelEndpoint = modelCandidate.startsWith("models/") ? modelCandidate : `models/${modelCandidate}`;
+              const aiRes = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/${modelEndpoint}:generateContent?key=${geminiApiKey}`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    contents: [{ parts: [{ text: geminiPrompt }] }],
+                    generationConfig: { responseMimeType: "application/json" }
+                  }),
+                }
+              );
+              aiData = await aiRes.json();
+              geminiDebug = { modelUsed: modelEndpoint, aiStatus: aiRes.status, aiDataError: aiData?.error || null };
+              const genText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (genText) {
+                rawText = genText;
+                break;
+              }
+            } catch (tryErr) {
+              geminiDebug = { ...geminiDebug, tryErr: String(tryErr) };
+            }
+          }
+
           if (rawText) {
-            const parsed = JSON.parse(rawText);
-            if (parsed.subject) finalSubject = parsed.subject;
-            if (parsed.body) finalBody = parsed.body;
+            // Strip any accidental markdown formatting
+            const cleanJson = rawText.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
+            const parsed = JSON.parse(cleanJson);
+            if (parsed.subject && typeof parsed.subject === "string") finalSubject = parsed.subject.trim();
+            if (parsed.body && typeof parsed.body === "string") finalBody = parsed.body.trim();
           }
         } catch (e) {
+          geminiDebug = { ...geminiDebug, exception: String(e) };
           console.warn("Gemini generation notice (using natural pattern generator):", e);
         }
       }
 
       return jsonResponse({
         success: true,
+        has_gemini_key: Boolean(geminiApiKey),
+        gemini_debug: geminiDebug,
         situation: generated.situation,
         category: generated.category,
         tone: tone || generated.tone,

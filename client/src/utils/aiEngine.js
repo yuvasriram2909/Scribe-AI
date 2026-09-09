@@ -346,7 +346,8 @@ export function classifyEmailIntent(input = '', subject = '') {
     return EMAIL_CATEGORIES.find(c => c.id === 'candidate_response');
   }
 
-  if (text.includes('application for') || text.includes('applying for') || (text.includes('position') && (text.includes('engineer') || text.includes('developer') || text.includes('candidate') || text.includes('apply')))) {
+  // Job application ONLY if explicitly applying for a job/position
+  if (text.includes('application for') || text.includes('applying for') || text.includes('job application') || (text.includes('position') && (text.includes('engineer') || text.includes('developer') || text.includes('candidate') || text.includes('apply')))) {
     return EMAIL_CATEGORIES.find(c => c.id === 'job_application');
   }
 
@@ -362,7 +363,7 @@ export function classifyEmailIntent(input = '', subject = '') {
     return EMAIL_CATEGORIES.find(c => c.id === 'complaint');
   }
 
-  if (text.includes('invoice') || text.includes('pay by') || text.includes('payment') || text.includes('due date')) {
+  if (text.includes('extension') || text.includes('rent') || text.includes('invoice') || text.includes('pay by') || text.includes('payment') || text.includes('due date')) {
     return EMAIL_CATEGORIES.find(c => c.id === 'payment_invoice');
   }
 
@@ -377,7 +378,8 @@ export function classifyEmailIntent(input = '', subject = '') {
     return EMAIL_CATEGORIES.find(c => c.id === 'resume_submission');
   }
 
-  if (text.includes('reschedule') || (text.includes('meeting') && (text.includes('move') || text.includes('tomorrow') || text.includes('friday')))) {
+  // Reschedule / postpone / meeting / demo
+  if (text.includes('postpone') || text.includes('reschedule') || text.includes('demo') || text.includes('sync') || (text.includes('meeting') && (text.includes('move') || text.includes('delay') || text.includes('tomorrow') || text.includes('friday') || text.includes('next week')))) {
     return EMAIL_CATEGORIES.find(c => c.id === 'meeting');
   }
 
@@ -398,8 +400,8 @@ export function classifyEmailIntent(input = '', subject = '') {
   }
 
   // 2. Keyword Scoring Match
-  let bestCategory = EMAIL_CATEGORIES[0];
-  let maxScore = -1;
+  let bestCategory = null;
+  let maxScore = 0;
 
   for (const cat of EMAIL_CATEGORIES) {
     let score = 0;
@@ -412,6 +414,11 @@ export function classifyEmailIntent(input = '', subject = '') {
       maxScore = score;
       bestCategory = cat;
     }
+  }
+
+  // If no strong keyword matches, default to Status / Progress Update (never job application!)
+  if (!bestCategory || maxScore <= 0) {
+    return EMAIL_CATEGORIES.find(c => c.id === 'status_update') || EMAIL_CATEGORIES[0];
   }
 
   return bestCategory;
@@ -601,7 +608,12 @@ export function determineGreeting(recipient = '', recipientType = 'unknown', ton
 export function cleanUserInput(raw = '') {
   let text = (raw || '').trim();
   text = text.replace(/\s+[a-zA-Z]$/, '').trim();
+  // Strip conversational dispatch commands ("send email to...", "write an email telling...")
   text = text.replace(/^(?:please\s+)?(?:send\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|saying\s+that\s+|saying\s+|about\s+)?|i\s+want\s+to\s+(?:send|write)\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|about\s+)?|write\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|about\s+)?)/i, '').trim();
+  // Strip informational conversational prefixes ("inform the team that...", "tell the client that...", "ask the manager for...")
+  text = text.replace(/^(?:(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:inform|tell|notify|alert)\s+(?:the\s+[^:]+?\s+|team\s+|client\s+|everyone\s+)?(?:that\s+|about\s+)?)/i, '').trim();
+  text = text.replace(/^(?:ask\s+(?:the\s+[^:]+?\s+)?(?:for\s+)?)/i, '').trim();
+  text = text.replace(/^(?:let\s+(?:the\s+[^:]+?|everyone|you|the\s+team)\s+know\s+(?:that\s+|about\s+)?)/i, '').trim();
   return text;
 }
 
@@ -932,33 +944,76 @@ ${closing}`;
     }
 
     case 'meeting': {
-      let meetDetail = input.replace(/^reschedule\s*(?:our)?\s*meeting[:\s-]*/i, '').trim();
-      if (!meetDetail) meetDetail = 'our upcoming project discussion';
+      // Deconstruct action vs cause/reason (e.g. "postpone tomorrow sprint demo ... because ...")
+      let actionPart = input;
+      let reasonPart = '';
+      const becauseMatch = input.match(/^(.*?)\s+(?:because|due\s+to|as\s+a\s+result\s+of|since)\s+(.*)$/i);
+      if (becauseMatch) {
+        actionPart = becauseMatch[1].trim();
+        reasonPart = becauseMatch[2].trim();
+      }
+
+      let cleanedTopic = actionPart.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:postpone|reschedule|move|delay)\s+(?:the\s+|our\s+)?/i, '').trim();
+      if (!cleanedTopic) cleanedTopic = 'Upcoming Discussion';
+      const topicTitle = cleanedTopic.charAt(0).toUpperCase() + cleanedTopic.slice(1);
 
       if (!finalSubject) {
-        finalSubject = `Meeting Update: ${meetDetail.slice(0, 40)}`;
+        finalSubject = `Rescheduling Notice: ${topicTitle.slice(0, 45)}`;
       }
+
+      let reasonContext = reasonPart 
+        ? `Due to unexpected staging developments (${reasonPart}), our team requires additional time to ensure complete stability and verification prior to the session.`
+        : 'Due to unforeseen operational priorities, our team requires a short window to finalize all deliverables prior to the session.';
 
       if (toneId === 'action_concise') {
         bodyContent = `${greeting}
 
-Meeting Request: ${meetDetail}
+Schedule Adjustment Request: ${cleanedTopic}
 
-- Agenda: Review key milestones, discuss blockers, and align on next steps
-- Proposed Duration: 20 minutes
-- Proposed Availability: Please confirm if this week's proposed slot works, or propose a time that fits your calendar
+- Reason: ${reasonPart || 'Finalizing prerequisites and ensuring quality verification'}
+- Proposed Action: Move scheduled demo/discussion to an updated time slot later this week
+- Requested Confirmation: Please reply with your availability or preferred 30-minute window
 
-Best,
+Thank you for your flexibility,
 
 ${closing}`;
-      } else {
+      } else if (toneId === 'executive') {
+        bodyContent = `${greeting}
+
+I am writing to request that we reschedule our ${cleanedTopic}.
+
+${reasonContext}
+
+To ensure we deliver a focused and high-value demonstration, we would like to propose holding this session later in the week. Please let me know your availability for an alternative time slot.
+
+Sincerely,
+
+${closing}`;
+      } else if (toneId === 'polite_diplomatic') {
         bodyContent = `${greeting}
 
 I hope you are having a productive week.
 
-Regarding our scheduled discussion on ${meetDetail}:
+I am writing to respectfully ask if it might be possible to reschedule our ${cleanedTopic}.
 
-Please let me know if the proposed timing aligns with your schedule, or feel free to suggest another time window that fits your availability. I appreciate your flexibility and look forward to our conversation.
+${reasonContext} We truly appreciate your team's partnership, and we want to ensure everything is thoroughly prepared for a productive conversation.
+
+Could you kindly share a few time slots later this week or next that fit your schedule? Thank you very much for your courteous understanding and flexibility.
+
+${closing}`;
+      } else {
+        // Corporate Professional standard
+        bodyContent = `${greeting}
+
+I hope you are having a productive week.
+
+I am writing to respectfully request that we reschedule our ${cleanedTopic}.
+
+${reasonContext}
+
+To ensure we provide a comprehensive walkthrough and address all technical aspects thoroughly, could we please move our meeting to a mutually convenient time later in the week? Kindly let me know your availability so we can confirm an updated calendar invite.
+
+Thank you very much for your flexibility and understanding.
 
 ${closing}`;
       }
@@ -1032,6 +1087,41 @@ ${closing}`;
     }
 
     case 'payment_invoice': {
+      if (lower.includes('extension') || lower.includes('rent') || lower.includes('extend')) {
+        let actionPart = input;
+        let reasonPart = '';
+        const becauseMatch = input.match(/^(.*?)\s+(?:because|due\s+to|since|as)\s+(.*)$/i);
+        if (becauseMatch) {
+          actionPart = becauseMatch[1].trim();
+          reasonPart = becauseMatch[2].trim();
+        }
+
+        let cleanExt = actionPart.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:request|ask\s+for)?\s*(?:an?\s+)?/i, '').trim();
+        const extTitle = cleanExt.charAt(0).toUpperCase() + cleanExt.slice(1);
+        if (!finalSubject) {
+          finalSubject = `Payment Extension Request – ${extTitle.slice(0, 42)}`;
+        }
+
+        let reasonText = reasonPart
+          ? `Due to unforeseen timing (${reasonPart}), there has been a temporary delay in available funds.`
+          : 'Due to unexpected banking processing times, there has been a temporary hold on funds.';
+
+        bodyContent = `${greeting}
+
+I hope this message finds you well.
+
+I am writing to respectfully request a short extension regarding ${cleanExt}.
+
+${reasonText} I am actively coordinating to ensure this is cleared promptly and anticipate fulfilling the payment in full immediately upon resolution.
+
+I deeply appreciate your understanding and flexibility regarding this matter. Please let me know if this proposed arrangement is acceptable.
+
+Thank you very much for your patience.
+
+${closing}`;
+        break;
+      }
+
       let payDetail = input.replace(/^invoice\s*(?:and)?\s*payment[:\s-]*/i, '').trim();
       if (!payDetail) payDetail = 'outstanding services';
 
@@ -1114,21 +1204,37 @@ ${closing}`;
     }
 
     default: {
-      let cleanGeneral = input.replace(/^(?:regarding|about)[:\s-]*/i, '').trim();
-      if (!cleanGeneral) cleanGeneral = 'important operational updates';
+      let stripped = input.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:tell|inform|notify|let\s+(?:the|you|everyone)\s+know)\s+(?:that|about)?\s*/i, '').trim();
+      stripped = stripped.replace(/^(?:regarding|about)[:\s-]*/i, '').trim();
+      if (!stripped) stripped = 'Project and Operational Update';
 
+      // Extract cause / background if "because" or "due to" is present
+      let mainAction = stripped;
+      let mainCause = '';
+      const splitMatch = stripped.match(/^(.*?)\s+(?:because|due\s+to|since|as)\s+(.*)$/i);
+      if (splitMatch) {
+        mainAction = splitMatch[1].trim();
+        mainCause = splitMatch[2].trim();
+      }
+
+      const titleLead = mainAction.charAt(0).toUpperCase() + mainAction.slice(1);
       if (!finalSubject) {
-        finalSubject = `Regarding: ${cleanGeneral.slice(0, 45)}`;
+        finalSubject = `Update: ${titleLead.slice(0, 48)}`;
+      }
+
+      let causeParagraph = '';
+      if (mainCause) {
+        causeParagraph = `\n\nThis development is primarily driven by ${mainCause}. Our team is actively managing all dependencies to ensure workstreams proceed smoothly with minimum disruption.`;
       }
 
       if (toneId === 'action_concise') {
         bodyContent = `${greeting}
 
-Update regarding ${cleanGeneral}:
+Operational Update: ${mainAction}
 
-- Core Detail: ${cleanGeneral}
-- Next Action: Please review and let me know if any questions arise
-- Timeline: Open for discussion at your convenience
+- Key Context: ${mainCause || mainAction}
+- Current Status: Action underway / actively monitored
+- Next Steps: Please review and let me know if any questions arise
 
 Best,
 
@@ -1136,23 +1242,34 @@ ${closing}`;
       } else if (toneId === 'executive') {
         bodyContent = `${greeting}
 
-I am reaching out to provide a strategic update regarding ${cleanGeneral}.
+I am reaching out to provide an executive update regarding ${mainAction}.${causeParagraph}
 
-Please review the context below and advise if your team requires further alignment or executive briefing. We remain focused on ensuring our milestones proceed smoothly.
+Please review the context above and let me know if your team requires further strategic alignment or executive briefing. We remain focused on ensuring our milestones proceed smoothly.
 
 Sincerely,
 
 ${closing}`;
-      } else {
+      } else if (toneId === 'polite_diplomatic') {
         bodyContent = `${greeting}
 
-I hope this email finds you well.
+I hope you are having a productive week.
 
-I am reaching out to communicate with you regarding ${cleanGeneral}.
+I wanted to take a moment to share an update regarding ${mainAction}.${causeParagraph}
 
-Please let me know if you need any additional details or clarification. I am happy to provide further information at your convenience.
+Please feel free to reach out if you need any additional context or clarification. I truly appreciate your continued support and collaboration.
 
-Thank you for your time and continued support.
+${closing}`;
+      } else {
+        // Corporate Professional standard
+        bodyContent = `${greeting}
+
+I hope this message finds you well.
+
+I am writing to provide an important update regarding ${mainAction}.${causeParagraph}
+
+Please let me know if you need any additional details or have any questions. I am happy to hop on a quick call or provide further information at your convenience.
+
+Thank you very much for your time and continued support.
 
 ${closing}`;
       }

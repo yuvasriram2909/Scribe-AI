@@ -10,7 +10,7 @@
  * - Header with user avatar, status pill, and notification bell
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Sparkles, Mail, Bell, LayoutDashboard, History, Settings, 
   Send, ShieldCheck, PlusCircle, Menu, X, LogOut, User,
@@ -57,6 +57,18 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isGmailConnected, setIsGmailConnected] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const userDropdownTimeoutRef = useRef(null);
+
+  const handleUserMouseEnter = () => {
+    if (userDropdownTimeoutRef.current) clearTimeout(userDropdownTimeoutRef.current);
+    setUserDropdownOpen(true);
+  };
+
+  const handleUserMouseLeave = () => {
+    userDropdownTimeoutRef.current = setTimeout(() => {
+      setUserDropdownOpen(false);
+    }, 200);
+  };
 
   // Single Source of Truth for Compose Form State
   const [composeState, setComposeState] = useState({
@@ -670,36 +682,6 @@ export default function App() {
             </div>
             <User className="w-4 h-4 text-[#99958F] group-hover:text-[#D4A373] transition-colors shrink-0" />
           </div>
-
-          <div className={`p-4 rounded-2xl border relative overflow-hidden group ${
-            theme === 'dark' 
-              ? 'bg-gradient-to-b from-[#1A1918] to-[#161514] border-[#2E2D2B] shadow-xl' 
-              : 'bg-gradient-to-b from-[#FFFDF8] to-[#FBF3DE] border-amber-300/80 shadow-md'
-          }`}>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#D4A373] to-[#ECE8E1] flex items-center justify-center text-[#121211] shadow-md shadow-[#D4A373]/20">
-                <Crown className="w-4 h-4" />
-              </div>
-              <h4 className={`text-xs font-extrabold ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
-                Upgrade to Premium
-              </h4>
-            </div>
-            
-            <div className={`space-y-1 text-[11px] mb-3 leading-relaxed ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
-              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-[#D4A373] shrink-0" /> <span>Unlock advanced features</span></div>
-              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-[#D4A373] shrink-0" /> <span>Higher email limits</span></div>
-              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-[#D4A373] shrink-0" /> <span>AI personalization</span></div>
-              <div className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-[#D4A373] shrink-0" /> <span>Priority support</span></div>
-            </div>
-
-            <button
-              onClick={() => setActiveTab('settings')}
-              className="w-full py-2.5 px-3 rounded-xl gold-btn light-sweep font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-md cursor-pointer group"
-            >
-              <span>Upgrade Now</span>
-              <span className="btn-arrow-slide transition-transform duration-200">→</span>
-            </button>
-          </div>
         </div>
       </aside>
 
@@ -796,10 +778,14 @@ export default function App() {
               )}
             </button>
 
-            {/* User Profile Pill & Dropdown with Hover Lift & Glow */}
-            <div className="relative">
+            {/* User Profile Pill & Dropdown with Hover and Click triggers */}
+            <div 
+              className="relative"
+              onMouseEnter={handleUserMouseEnter}
+              onMouseLeave={handleUserMouseLeave}
+            >
               <div 
-                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                onClick={() => setUserDropdownOpen(prev => !prev)}
                 className={`flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl border cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:border-[#D4A373]/40 hover:shadow-md active:scale-[0.98] ${
                   theme === 'dark'
                     ? 'bg-[#1A1918] hover:bg-[#22211F] border-[#2E2D2B]'
@@ -815,8 +801,8 @@ export default function App() {
                   }`}>
                     {displayName}
                   </span>
-                  <span className="text-[10px] text-[#D4A373] font-semibold flex items-center gap-1">
-                    👑 Premium Plan
+                  <span className="text-[10px] text-[#99958F] font-mono truncate max-w-[130px] block leading-tight">
+                    {currentUserEmail ? currentUserEmail.split('@')[0] : 'Active User'}
                   </span>
                 </div>
                 <ChevronDown className={`w-3.5 h-3.5 text-[#99958F] transition-transform duration-200 ${userDropdownOpen ? 'rotate-180' : ''}`} />
@@ -824,9 +810,13 @@ export default function App() {
 
               {/* User Dropdown Menu */}
               {userDropdownOpen && (
-                <div className={`absolute right-0 mt-2 w-56 rounded-2xl p-2 border shadow-2xl z-50 animate-fadeIn ${
-                  theme === 'dark' ? 'bg-[#22211F] border-[#2E2D2B] text-[#F5F3EF]' : 'bg-white border-stone-200 text-stone-900'
-                }`}>
+                <div 
+                  onMouseEnter={handleUserMouseEnter}
+                  onMouseLeave={handleUserMouseLeave}
+                  className={`absolute right-0 mt-1.5 w-56 rounded-2xl p-2 border shadow-2xl z-50 animate-fadeIn ${
+                    theme === 'dark' ? 'bg-[#22211F] border-[#2E2D2B] text-[#F5F3EF]' : 'bg-white border-stone-200 text-stone-900'
+                  }`}
+                >
                   <div className={`p-3 border-b mb-1 ${theme === 'dark' ? 'border-[#2E2D2B]' : 'border-stone-100'}`}>
                     <p className="text-xs font-bold truncate">{displayName}</p>
                     <p className={`text-[11px] font-mono truncate ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>{currentUserEmail}</p>
@@ -841,7 +831,7 @@ export default function App() {
                     <span>Account Settings</span>
                   </button>
                   <button
-                    onClick={handleLogout}
+                    onClick={() => { setUserDropdownOpen(false); handleLogout(); }}
                     className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer mt-1 transition-colors"
                   >
                     <LogOut className="w-4 h-4 text-rose-400" />

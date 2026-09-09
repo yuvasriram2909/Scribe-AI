@@ -359,17 +359,24 @@ export function buildNaturalBody({ instruction, situationObj, recipientName, use
     paragraphs.push(`Thank you for your consideration.`);
   }
 
-  // Scenario F: Meeting request
-  else if (lower.includes('meeting')) {
+  // Scenario F: Meeting request & Reschedule
+  else if (lower.includes('meeting') || lower.includes('reschedule') || lower.includes('postpone') || lower.includes('demo')) {
     let person = 'the project manager';
     if (lower.includes('project manager')) person = 'the Project Manager';
     else if (lower.includes('team')) person = 'the team';
     else if (lower.includes('client')) person = 'you';
 
-    paragraphs.push(`I hope you are having a productive week. I would like to request a brief meeting with ${person} to discuss [Topic / Agenda Items].`);
-    paragraphs.push(`The objective of this discussion is to align on current priorities, review open action items, and address any questions moving forward.`);
-    paragraphs.push(`Please let me know your availability for a 15–30 minute session during [Proposed Date / Time Range], and I will send a calendar invite accordingly.`);
-    paragraphs.push(`Thank you for your time, and I look forward to connecting.`);
+    // Check for reason clause if present
+    let becauseClause = '';
+    const becauseMatch = instruction.match(/^(.*?)\s+(?:because|due\s+to|as\s+a\s+result\s+of|since)\s+(.*)$/i);
+    if (becauseMatch) {
+      becauseClause = ` Due to recent developments (${becauseMatch[2].trim()}), we require a brief window to ensure everything is thoroughly finalized prior to the session.`;
+    }
+
+    paragraphs.push(`I hope you are having a productive week. I would like to request that we reschedule our scheduled session.${becauseClause}`);
+    paragraphs.push(`The objective of this discussion is to review our progress, walk through key milestones, and align on next steps.`);
+    paragraphs.push(`Please let me know your availability for an updated slot later in the week that fits your calendar.`);
+    paragraphs.push(`Thank you for your time, flexibility, and understanding.`);
   }
 
   // Scenario G: Salary revision
@@ -393,7 +400,7 @@ export function buildNaturalBody({ instruction, situationObj, recipientName, use
   }
 
   // Scenario H3: Resume / Job Application
-  else if (sitName.includes('Resume') || lower.includes('resume') || lower.includes('job application') || lower.includes('application for') || lower.includes('position')) {
+  else if (sitName.includes('Resume') || lower.includes('resume') || lower.includes('job application') || lower.includes('applying for') || (lower.includes('position') && (lower.includes('apply') || lower.includes('candidate')))) {
     paragraphs.push(`I am writing to express my strong interest in the Senior Software Engineer position at your organization.`);
     paragraphs.push(`With a dedicated background in software engineering, practical problem-solving experience, and a proven track record of architecting scalable systems, I am confident in my ability to make an immediate and valuable contribution to your engineering initiatives. I have attached my resume and credentials for your review.`);
     paragraphs.push(`I would welcome the opportunity to discuss how my qualifications align with your requirements in an introductory conversation. Thank you very much for your time and consideration.`);
