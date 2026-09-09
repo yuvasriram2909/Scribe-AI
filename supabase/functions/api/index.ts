@@ -407,6 +407,49 @@ function parseEmailList(headerStr: string): { emails: string[]; names: string[] 
   return { emails, names };
 }
 
+function decodeBase64Url(data: string): string {
+  if (!data) return "";
+  try {
+    const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
+    return new TextDecoder().decode(Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)));
+  } catch (_) {
+    try {
+      return atob(data.replace(/-/g, "+").replace(/_/g, "/"));
+    } catch (_) {
+      return "";
+    }
+  }
+}
+
+function extractEmailBodies(payload: any): { text: string; html: string } {
+  let text = "";
+  let html = "";
+  if (!payload) return { text, html };
+
+  function traverse(part: any) {
+    if (!part) return;
+    if (part.mimeType === "text/plain" && part.body?.data && !text) {
+      text = decodeBase64Url(part.body.data);
+    } else if (part.mimeType === "text/html" && part.body?.data && !html) {
+      html = decodeBase64Url(part.body.data);
+    }
+    if (part.parts && Array.isArray(part.parts)) {
+      for (const p of part.parts) {
+        traverse(p);
+      }
+    }
+  }
+
+  if (payload.body?.data) {
+    if (payload.mimeType === "text/html") html = decodeBase64Url(payload.body.data);
+    else text = decodeBase64Url(payload.body.data);
+  }
+  if (payload.parts) {
+    traverse(payload);
+  }
+  return { text, html };
+}
+
 async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
   const emailId = payload.id || crypto.randomUUID();
   const now = new Date().toISOString();
@@ -451,6 +494,7 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       id: emailId,
       user_id: payload.userId,
       gmail_message_id: payload.gmailMessageId || payload.gmail_message_id || null,
+      gmail_draft_id: payload.gmailDraftId || payload.gmail_draft_id || null,
       gmail_thread_id: payload.gmailThreadId || payload.gmail_thread_id || payload.thread_id || null,
       thread_id: payload.gmailThreadId || payload.gmail_thread_id || payload.thread_id || null,
       sender_email: senderEmailVal,
@@ -465,7 +509,7 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       subject: payload.subject || '(No Subject)',
       body: payload.body || payload.body_text || '',
       body_text: payload.body_text || payload.body || '',
-      body_html: payload.body_html || null,
+      body_html: payload.body_html || payload.bodyHtml || null,
       snippet: payload.snippet || payload.body?.slice(0, 160) || '',
       email_type: payload.category || payload.email_type || payload.situation || 'Professional / Official',
       tone: payload.tone || 'Professional',
@@ -476,6 +520,7 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       is_read: payload.isRead !== undefined ? !!payload.isRead : (payload.is_read !== undefined ? !!payload.is_read : true),
       is_starred: !!payload.isStarred || !!payload.is_starred,
       is_important: !!payload.isImportant || !!payload.is_important,
+      is_archived: !!payload.isArchived || !!payload.is_archived,
       is_spam: isSpam,
       is_trash: isTrash,
       labels: labelsArray,
@@ -487,7 +532,12 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
     };
 
     try {
-      const onConflictTarget = canonicalPayload.gmail_message_id ? "user_id,gmail_message_id" : "id";
+      let onConflictTarget = "id";
+      if (canonicalPayload.gmail_message_id) {
+        onConflictTarget = "user_id,gmail_message_id";
+      } else if (canonicalPayload.gmail_draft_id) {
+        onConflictTarget = "user_id,gmail_draft_id";
+      }
       const { error: upErr } = await supabase.from("emails").upsert(canonicalPayload, { onConflict: onConflictTarget });
       if (upErr) {
         await supabase.from("emails").upsert(canonicalPayload, { onConflict: "id" });
@@ -545,8 +595,9 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
     "id", "userId", "sender", "recipient", "cc", "bcc", "subject", "body",
     "instruction", "originalSituation", "category", "situation",
     "situationSource", "priority", "tone", "status", "errorMessage",
-    "gmailMessageId", "gmailThreadId", "gmailAccount", "isSent", "isReceived", "isSpam", "isRead",
-    "createdAt", "sentAt", "receivedAt", "labels", "snippet"
+    "gmailMessageId", "gmailThreadId", "gmailAccount", "gmailDraftId",
+    "isSent", "isReceived", "isSpam", "isRead", "isStarred", "isImportant", "isArchived", "isTrash",
+    "createdAt", "sentAt", "receivedAt", "labels", "snippet", "bodyHtml", "bodyText"
   ];
   const fallbackPayload: Record<string, any> = {};
   for (const c of coreColumns) {
@@ -618,11 +669,25 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
   const accountEmail = (account.gmail_email || account.gmailEmail || "").toLowerCase().trim();
   const nowIso = new Date().toISOString();
 
-  // Mark sync state as 'syncing'
+  // 0. Concurrency Lock: Check if another sync is currently running
+  const { data: existingSyncState } = await supabase
+    .from("email_sync_state")
+    .select("*")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const lockUntil = existingSyncState?.sync_locked_until;
+  if (lockUntil && new Date(lockUntil).getTime() > Date.now()) {
+    return { status: "busy", message: "Synchronization already in progress" };
+  }
+
+  // Set lock for 60 seconds
+  const lockIso = new Date(Date.now() + 60000).toISOString();
   try {
     await supabase.from("email_sync_state").upsert({
       user_id: user.id,
       sync_status: "syncing",
+      sync_locked_until: lockIso,
       updated_at: nowIso,
     }, { onConflict: "user_id" });
   } catch (_) {}
@@ -635,7 +700,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
   let latestHistoryId: string | null = null;
 
   try {
-    // 1. Fetch current Gmail Profile to get latest historyId & email
+    // 1. Fetch current Gmail Profile to validate connection & get latest historyId
     let profileHistoryId: string | null = null;
     try {
       const profRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
@@ -646,13 +711,6 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
         profileHistoryId = profData.historyId || null;
       }
     } catch (_) {}
-
-    // Check existing sync state for historyId
-    const { data: existingSyncState } = await supabase
-      .from("email_sync_state")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
 
     const storedHistoryId = existingSyncState?.history_id;
     let incrementalSucceeded = false;
@@ -719,6 +777,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
                   const isUnread = labelIds.includes("UNREAD");
                   const isStarred = labelIds.includes("STARRED");
                   const isImportant = labelIds.includes("IMPORTANT");
+                  const isArchived = !labelIds.includes("INBOX") && !isTrash && !isSpam && !isDraft;
 
                   const detectedCat = detectSituationEngine(`${subjectHeader} ${meta.snippet || ""}`);
                   const dateIso = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
@@ -754,6 +813,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
                     isRead: !isUnread,
                     isStarred: isStarred,
                     isImportant: isImportant,
+                    isArchived: isArchived,
                     labels: labelIds.join(","),
                     historyId: latestHistoryId,
                     createdAt: dateIso,
@@ -769,7 +829,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
               }
             }
 
-            // Handle labels added (read, starred, etc.)
+            // Handle labels added (read, starred, archive, trash, spam)
             if (h.labelsAdded) {
               for (const la of h.labelsAdded) {
                 const msg = la.message;
@@ -779,10 +839,22 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
                 if (added.includes("UNREAD")) updateData.is_read = false;
                 if (added.includes("STARRED")) updateData.is_starred = true;
                 if (added.includes("IMPORTANT")) updateData.is_important = true;
+                if (added.includes("INBOX")) updateData.is_archived = false;
                 if (added.includes("SPAM")) { updateData.is_spam = true; updateData.status = "Spam"; }
                 if (added.includes("TRASH")) { updateData.is_trash = true; updateData.status = "Trash"; }
 
                 await supabase.from("emails").update(updateData).eq("user_id", user.id).eq("gmail_message_id", msg.id);
+                try {
+                  const legUpdate: Record<string, any> = { updatedAt: nowIso };
+                  if (updateData.is_read !== undefined) legUpdate.isRead = updateData.is_read;
+                  if (updateData.is_starred !== undefined) legUpdate.isStarred = updateData.is_starred;
+                  if (updateData.is_important !== undefined) legUpdate.isImportant = updateData.is_important;
+                  if (updateData.is_trash !== undefined) legUpdate.isTrash = updateData.is_trash;
+                  if (updateData.is_spam !== undefined) legUpdate.isSpam = updateData.is_spam;
+                  if (updateData.is_archived !== undefined) legUpdate.isArchived = updateData.is_archived;
+                  if (updateData.status) legUpdate.status = updateData.status;
+                  await supabase.from("Email").update(legUpdate).eq("userId", user.id).eq("gmailMessageId", msg.id);
+                } catch (_) {}
                 updatedCount++;
               }
             }
@@ -797,11 +869,34 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
                 if (removed.includes("UNREAD")) updateData.is_read = true;
                 if (removed.includes("STARRED")) updateData.is_starred = false;
                 if (removed.includes("IMPORTANT")) updateData.is_important = false;
+                if (removed.includes("INBOX")) updateData.is_archived = true;
                 if (removed.includes("SPAM")) { updateData.is_spam = false; }
                 if (removed.includes("TRASH")) { updateData.is_trash = false; }
 
                 await supabase.from("emails").update(updateData).eq("user_id", user.id).eq("gmail_message_id", msg.id);
+                try {
+                  const legUpdate: Record<string, any> = { updatedAt: nowIso };
+                  if (updateData.is_read !== undefined) legUpdate.isRead = updateData.is_read;
+                  if (updateData.is_starred !== undefined) legUpdate.isStarred = updateData.is_starred;
+                  if (updateData.is_important !== undefined) legUpdate.isImportant = updateData.is_important;
+                  if (updateData.is_trash !== undefined) legUpdate.isTrash = updateData.is_trash;
+                  if (updateData.is_spam !== undefined) legUpdate.isSpam = updateData.is_spam;
+                  if (updateData.is_archived !== undefined) legUpdate.isArchived = updateData.is_archived;
+                  await supabase.from("Email").update(legUpdate).eq("userId", user.id).eq("gmailMessageId", msg.id);
+                } catch (_) {}
                 updatedCount++;
+              }
+            }
+
+            // Handle messages deleted
+            if (h.messagesDeleted) {
+              for (const md of h.messagesDeleted) {
+                const msg = md.message;
+                if (!msg?.id) continue;
+                await supabase.from("emails").delete().eq("user_id", user.id).eq("gmail_message_id", msg.id);
+                try {
+                  await supabase.from("Email").delete().eq("userId", user.id).eq("gmailMessageId", msg.id);
+                } catch (_) {}
               }
             }
           }
@@ -809,6 +904,8 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
           incrementalSucceeded = true;
         } else if (historyRes.status === 404 || historyRes.status === 400) {
           console.log(`[Gmail Sync] History ID ${storedHistoryId} expired or invalid. Running full sync fallback.`);
+          // Clear expired history_id in state
+          await supabase.from("email_sync_state").update({ history_id: null }).eq("user_id", user.id);
         }
       } catch (histEx) {
         console.warn("[Gmail Sync] Incremental sync attempt note:", histEx);
@@ -825,16 +922,20 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
       // B. SENT Messages (Paginated up to 50)
       const sentList = await fetchGmailMessagesPaginated(accessToken, "label:SENT", 50);
 
-      // C. SPAM Messages (Paginated up to 25)
+      // C. STARRED Messages (Paginated up to 25)
+      const starredList = await fetchGmailMessagesPaginated(accessToken, "label:STARRED", 25);
+
+      // D. SPAM Messages (Paginated up to 25)
       const spamList = await fetchGmailMessagesPaginated(accessToken, "label:SPAM", 25);
 
-      // D. TRASH Messages (Paginated up to 25)
+      // E. TRASH Messages (Paginated up to 25)
       const trashList = await fetchGmailMessagesPaginated(accessToken, "label:TRASH", 25);
 
       // Combine message IDs and remove duplicates
       const uniqueMsgMap = new Map<string, { id: string; threadId: string; defaultDir: string }>();
       for (const m of inboxList) uniqueMsgMap.set(m.id, { ...m, defaultDir: "received" });
       for (const m of sentList) uniqueMsgMap.set(m.id, { ...m, defaultDir: "sent" });
+      for (const m of starredList) if (!uniqueMsgMap.has(m.id)) uniqueMsgMap.set(m.id, { ...m, defaultDir: "starred" });
       for (const m of spamList) uniqueMsgMap.set(m.id, { ...m, defaultDir: "spam" });
       for (const m of trashList) uniqueMsgMap.set(m.id, { ...m, defaultDir: "trash" });
 
@@ -880,8 +981,9 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
         const isTrash = labelIds.includes("TRASH") || m.defaultDir === "trash";
         const isDraft = labelIds.includes("DRAFT");
         const isUnread = labelIds.includes("UNREAD");
-        const isStarred = labelIds.includes("STARRED");
+        const isStarred = labelIds.includes("STARRED") || m.defaultDir === "starred";
         const isImportant = labelIds.includes("IMPORTANT");
+        const isArchived = !labelIds.includes("INBOX") && !isTrash && !isSpam && !isDraft;
 
         const detectedCat = detectSituationEngine(`${subjectHeader} ${meta.snippet || ""}`);
         const dateIso = dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString();
@@ -910,6 +1012,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
           priority: detectedCat.priority,
           tone: detectedCat.tone,
           status: isDraft ? "Draft" : isSpam ? "Spam" : isTrash ? "Trash" : isSent ? "Sent" : "Received",
+          direction: isDraft ? "draft" : isSent ? "sent" : "received",
           isReceived: !isSent && !isSpam && !isDraft,
           isSent: isSent,
           isSpam: isSpam,
@@ -917,6 +1020,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
           isRead: !isUnread,
           isStarred: isStarred,
           isImportant: isImportant,
+          isArchived: isArchived,
           labels: labelIds.join(","),
           historyId: latestHistoryId,
           createdAt: dateIso,
@@ -929,10 +1033,10 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
         else newReceived++;
       }
 
-      // E. Drafts from Gmail
+      // F. Real Drafts from Gmail
       try {
         const draftsRes = await fetch(
-          "https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=20",
+          "https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=30",
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
         if (draftsRes.ok) {
@@ -944,35 +1048,50 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
             const msgId = d.message?.id || d.id;
 
             const dRes = await fetch(
-              `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${d.id}?format=metadata&metadataHeaders=To&metadataHeaders=Subject`,
+              `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${d.id}?format=full`,
               { headers: { Authorization: `Bearer ${accessToken}` } }
             );
             if (dRes.ok) {
               const dMeta = await dRes.json();
               const headers = dMeta.message?.payload?.headers || [];
               const toHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "to")?.value || "");
+              const ccHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "cc")?.value || "");
+              const bccHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "bcc")?.value || "");
               const subjectHeader = decodeMimeHeader(headers.find((hdr: any) => hdr.name.toLowerCase() === "subject")?.value || "(Untitled Draft)");
               const { emails: toEmails } = parseEmailList(toHeader);
+              const { emails: ccEmails } = parseEmailList(ccHeader);
+              const { emails: bccEmails } = parseEmailList(bccHeader);
+
+              const bodies = extractEmailBodies(dMeta.message?.payload);
+              const textContent = bodies.text || dMeta.message?.snippet || "";
 
               await safeInsertEmail(supabase, {
                 id: crypto.randomUUID(),
                 userId: user.id,
                 gmailAccount: accountEmail,
                 gmailMessageId: msgId,
+                gmailDraftId: d.id,
                 recipient: toEmails[0] || toHeader || "(No recipient)",
                 recipient_emails: toEmails,
+                cc: ccHeader,
+                cc_emails: ccEmails,
+                bcc: bccHeader,
+                bcc_emails: bccEmails,
                 subject: subjectHeader,
-                body: dMeta.message?.snippet || "",
-                body_text: dMeta.message?.snippet || "",
-                snippet: dMeta.message?.snippet || "",
-                category: "Official/Professional",
+                body: textContent,
+                body_text: textContent,
+                body_html: bodies.html || null,
+                snippet: dMeta.message?.snippet || textContent.slice(0, 160),
+                category: "Official / Professional",
                 situation: "💼 Official / Professional",
                 priority: "Normal",
                 tone: "Professional",
                 status: "Draft",
+                direction: "draft",
                 isReceived: false,
                 isSent: false,
                 isSpam: false,
+                isTrash: false,
                 isRead: true,
                 createdAt: new Date().toISOString(),
               });
@@ -986,7 +1105,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
       }
     }
 
-    // 4. Update email_sync_state with final results
+    // 4. Update email_sync_state with final results and release sync lock
     const totalSynced = newReceived + newSent + newSpam + newDrafts;
     try {
       await supabase.from("email_sync_state").upsert({
@@ -994,6 +1113,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
         history_id: latestHistoryId || profileHistoryId,
         last_synced_at: nowIso,
         sync_status: "success",
+        sync_locked_until: null,
         sync_error: null,
         messages_synced: (existingSyncState?.messages_synced || 0) + totalSynced,
         new_messages: totalSynced,
@@ -1021,6 +1141,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
       await supabase.from("email_sync_state").upsert({
         user_id: user.id,
         sync_status: "error",
+        sync_locked_until: null,
         sync_error: err.message || "Sync failed",
         updated_at: nowIso,
       }, { onConflict: "user_id" });
@@ -1731,6 +1852,10 @@ serve(async (req: Request) => {
           isConnected: false,
           status: "DISCONNECTED",
           connectedEmail: null,
+          mailboxEmail: null,
+          hasModifyScope: false,
+          hasSendScope: false,
+          needsReauth: false,
           isGoogleConfigured: true,
           mode: "Not Logged In",
           user: null,
@@ -1741,20 +1866,66 @@ serve(async (req: Request) => {
       const accounts = user.gmailAccounts || [];
       const connection = conns[0] || accounts[0];
 
-      const isConnected = Boolean(connection && connection.status !== "DISCONNECTED" && (connection.access_token_encrypted || connection.encryptedAccessToken || connection.refresh_token_encrypted || connection.encryptedRefreshToken));
-      const connectedEmail = connection?.gmail_email || connection?.gmailEmail || (isConnected ? user.email : null);
+      let isConnected = Boolean(connection && connection.status !== "DISCONNECTED" && (connection.access_token_encrypted || connection.encryptedAccessToken || connection.refresh_token_encrypted || connection.encryptedRefreshToken));
+      let connectedEmail = connection?.gmail_email || connection?.gmailEmail || (isConnected ? user.email : null);
+      let mailboxEmail = connectedEmail;
+      let hasModifyScope = false;
+      let hasSendScope = false;
+      let needsReauth = false;
+      let historyId = null;
+      let messagesTotal = 0;
+      let threadsTotal = 0;
 
-      // If connected, ensure latest emails are synced in background
       if (isConnected && connection) {
-        syncUserGmail(user, connection, supabase).catch((e: any) => console.warn("Status auto-sync notice:", e));
+        const accessToken = await getValidAccessToken(connection, supabase);
+        if (!accessToken) {
+          isConnected = false;
+          needsReauth = true;
+        } else {
+          try {
+            const profRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (profRes.ok) {
+              const profData = await profRes.json();
+              mailboxEmail = profData.emailAddress || connectedEmail;
+              connectedEmail = profData.emailAddress || connectedEmail;
+              historyId = profData.historyId || null;
+              messagesTotal = profData.messagesTotal || 0;
+              threadsTotal = profData.threadsTotal || 0;
+
+              // Inspect granted scopes from connection record
+              const rawScopes = connection.scopes || (connection.scope ? connection.scope.split(" ") : []);
+              const scopesStr = Array.isArray(rawScopes) ? rawScopes.join(" ") : String(rawScopes);
+              hasModifyScope = scopesStr.includes("gmail.modify") || scopesStr.includes("mail.google.com");
+              hasSendScope = scopesStr.includes("gmail.send") || scopesStr.includes("mail.google.com");
+              needsReauth = !hasModifyScope;
+
+              // Ensure latest emails are synced in background
+              syncUserGmail(user, connection, supabase).catch((e: any) => console.warn("Status auto-sync notice:", e));
+            } else if (profRes.status === 401 || profRes.status === 403) {
+              isConnected = false;
+              needsReauth = true;
+            }
+          } catch (_) {
+            // Keep connected if temporary network fluctuation
+          }
+        }
       }
 
       return jsonResponse({
         isConnected,
-        status: isConnected ? "CONNECTED" : "DISCONNECTED",
+        status: isConnected ? "CONNECTED" : (needsReauth ? "NEEDS_REAUTH" : "DISCONNECTED"),
         connectedEmail,
+        mailboxEmail,
+        hasModifyScope,
+        hasSendScope,
+        needsReauth,
+        historyId,
+        messagesTotal,
+        threadsTotal,
         isGoogleConfigured: true,
-        mode: isConnected ? "Official Gmail REST API Connected" : "Ready to Connect",
+        mode: hasModifyScope ? "Complete Two-Way Gmail Sync" : (isConnected ? "Limited (Send Only - Upgrade Needed)" : "Ready to Connect"),
         user: {
           id: user.id,
           name: user.name,
@@ -1771,11 +1942,12 @@ serve(async (req: Request) => {
         return errorResponse("Google Client ID is not configured in Supabase Edge Function Secrets.", 400);
       }
 
-      // Explicitly request Gmail Send and Readonly scopes along with profile and email
+      // Explicitly request Gmail Modify, Send, and Readonly scopes along with profile and email
       const scopes = [
         "openid",
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/gmail.send",
         "https://www.googleapis.com/auth/gmail.readonly",
       ].join(" ");
@@ -1792,12 +1964,12 @@ serve(async (req: Request) => {
       };
       const state = btoa(JSON.stringify(stateObj));
 
-      // prompt=select_account lets the user pick any Google account and connects directly
+      // prompt=consent ensures Google presents the consent screen for newly requested gmail.modify scope
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
         clientId
       )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(
         scopes
-      )}&access_type=offline&prompt=select_account&include_granted_scopes=true&state=${encodeURIComponent(state)}`;
+      )}&access_type=offline&prompt=consent&include_granted_scopes=true&state=${encodeURIComponent(state)}`;
 
       return jsonResponse({ success: true, configured: true, url: googleAuthUrl });
     }
@@ -2792,6 +2964,9 @@ HUMAN-WRITTEN WRITING GUIDELINES:
           bcc: ce.bcc,
           subject: ce.subject || "(No Subject)",
           body: ce.body || "",
+          body_text: ce.body_text || ce.body || "",
+          body_html: ce.body_html || null,
+          snippet: ce.snippet || (ce.body ? ce.body.slice(0, 160) : ""),
           category: ce.email_type || "Official / Professional",
           situation: ce.email_type || "Official / Professional",
           tone: ce.tone || "Professional",
@@ -2802,9 +2977,16 @@ HUMAN-WRITTEN WRITING GUIDELINES:
           isSent,
           isReceived,
           isDraft,
+          isRead: ce.is_read !== false,
+          isStarred: Boolean(ce.is_starred),
+          isImportant: Boolean(ce.is_important),
+          isArchived: Boolean(ce.is_archived),
+          isTrash: Boolean(ce.is_trash),
           isSpam: ce.spam_status === "spam" || rawStatus === "spam",
           gmailMessageId: ce.gmail_message_id,
+          gmailDraftId: ce.gmail_draft_id || null,
           gmailThreadId: ce.thread_id,
+          labels: ce.labels || [],
           sentAt: ce.sent_at,
           receivedAt: ce.received_at,
           createdAt: ce.created_at,
@@ -2832,16 +3014,42 @@ HUMAN-WRITTEN WRITING GUIDELINES:
           sender_email: le.sender_email || le.sender || "",
           recipient: le.recipient || le.recipient_email || "",
           recipient_email: le.recipient || le.recipient_email || "",
+          body_text: le.bodyText || le.body_text || le.body || "",
+          body_html: le.bodyHtml || le.body_html || null,
+          snippet: le.snippet || (le.body ? le.body.slice(0, 160) : ""),
           status,
           direction,
           isSent,
           isReceived,
           isDraft,
+          isRead: le.isRead !== false,
+          isStarred: Boolean(le.isStarred),
+          isImportant: Boolean(le.isImportant),
+          isArchived: Boolean(le.isArchived),
+          isTrash: Boolean(le.isTrash),
           isSpam: le.isSpam === true || rawStatus === "spam",
+          gmailDraftId: le.gmailDraftId || null,
+          labels: le.labels || [],
         });
       }
 
       let result = combined;
+
+      // Folder Query Filter (Inbox, Sent, Drafts, Starred, Archive, Trash, Spam)
+      const folderQuery = url.searchParams.get("folder");
+      if (folderQuery && folderQuery !== "all") {
+        const fQ = folderQuery.toLowerCase().trim();
+        result = result.filter((e: any) => {
+          if (fQ === "inbox") return !e.isDraft && !e.isTrash && !e.isSpam && !e.isArchived && (e.isReceived || (e.status || "").toLowerCase() === "received");
+          if (fQ === "sent") return !e.isDraft && !e.isTrash && (e.isSent || (e.direction || "").toLowerCase() === "sent");
+          if (fQ === "drafts" || fQ === "draft") return e.isDraft || (e.direction || "").toLowerCase() === "draft" || (e.status || "").toLowerCase() === "draft";
+          if (fQ === "starred") return !e.isTrash && Boolean(e.isStarred);
+          if (fQ === "archive" || fQ === "archived") return !e.isTrash && !e.isSpam && !e.isDraft && Boolean(e.isArchived);
+          if (fQ === "trash") return Boolean(e.isTrash);
+          if (fQ === "spam") return Boolean(e.isSpam);
+          return true;
+        });
+      }
 
       // Status Filter
       if (statusQuery && statusQuery !== "All") {
@@ -2943,13 +3151,454 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       return jsonResponse(result);
     }
 
+    // ----------------------------------------------------
+    // Two-Way Actions: Get Email, Read, Star, Archive, Trash, Untrash, Delete
+    // ----------------------------------------------------
+
+    if (path.startsWith("/emails/") && method === "GET") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const id = path.split("/")[2];
+
+      // Find email in emails or Email
+      let emailRecord: any = null;
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      if (cData) {
+        emailRecord = cData;
+      } else {
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        if (lData) emailRecord = lData;
+      }
+
+      if (!emailRecord) {
+        // Try looking up by gmail_message_id
+        const { data: gData } = await supabase.from("emails").select("*").eq("gmail_message_id", id).eq("user_id", user.id).maybeSingle();
+        if (gData) emailRecord = gData;
+      }
+
+      if (!emailRecord) return errorResponse("Email not found", 404);
+
+      // If email has gmail_message_id and body_html is missing, fetch full message from Gmail
+      const msgId = emailRecord.gmail_message_id || emailRecord.gmailMessageId;
+      if (msgId && !emailRecord.body_html) {
+        const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
+        if (connection) {
+          const accessToken = await getValidAccessToken(connection, supabase);
+          if (accessToken) {
+            try {
+              const fullRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}?format=full`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              });
+              if (fullRes.ok) {
+                const fullData = await fullRes.json();
+                const bodies = extractEmailBodies(fullData.payload);
+                if (bodies.html || bodies.text) {
+                  emailRecord.body_html = bodies.html || null;
+                  emailRecord.body_text = bodies.text || emailRecord.body_text || emailRecord.body;
+                  await supabase.from("emails").update({
+                    body_html: emailRecord.body_html,
+                    body_text: emailRecord.body_text,
+                    snippet: fullData.snippet || emailRecord.snippet,
+                  }).eq("id", emailRecord.id);
+                  try {
+                    await supabase.from("Email").update({
+                      bodyHtml: emailRecord.body_html,
+                      bodyText: emailRecord.body_text,
+                      snippet: fullData.snippet || emailRecord.snippet,
+                    }).eq("id", emailRecord.id);
+                  } catch (_) {}
+                }
+              }
+            } catch (fErr) {
+              console.warn("Gmail full message fetch note:", fErr);
+            }
+          }
+        }
+      }
+
+      return jsonResponse({
+        id: emailRecord.id,
+        userId: emailRecord.user_id || emailRecord.userId,
+        sender: emailRecord.sender || emailRecord.sender_email || "",
+        sender_email: emailRecord.sender_email || emailRecord.sender || "",
+        recipient: emailRecord.recipient || emailRecord.recipient_email || "",
+        recipient_email: emailRecord.recipient_email || emailRecord.recipient || "",
+        subject: emailRecord.subject || "(No Subject)",
+        body: emailRecord.body || emailRecord.body_text || "",
+        body_text: emailRecord.body_text || emailRecord.body || "",
+        body_html: emailRecord.body_html || emailRecord.bodyHtml || null,
+        snippet: emailRecord.snippet || "",
+        category: emailRecord.category || emailRecord.email_type || "Official / Professional",
+        situation: emailRecord.situation || emailRecord.email_type || "💼 Official / Professional",
+        tone: emailRecord.tone || "Professional",
+        priority: emailRecord.priority || emailRecord.importance || "Normal",
+        status: emailRecord.status,
+        direction: emailRecord.direction,
+        isRead: emailRecord.is_read !== false && emailRecord.isRead !== false,
+        isStarred: Boolean(emailRecord.is_starred || emailRecord.isStarred),
+        isArchived: Boolean(emailRecord.is_archived || emailRecord.isArchived),
+        isTrash: Boolean(emailRecord.is_trash || emailRecord.isTrash),
+        isSpam: Boolean(emailRecord.is_spam || emailRecord.isSpam),
+        gmailMessageId: msgId || null,
+        gmailDraftId: emailRecord.gmail_draft_id || emailRecord.gmailDraftId || null,
+        labels: emailRecord.labels || [],
+        createdAt: emailRecord.created_at || emailRecord.createdAt,
+        sentAt: emailRecord.sent_at || emailRecord.sentAt,
+        receivedAt: emailRecord.received_at || emailRecord.receivedAt,
+      });
+    }
+
+    if (path.startsWith("/emails/") && path.endsWith("/read") && (method === "POST" || method === "PUT" || method === "PATCH")) {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const id = path.split("/")[2];
+      const body = await req.json().catch(() => ({}));
+
+      let emailRecord: any = null;
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      if (cData) emailRecord = cData;
+      else {
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        if (lData) emailRecord = lData;
+      }
+      if (!emailRecord) return errorResponse("Email not found", 404);
+
+      const isRead = body.isRead !== undefined ? Boolean(body.isRead) : !(emailRecord.is_read !== false && emailRecord.isRead !== false);
+      const msgId = emailRecord.gmail_message_id || emailRecord.gmailMessageId;
+
+      // Update in Gmail API
+      if (msgId) {
+        const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
+        if (connection) {
+          const accessToken = await getValidAccessToken(connection, supabase);
+          if (accessToken) {
+            try {
+              await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}/modify`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  removeLabelIds: isRead ? ["UNREAD"] : [],
+                  addLabelIds: isRead ? [] : ["UNREAD"],
+                }),
+              });
+            } catch (gErr) {
+              console.warn("Gmail modify read/unread error:", gErr);
+            }
+          }
+        }
+      }
+
+      // Update in DB
+      const now = new Date().toISOString();
+      await supabase.from("emails").update({ is_read: isRead, updated_at: now }).eq("id", emailRecord.id);
+      try {
+        await supabase.from("Email").update({ isRead, updatedAt: now }).eq("id", emailRecord.id);
+      } catch (_) {}
+
+      return jsonResponse({ success: true, isRead, message: isRead ? "Email marked as read." : "Email marked as unread." });
+    }
+
+    if (path.startsWith("/emails/") && path.endsWith("/star") && (method === "POST" || method === "PUT" || method === "PATCH")) {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const id = path.split("/")[2];
+      const body = await req.json().catch(() => ({}));
+
+      let emailRecord: any = null;
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      if (cData) emailRecord = cData;
+      else {
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        if (lData) emailRecord = lData;
+      }
+      if (!emailRecord) return errorResponse("Email not found", 404);
+
+      const isStarred = body.isStarred !== undefined ? Boolean(body.isStarred) : !Boolean(emailRecord.is_starred || emailRecord.isStarred);
+      const msgId = emailRecord.gmail_message_id || emailRecord.gmailMessageId;
+
+      // Update in Gmail API
+      if (msgId) {
+        const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
+        if (connection) {
+          const accessToken = await getValidAccessToken(connection, supabase);
+          if (accessToken) {
+            try {
+              await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}/modify`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  addLabelIds: isStarred ? ["STARRED"] : [],
+                  removeLabelIds: isStarred ? [] : ["STARRED"],
+                }),
+              });
+            } catch (gErr) {
+              console.warn("Gmail modify star/unstar error:", gErr);
+            }
+          }
+        }
+      }
+
+      // Update in DB
+      const now = new Date().toISOString();
+      await supabase.from("emails").update({ is_starred: isStarred, updated_at: now }).eq("id", emailRecord.id);
+      try {
+        await supabase.from("Email").update({ isStarred, updatedAt: now }).eq("id", emailRecord.id);
+      } catch (_) {}
+
+      return jsonResponse({ success: true, isStarred, message: isStarred ? "Email starred." : "Email unstarred." });
+    }
+
+    if (path.startsWith("/emails/") && path.endsWith("/archive") && (method === "POST" || method === "PUT" || method === "PATCH")) {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const id = path.split("/")[2];
+      const body = await req.json().catch(() => ({}));
+
+      let emailRecord: any = null;
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      if (cData) emailRecord = cData;
+      else {
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        if (lData) emailRecord = lData;
+      }
+      if (!emailRecord) return errorResponse("Email not found", 404);
+
+      const isArchived = body.isArchived !== undefined ? Boolean(body.isArchived) : !Boolean(emailRecord.is_archived || emailRecord.isArchived);
+      const msgId = emailRecord.gmail_message_id || emailRecord.gmailMessageId;
+
+      // Update in Gmail API: archive removes INBOX, unarchive adds INBOX
+      if (msgId) {
+        const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
+        if (connection) {
+          const accessToken = await getValidAccessToken(connection, supabase);
+          if (accessToken) {
+            try {
+              await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}/modify`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  removeLabelIds: isArchived ? ["INBOX"] : [],
+                  addLabelIds: isArchived ? [] : ["INBOX"],
+                }),
+              });
+            } catch (gErr) {
+              console.warn("Gmail modify archive error:", gErr);
+            }
+          }
+        }
+      }
+
+      // Update in DB
+      const now = new Date().toISOString();
+      await supabase.from("emails").update({ is_archived: isArchived, updated_at: now }).eq("id", emailRecord.id);
+      try {
+        await supabase.from("Email").update({ isArchived, updatedAt: now }).eq("id", emailRecord.id);
+      } catch (_) {}
+
+      return jsonResponse({ success: true, isArchived, message: isArchived ? "Email archived." : "Email moved to inbox." });
+    }
+
+    if (path.startsWith("/emails/") && path.endsWith("/trash") && (method === "POST" || method === "PUT" || method === "PATCH")) {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const id = path.split("/")[2];
+
+      let emailRecord: any = null;
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      if (cData) emailRecord = cData;
+      else {
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        if (lData) emailRecord = lData;
+      }
+      if (!emailRecord) return errorResponse("Email not found", 404);
+
+      const msgId = emailRecord.gmail_message_id || emailRecord.gmailMessageId;
+      if (msgId) {
+        const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
+        if (connection) {
+          const accessToken = await getValidAccessToken(connection, supabase);
+          if (accessToken) {
+            try {
+              await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}/trash`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${accessToken}` },
+              });
+            } catch (gErr) {
+              console.warn("Gmail trash error:", gErr);
+            }
+          }
+        }
+      }
+
+      const now = new Date().toISOString();
+      await supabase.from("emails").update({ is_trash: true, status: "Trash", updated_at: now }).eq("id", emailRecord.id);
+      try {
+        await supabase.from("Email").update({ isTrash: true, status: "Trash", updatedAt: now }).eq("id", emailRecord.id);
+      } catch (_) {}
+
+      return jsonResponse({ success: true, isTrash: true, message: "Email moved to trash." });
+    }
+
+    if (path.startsWith("/emails/") && path.endsWith("/untrash") && (method === "POST" || method === "PUT" || method === "PATCH")) {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const id = path.split("/")[2];
+
+      let emailRecord: any = null;
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      if (cData) emailRecord = cData;
+      else {
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        if (lData) emailRecord = lData;
+      }
+      if (!emailRecord) return errorResponse("Email not found", 404);
+
+      const msgId = emailRecord.gmail_message_id || emailRecord.gmailMessageId;
+      if (msgId) {
+        const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
+        if (connection) {
+          const accessToken = await getValidAccessToken(connection, supabase);
+          if (accessToken) {
+            try {
+              await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}/untrash`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${accessToken}` },
+              });
+            } catch (gErr) {
+              console.warn("Gmail untrash error:", gErr);
+            }
+          }
+        }
+      }
+
+      const now = new Date().toISOString();
+      const restoredStatus = emailRecord.direction === "sent" ? "Sent" : (emailRecord.direction === "draft" ? "Draft" : "Received");
+      await supabase.from("emails").update({ is_trash: false, status: restoredStatus, updated_at: now }).eq("id", emailRecord.id);
+      try {
+        await supabase.from("Email").update({ isTrash: false, status: restoredStatus, updatedAt: now }).eq("id", emailRecord.id);
+      } catch (_) {}
+
+      return jsonResponse({ success: true, isTrash: false, message: "Email restored from trash." });
+    }
+
     if (path.startsWith("/emails/") && method === "DELETE") {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
 
+      let emailRecord: any = null;
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      if (cData) emailRecord = cData;
+      else {
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        if (lData) emailRecord = lData;
+      }
+
+      if (emailRecord) {
+        const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
+        if (connection) {
+          const accessToken = await getValidAccessToken(connection, supabase);
+          if (accessToken) {
+            try {
+              if (emailRecord.gmail_draft_id || emailRecord.gmailDraftId) {
+                const draftId = emailRecord.gmail_draft_id || emailRecord.gmailDraftId;
+                await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}`, {
+                  method: "DELETE",
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                });
+              } else if (emailRecord.gmail_message_id || emailRecord.gmailMessageId) {
+                const msgId = emailRecord.gmail_message_id || emailRecord.gmailMessageId;
+                await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}/trash`, {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                });
+              }
+            } catch (dErr) {
+              console.warn("Gmail delete operation error:", dErr);
+            }
+          }
+        }
+      }
+
+      await supabase.from("emails").delete().eq("id", id).eq("user_id", user.id);
       await supabase.from("Email").delete().eq("id", id).eq("userId", user.id);
       return jsonResponse({ success: true, message: "Email removed." });
+    }
+
+    if (path === "/gmail/watch" && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+
+      const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
+      if (!connection) return errorResponse("No Gmail connected", 400);
+
+      const body = await req.json().catch(() => ({}));
+      const topicName = body.topicName || Deno.env.get("GMAIL_PUBSUB_TOPIC");
+      if (!topicName) return errorResponse("Google Cloud Pub/Sub topicName is required.", 400);
+
+      const accessToken = await getValidAccessToken(connection, supabase);
+      if (!accessToken) return errorResponse("No valid access token", 400);
+
+      const watchRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/watch", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          topicName,
+          labelIds: ["INBOX", "SENT", "STARRED", "DRAFT", "TRASH", "SPAM"],
+        }),
+      });
+
+      const watchData = await watchRes.json();
+      if (!watchRes.ok) return jsonResponse({ success: false, error: watchData }, watchRes.status);
+
+      const expDate = watchData.expiration ? new Date(parseInt(watchData.expiration, 10)).toISOString() : null;
+      await supabase.from("email_sync_state").upsert({
+        user_id: user.id,
+        history_id: watchData.historyId,
+        watch_resource_id: watchData.historyId,
+        watch_expiration: expDate,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
+
+      return jsonResponse({ success: true, watch: watchData });
+    }
+
+    if (path === "/gmail/webhook" && method === "POST") {
+      try {
+        const body = await req.json().catch(() => ({}));
+        const message = body.message;
+        if (message && message.data) {
+          const decodedStr = decodeBase64Url(message.data);
+          const pushPayload = JSON.parse(decodedStr);
+          const pushEmail = (pushPayload.emailAddress || "").toLowerCase();
+
+          if (pushEmail) {
+            const { data: conns } = await supabase.from("gmail_connections").select("*").ilike("gmail_email", pushEmail);
+            if (conns && conns.length > 0) {
+              const conn = conns[0];
+              const { data: usr } = await supabase.from("users").select("*").eq("id", conn.user_id).maybeSingle();
+              if (usr) {
+                syncUserGmail(usr, conn, supabase).catch((e: any) => console.warn("PubSub background sync notice:", e));
+              }
+            }
+          }
+        }
+      } catch (wErr) {
+        console.warn("Gmail webhook processing note:", wErr);
+      }
+      return jsonResponse({ success: true });
     }
 
     if (path === "/templates" && method === "GET") {
@@ -3125,30 +3774,210 @@ HUMAN-WRITTEN WRITING GUIDELINES:
       if (!user) return errorResponse("Unauthorized", 401);
 
       const body = await req.json().catch(() => ({}));
+      const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
+      const connectedEmail = connection?.gmail_email || connection?.gmailEmail || user.email;
+
+      const recipient = body.recipient || body.to || "";
+      const cc = body.cc || "";
+      const bcc = body.bcc || "";
+      const subject = body.subject || "(Untitled Draft)";
+      const emailBody = body.body || "";
+
+      let gmailDraftId = body.gmailDraftId || null;
+      let gmailMessageId = body.gmailMessageId || null;
+
+      // Sync with Gmail Draft API
+      if (connection) {
+        const accessToken = await getValidAccessToken(connection, supabase);
+        if (accessToken) {
+          try {
+            const emailLines = [
+              `From: ${connectedEmail}`,
+              recipient ? `To: ${recipient}` : "",
+              cc ? `Cc: ${cc}` : "",
+              bcc ? `Bcc: ${bcc}` : "",
+              `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+              "MIME-Version: 1.0",
+              "Content-Type: text/plain; charset=UTF-8",
+              "Content-Transfer-Encoding: 7bit",
+              "",
+              emailBody,
+            ].filter(Boolean).join("\r\n");
+
+            const rawBase64 = btoa(unescape(encodeURIComponent(emailLines)))
+              .replace(/\+/g, "-")
+              .replace(/\//g, "_")
+              .replace(/=+$/, "");
+
+            if (gmailDraftId) {
+              // Update existing draft in Gmail
+              const dUpdateRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/drafts/${gmailDraftId}`, {
+                method: "PUT",
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ message: { raw: rawBase64 } }),
+              });
+              if (dUpdateRes.ok) {
+                const uData = await dUpdateRes.json();
+                gmailDraftId = uData.id || gmailDraftId;
+                gmailMessageId = uData.message?.id || gmailMessageId;
+              }
+            } else {
+              // Create new draft in Gmail
+              const dCreateRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ message: { raw: rawBase64 } }),
+              });
+              if (dCreateRes.ok) {
+                const cData = await dCreateRes.json();
+                gmailDraftId = cData.id;
+                gmailMessageId = cData.message?.id || null;
+              }
+            }
+          } catch (dErr) {
+            console.warn("Gmail draft sync error:", dErr);
+          }
+        }
+      }
+
       const now = new Date().toISOString();
       const draftPayload = {
         id: body.id || crypto.randomUUID(),
         userId: user.id,
-        recipient: body.recipient || body.to || "",
-        cc: body.cc || null,
-        bcc: body.bcc || null,
-        subject: body.subject || "(Untitled Draft)",
-        body: body.body || "",
-        category: body.category || "Official/Professional",
+        gmailAccount: connectedEmail,
+        gmailMessageId: gmailMessageId,
+        gmailDraftId: gmailDraftId,
+        recipient: recipient,
+        cc: cc || null,
+        bcc: bcc || null,
+        subject: subject,
+        body: emailBody,
+        body_text: emailBody,
+        body_html: body.body_html || null,
+        category: body.category || "Official / Professional",
         situation: body.situation || "💼 Official / Professional",
         priority: body.priority || "Normal",
         tone: body.tone || "Professional",
         status: "Draft",
+        direction: "draft",
         isReceived: false,
         isSent: false,
         isSpam: false,
+        isTrash: false,
         isRead: true,
         createdAt: now,
+        updatedAt: now,
       };
 
       const { data, error } = await safeInsertEmail(supabase, draftPayload);
       if (error) throw error;
-      return jsonResponse({ success: true, email: data || draftPayload });
+      return jsonResponse({ success: true, email: data || draftPayload, gmailDraftId, gmailMessageId });
+    }
+
+    if (path.startsWith("/emails/draft/") && (method === "PUT" || method === "PATCH")) {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const draftId = path.split("/")[3];
+
+      const body = await req.json().catch(() => ({}));
+      const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
+      const connectedEmail = connection?.gmail_email || connection?.gmailEmail || user.email;
+
+      const recipient = body.recipient || body.to || "";
+      const cc = body.cc || "";
+      const bcc = body.bcc || "";
+      const subject = body.subject || "(Untitled Draft)";
+      const emailBody = body.body || "";
+
+      // If Gmail draft ID exists, update it in Gmail
+      if (connection && (body.gmailDraftId || draftId)) {
+        const targetDraftId = body.gmailDraftId || draftId;
+        const accessToken = await getValidAccessToken(connection, supabase);
+        if (accessToken) {
+          try {
+            const emailLines = [
+              `From: ${connectedEmail}`,
+              recipient ? `To: ${recipient}` : "",
+              cc ? `Cc: ${cc}` : "",
+              bcc ? `Bcc: ${bcc}` : "",
+              `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+              "MIME-Version: 1.0",
+              "Content-Type: text/plain; charset=UTF-8",
+              "Content-Transfer-Encoding: 7bit",
+              "",
+              emailBody,
+            ].filter(Boolean).join("\r\n");
+
+            const rawBase64 = btoa(unescape(encodeURIComponent(emailLines)))
+              .replace(/\+/g, "-")
+              .replace(/\//g, "_")
+              .replace(/=+$/, "");
+
+            await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/drafts/${targetDraftId}`, {
+              method: "PUT",
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ message: { raw: rawBase64 } }),
+            });
+          } catch (dErr) {
+            console.warn("Gmail draft update error:", dErr);
+          }
+        }
+      }
+
+      const now = new Date().toISOString();
+      await supabase.from("emails").update({
+        recipient_email: recipient,
+        recipient,
+        subject,
+        body: emailBody,
+        body_text: emailBody,
+        updated_at: now,
+      }).eq("id", draftId).eq("user_id", user.id);
+
+      try {
+        await supabase.from("Email").update({
+          recipient,
+          subject,
+          body: emailBody,
+          updatedAt: now,
+        }).eq("id", draftId).eq("userId", user.id);
+      } catch (_) {}
+
+      return jsonResponse({ success: true, message: "Draft updated successfully." });
+    }
+
+    if (path.startsWith("/emails/draft/") && method === "DELETE") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const draftId = path.split("/")[3];
+
+      const connection = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0];
+      if (connection) {
+        const accessToken = await getValidAccessToken(connection, supabase);
+        if (accessToken) {
+          try {
+            await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}`, {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+          } catch (dErr) {
+            console.warn("Gmail draft delete error:", dErr);
+          }
+        }
+      }
+
+      await supabase.from("emails").delete().or(`id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id);
+      await supabase.from("Email").delete().or(`id.eq.${draftId},"gmailDraftId".eq.${draftId}`).eq("userId", user.id);
+      return jsonResponse({ success: true, message: "Draft deleted." });
     }
 
     if (path === "/emails/schedule" && method === "POST") {

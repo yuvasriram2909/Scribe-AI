@@ -70,6 +70,8 @@ export function ComposeWorkflow({
   const errorMessage = composeState.errorMessage || '';
   const sentResult = composeState.sentResult || null;
 
+  const gmailDraftId = composeState.gmailDraftId || initialData.gmailDraftId || null;
+
   const [aiLoading, setAiLoading] = useState(false);
   const [showCcBcc, setShowCcBcc] = useState(Boolean(composeState.cc || composeState.bcc || initialData.cc || initialData.bcc));
   const [isEditing, setIsEditing] = useState(false);
@@ -100,13 +102,13 @@ export function ComposeWorkflow({
           priority,
           tone
         })
-      }).catch((e) => console.warn('Pending review track notice:', e));
+      }).catch(() => {});
     }
   }, [step, subject, body, recipient]);
 
   const handleSaveDraft = async () => {
-    if (!recipient.trim() && !subject.trim()) {
-      updateState({ errorMessage: 'Please enter a recipient or subject to save a draft.' });
+    if (!recipient && !subject && !body) {
+      updateState({ errorMessage: 'Cannot save an empty email as draft.' });
       return;
     }
     try {
@@ -122,11 +124,16 @@ export function ComposeWorkflow({
           category: detectedCategory,
           situation,
           priority,
-          tone
+          tone,
+          gmailDraftId,
         })
       });
       if (res.ok) {
-        setDraftToast('✓ Draft successfully saved in Supabase database!');
+        const data = await res.json();
+        if (data?.gmailDraftId) {
+          updateState({ gmailDraftId: data.gmailDraftId });
+        }
+        setDraftToast('✓ Saved as Gmail Draft & synchronized with mailbox!');
         setTimeout(() => setDraftToast(''), 4000);
       }
     } catch (e) {

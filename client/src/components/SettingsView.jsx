@@ -36,10 +36,19 @@ export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
     isConnected: false,
     status: 'DISCONNECTED',
     connectedEmail: null,
+    mailboxEmail: null,
+    hasModifyScope: false,
+    hasSendScope: false,
+    needsReauth: false,
+    scope: '',
+    lastSyncedAt: null,
+    syncStatus: 'IDLE',
     isGoogleConfigured: true,
     mode: 'Checking connection...'
   });
   const [connectingGoogle, setConnectingGoogle] = useState(false);
+  const [syncingGmail, setSyncingGmail] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
   const [authError, setAuthError] = useState('');
 
   // Backend API URL State
@@ -106,6 +115,13 @@ export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
           isConnected: !!authData.isConnected,
           status: authData.status || (authData.isConnected ? 'CONNECTED' : 'DISCONNECTED'),
           connectedEmail: authData.connectedEmail || null,
+          mailboxEmail: authData.mailboxEmail || authData.connectedEmail || null,
+          hasModifyScope: !!authData.hasModifyScope,
+          hasSendScope: !!authData.hasSendScope,
+          needsReauth: !!authData.needsReauth,
+          scope: authData.scope || '',
+          lastSyncedAt: authData.lastSyncedAt || null,
+          syncStatus: authData.syncStatus || 'IDLE',
           isGoogleConfigured: true,
           mode: authData.isConnected ? 'Gmail OAuth Active' : 'Not Connected'
         });
@@ -140,6 +156,13 @@ export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
           isConnected: false,
           status: 'DISCONNECTED',
           connectedEmail: null,
+          mailboxEmail: null,
+          hasModifyScope: false,
+          hasSendScope: false,
+          needsReauth: false,
+          scope: '',
+          lastSyncedAt: null,
+          syncStatus: 'IDLE',
           isGoogleConfigured: true,
           mode: 'Not Connected'
         });
@@ -160,13 +183,31 @@ export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
       const data = await safeParseResponse(res);
       if (data && data.url) {
         window.location.href = data.url;
-      } else {
-        throw new Error(data?.error || 'Google OAuth is not configured in backend environment.');
+        return;
       }
+    } catch (_) {}
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) throw error;
     } catch (err) {
       console.error('OAuth start error:', err);
       setAuthError(err.message || 'Failed to initiate Google OAuth. Please ensure GOOGLE_CLIENT_ID is set in Supabase Secrets.');
       setConnectingGoogle(false);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    setSyncingGmail(true);
+    setSyncMsg('');
+    try {
+      const res = await apiFetch('/api/gmail/sync', { method: 'POST' });
+      const data = await safeParseResponse(res);
+      setSyncMsg(data?.synced > 0 ? `✓ Synchronized ${data.synced} emails.` : '✓ Mailbox is already up to date.');
+      await fetchSettings();
+    } catch (err) {
+      setSyncMsg('⚠️ Sync failed: ' + err.message);
+    } finally {
+      setSyncingGmail(false);
     }
   };
 
@@ -336,10 +377,16 @@ export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
           </div>
           <span className={`text-xs font-bold px-3 py-1 rounded-full ${
             authStatus.isConnected
-              ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
+              ? authStatus.hasModifyScope
+                ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
+                : 'bg-amber-950/80 text-amber-300 border border-amber-500/40'
               : 'bg-[#22211F] text-[#D4A373] border border-[#2E2D2B]'
           }`}>
-            {authStatus.isConnected ? 'Gmail OAuth Active ✓' : 'Not Connected'}
+            {authStatus.isConnected
+              ? authStatus.hasModifyScope
+                ? 'Two-Way Sync Active ✓'
+                : 'Send Only (Upgrade Available)'
+              : 'Not Connected'}
           </span>
         </div>
 
@@ -350,23 +397,84 @@ export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
         )}
 
         {authStatus.isConnected ? (
-          <div className="p-5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 space-y-3">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
-                <span className="text-xs font-bold text-[#F5F3EF]">
-                  Connected account: <span className="text-emerald-300 font-mono">{authStatus.connectedEmail}</span>
-                </span>
+          <div className="p-5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0 shadow-xs">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z" opacity=".15"/>
+                    <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
+                    <path fill="#34A853" d="M4 20h16c1.1 0 2-.9 2-2V8.25l-10 6.25-10-6.25V18c0 1.1.9 2 2 2z"/>
+                    <path fill="#EA4335" d="M22 6c0-.42-.14-.8-.37-1.12L12 11 2.37 4.88C2.14 5.2 2 5.58 2 6v2.25l10 6.25 10-6.25V6z"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-[#F5F3EF]">
+                      Verified Mailbox: <span className="text-emerald-300 font-mono">{authStatus.mailboxEmail || authStatus.connectedEmail}</span>
+                    </span>
+                    {authStatus.hasModifyScope ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                        gmail.modify Active
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        gmail.send only
+                      </span>
+                    )}
+                  </div>
+                  {authStatus.lastSyncedAt && (
+                    <p className="text-[11px] text-[#99958F] mt-0.5">
+                      Last synchronized: {new Date(authStatus.lastSyncedAt).toLocaleString()}
+                    </p>
+                  )}
+                </div>
               </div>
-              <button
-                onClick={handleDisconnect}
-                className="px-4 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 text-xs font-bold border border-rose-500/30 transition-all cursor-pointer shadow-sm"
-              >
-                Disconnect Google
-              </button>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {!authStatus.hasModifyScope && (
+                  <button
+                    onClick={handleConnectClick}
+                    disabled={connectingGoogle}
+                    className="px-3.5 py-2 rounded-xl gold-btn text-[#121211] text-xs font-bold transition-all hover:scale-102 cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <span>⚡ Upgrade Scope</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleSyncNow}
+                  disabled={syncingGmail}
+                  className="px-3.5 py-2 rounded-xl bg-[#22211F] hover:bg-[#2E2D2B] text-[#F5F3EF] border border-[#2E2D2B] text-xs font-bold transition-all cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingGmail ? 'animate-spin text-[#D4A373]' : 'text-[#99958F]'}`} />
+                  <span>{syncingGmail ? 'Syncing...' : 'Sync Mailbox'}</span>
+                </button>
+                <button
+                  onClick={handleDisconnect}
+                  className="px-3.5 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 text-xs font-bold border border-rose-500/30 transition-all cursor-pointer shadow-sm"
+                >
+                  Disconnect Google
+                </button>
+              </div>
             </div>
+
+            {!authStatus.hasModifyScope && (
+              <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/30 text-amber-200 text-xs space-y-1">
+                <div className="font-bold">Two-Way Gmail Sync Upgrade Notice:</div>
+                <p className="text-[11px] text-stone-300">
+                  Your Google account is currently authorized with send-only permissions. Click <strong>Upgrade Scope</strong> to grant <code className="font-mono text-amber-300">gmail.modify</code>, enabling real-time inbox synchronization, draft editing, starring, archiving, and trashing directly within Scribe AI.
+                </p>
+              </div>
+            )}
+
+            {syncMsg && (
+              <div className="text-xs text-[#D4A373] font-medium animate-fadeIn">
+                {syncMsg}
+              </div>
+            )}
+
             <p className="text-xs text-[#99958F]">
-              All AI-generated emails are dispatched directly from your authenticated Gmail address (<span className="font-semibold text-[#ECE8E1]">{authStatus.connectedEmail}</span>) via the official Google OAuth 2.0 Gmail API.
+              All AI-generated emails and mailbox actions synchronize directly with your authenticated Gmail account (<span className="font-semibold text-[#ECE8E1]">{authStatus.mailboxEmail || authStatus.connectedEmail}</span>) via Google OAuth 2.0 Gmail REST API.
             </p>
           </div>
         ) : (

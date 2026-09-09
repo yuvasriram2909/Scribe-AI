@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   Mail, Send, AlertTriangle, Calendar, FileText, Briefcase, Sparkles, 
   ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings, Bell, LogOut, ChevronRight, Wand2, Inbox, UserPlus,
-  Sun, Moon, TrendingUp, BarChart3, Zap, MoreVertical
+  Sun, Moon, TrendingUp, BarChart3, Zap, MoreVertical, Star
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import { sanitizeHtml } from '../utils/sanitize';
 import { validateEmailList, parseEmailList } from '../utils/emailValidation';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
 import { supabase, subscribeToEmailChanges, subscribeToEmailEvents, signInWithGoogle, subscribeToSyncState } from '../utils/supabaseClient';
@@ -280,6 +281,8 @@ export function Dashboard({
 
   // Email Detail Modal
   const [detailModalEmail, setDetailModalEmail] = useState(null);
+  const [detailModalTab, setDetailModalTab] = useState('html');
+  const [loadingDetailModal, setLoadingDetailModal] = useState(false);
 
   // Quick compose state - single source of truth initialized with composeState
   const [quickInstruction, setQuickInstruction] = useState(composeState.instruction || '');
@@ -449,11 +452,73 @@ export function Dashboard({
       const data = await res.json();
       if (data && data.url) {
         window.location.href = data.url;
-      } else if (onNavigateToSettings) {
-        onNavigateToSettings();
+        return;
       }
+    } catch (_) {}
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) throw error;
     } catch (err) {
       if (onNavigateToSettings) onNavigateToSettings();
+    }
+  };
+
+  const handleOpenDetailModal = async (em) => {
+    setDetailModalEmail(em);
+    setDetailModalTab(em.bodyHtml || em.body_html ? 'html' : 'text');
+    if (em.id && (!em.bodyHtml && !em.body_html)) {
+      setLoadingDetailModal(true);
+      try {
+        const res = await apiFetch(`/api/emails/${em.id}`);
+        if (res.ok) {
+          const full = await res.json();
+          if (full && full.id) {
+            setDetailModalEmail(prev => prev && prev.id === full.id ? { ...prev, ...full } : prev);
+            if (full.bodyHtml || full.body_html) setDetailModalTab('html');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch full email details:', err);
+      } finally {
+        setLoadingDetailModal(false);
+      }
+    }
+  };
+
+  const handleToggleStar = async (e, em) => {
+    if (e) e.stopPropagation();
+    const currentVal = Boolean(em.isStarred || em.is_starred);
+    const nextVal = !currentVal;
+    setRecentEmails(prev => prev.map(item => item.id === em.id ? { ...item, isStarred: nextVal, is_starred: nextVal } : item));
+    if (detailModalEmail && detailModalEmail.id === em.id) {
+      setDetailModalEmail(prev => prev ? { ...prev, isStarred: nextVal, is_starred: nextVal } : null);
+    }
+    try {
+      await apiFetch(`/api/emails/${em.id}/star`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isStarred: nextVal })
+      });
+    } catch (err) {
+      console.error('Failed to toggle star:', err);
+    }
+  };
+
+  const handleToggleRead = async (em) => {
+    const currentUnread = Boolean(em.isUnread || em.is_unread);
+    const nextUnread = !currentUnread;
+    setRecentEmails(prev => prev.map(item => item.id === em.id ? { ...item, isUnread: nextUnread, is_unread: nextUnread } : item));
+    if (detailModalEmail && detailModalEmail.id === em.id) {
+      setDetailModalEmail(prev => prev ? { ...prev, isUnread: nextUnread, is_unread: nextUnread } : null);
+    }
+    try {
+      await apiFetch(`/api/emails/${em.id}/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isUnread: nextUnread })
+      });
+    } catch (err) {
+      console.error('Failed to toggle read:', err);
     }
   };
 
@@ -741,6 +806,38 @@ export function Dashboard({
         </div>
       )}
 
+      {/* Scope Upgrade Banner */}
+      {connectionStatus.isConnected && (!connectionStatus.hasModifyScope || connectionStatus.needsReauth) && (
+        <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md animate-fadeIn ${
+          theme === 'dark'
+            ? 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+            : 'bg-amber-50 border-amber-200 text-amber-900'
+        }`}>
+          <div className="flex items-center gap-3 text-center sm:text-left">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <h4 className={`text-xs font-extrabold ${theme === 'dark' ? 'text-amber-200' : 'text-amber-900'}`}>
+                Two-Way Gmail Synchronization Available
+              </h4>
+              <p className={`text-[11px] ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
+                Grant full read & sync permissions (<code className="font-mono text-amber-300 text-[10px]">gmail.modify</code>) to access existing Inbox emails, sync drafts, and manage stars & archives directly in Scribe AI.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleConnectGmail}
+              className="px-4 py-2 rounded-xl gold-btn text-[#121211] text-xs font-bold shadow-md cursor-pointer hover:scale-102 transition-transform flex items-center gap-1.5"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>Upgrade Permissions</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ============================================================
           1. GMAIL CONNECTED STATUS BAR (Warm Cashmere Minimalist)
       ============================================================ */}
@@ -766,10 +863,16 @@ export function Dashboard({
                   {connectionStatus.isConnected ? 'Gmail Connected' : 'Gmail Disconnected'}
                 </h3>
                 {connectionStatus.isConnected ? (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 inline-flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    OAuth Active
-                  </span>
+                  connectionStatus.hasModifyScope ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 inline-flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Two-Way Sync Active
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-400 inline-flex items-center gap-1">
+                      Send Only (Upgrade Available)
+                    </span>
+                  )
                 ) : (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-400 inline-flex items-center gap-1">
                     Ready to Connect
@@ -784,7 +887,7 @@ export function Dashboard({
               <div className="flex items-center gap-2 flex-wrap mt-0.5">
                 <p className={`text-xs font-mono ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
                   {connectionStatus.isConnected
-                    ? `Connected account: ${connectionStatus.connectedEmail || currentUserEmail || 'Active'}`
+                    ? `Mailbox: ${connectionStatus.mailboxEmail || connectionStatus.connectedEmail || currentUserEmail || 'Active'}`
                     : 'Connect your Gmail account to synchronize emails and analytics.'}
                 </p>
                 {syncState?.last_synced_at && (
@@ -802,6 +905,16 @@ export function Dashboard({
           <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
             {connectionStatus.isConnected ? (
               <>
+                {(!connectionStatus.hasModifyScope || connectionStatus.needsReauth) && (
+                  <button
+                    onClick={handleConnectGmail}
+                    className="px-3.5 py-2 rounded-xl gold-btn text-[#121211] text-xs font-bold flex items-center gap-1.5 transition-all duration-200 hover:scale-102 cursor-pointer shadow-md"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Upgrade Scope</span>
+                  </button>
+                )}
+
                 <button
                   onClick={handleManualSync}
                   disabled={isSyncing}
@@ -1327,7 +1440,7 @@ export function Dashboard({
               recentEmails.slice(0, 4).map((em, idx) => (
                 <div
                   key={em.id || idx}
-                  onClick={() => setDetailModalEmail(em)}
+                  onClick={() => handleOpenDetailModal(em)}
                   className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer recent-email-row group ${
                     theme === 'dark'
                       ? 'bg-[#161514] border-[#2E2D2B]'
@@ -1335,6 +1448,13 @@ export function Dashboard({
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
+                    <button
+                      onClick={(e) => handleToggleStar(e, em)}
+                      title={em.isStarred || em.is_starred ? 'Unstar email' : 'Star email'}
+                      className="p-1 rounded-lg hover:bg-[#22211F] transition-colors shrink-0 text-[#99958F] hover:text-amber-400"
+                    >
+                      <Star className={`w-3.5 h-3.5 ${em.isStarred || em.is_starred ? 'fill-amber-400 text-amber-400' : 'text-[#99958F]'}`} />
+                    </button>
                     <div className="w-8 h-8 rounded-xl bg-white border border-stone-200 flex items-center justify-center shrink-0 recent-mail-icon transition-transform duration-200 shadow-xs">
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M20 4H4c-1.1 0-2 .9-2 2v.8l10 6.25 10-6.25V6c0-1.1-.9-2-2-2z"/>
@@ -1571,29 +1691,123 @@ export function Dashboard({
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="glass-panel w-full max-w-2xl rounded-3xl p-6 sm:p-8 border border-[#2E2D2B] shadow-2xl space-y-5 animate-fadeIn bg-[#1A1918]">
             <div className="flex items-center justify-between border-b border-[#2E2D2B] pb-4">
-              <div>
-                <span className="text-[10px] font-bold text-[#D4A373] uppercase tracking-wider">Email Inspection</span>
-                <h3 className="text-lg font-extrabold text-[#F5F3EF] mt-0.5">{detailModalEmail.subject}</h3>
+              <div className="min-w-0 pr-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-[#D4A373] uppercase tracking-wider">Email Inspection</span>
+                  {loadingDetailModal && (
+                    <span className="text-[10px] text-[#99958F] animate-pulse flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3 animate-spin text-[#D4A373]" /> Loading full message...
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-lg font-extrabold text-[#F5F3EF] mt-0.5 truncate">{detailModalEmail.subject || '(No Subject)'}</h3>
               </div>
-              <button onClick={() => setDetailModalEmail(null)} className="p-2 rounded-xl text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#22211F]">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={(e) => handleToggleStar(e, detailModalEmail)}
+                  title={detailModalEmail.isStarred || detailModalEmail.is_starred ? 'Starred' : 'Star this email'}
+                  className="p-2 rounded-xl text-[#99958F] hover:text-amber-400 hover:bg-[#22211F] transition-colors"
+                >
+                  <Star className={`w-5 h-5 ${detailModalEmail.isStarred || detailModalEmail.is_starred ? 'fill-amber-400 text-amber-400' : ''}`} />
+                </button>
+                <button onClick={() => setDetailModalEmail(null)} className="p-2 rounded-xl text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#22211F]">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs bg-[#161514] p-3.5 rounded-2xl border border-[#2E2D2B]">
-              <div><span className="text-[#99958F]">To:</span> <span className="font-mono text-[#ECE8E1]">{detailModalEmail.recipient}</span></div>
-              <div><span className="text-[#99958F]">Status:</span> <span className="text-emerald-400 font-bold">{detailModalEmail.status}</span></div>
-              <div><span className="text-[#99958F]">Category:</span> <span className="text-[#D4A373]">{detailModalEmail.category}</span></div>
-              <div><span className="text-[#99958F]">Date:</span> <span className="text-[#ECE8E1]">{new Date(detailModalEmail.createdAt).toLocaleString()}</span></div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-[#161514] p-3.5 rounded-2xl border border-[#2E2D2B]">
+              <div>
+                <span className="text-[#99958F] block text-[10px] uppercase font-bold">
+                  {detailModalEmail.direction === 'sent' || detailModalEmail.isSent ? 'To' : 'From'}
+                </span>
+                <span className="font-mono text-[#ECE8E1] truncate block mt-0.5" title={detailModalEmail.recipient || detailModalEmail.sender}>
+                  {detailModalEmail.recipient || detailModalEmail.sender || 'Unknown'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#99958F] block text-[10px] uppercase font-bold">Status</span>
+                <span className="text-emerald-400 font-bold block mt-0.5">{detailModalEmail.status || 'Delivered'}</span>
+              </div>
+              <div>
+                <span className="text-[#99958F] block text-[10px] uppercase font-bold">Category</span>
+                <span className="text-[#D4A373] font-semibold block mt-0.5">{detailModalEmail.category || 'Standard'}</span>
+              </div>
+              <div>
+                <span className="text-[#99958F] block text-[10px] uppercase font-bold">Date</span>
+                <span className="text-[#ECE8E1] truncate block mt-0.5">
+                  {new Date(detailModalEmail.sentAt || detailModalEmail.createdAt || detailModalEmail.receivedAt || Date.now()).toLocaleDateString()}
+                </span>
+              </div>
             </div>
 
-            <div className="bg-[#121211] p-4 rounded-2xl border border-[#2E2D2B] max-h-60 overflow-y-auto">
-              <pre className="text-xs text-[#F5F3EF] whitespace-pre-wrap font-sans leading-relaxed">
-                {detailModalEmail.body}
-              </pre>
-            </div>
+            {/* Content Tabs (HTML vs Plain Text) */}
+            {(detailModalEmail.bodyHtml || detailModalEmail.body_html) ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setDetailModalTab('html')}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      detailModalTab === 'html'
+                        ? 'bg-[#D4A373] text-[#121211]'
+                        : 'bg-[#22211F] text-[#99958F] hover:text-[#F5F3EF]'
+                    }`}
+                  >
+                    HTML View
+                  </button>
+                  <button
+                    onClick={() => setDetailModalTab('text')}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      detailModalTab === 'text'
+                        ? 'bg-[#D4A373] text-[#121211]'
+                        : 'bg-[#22211F] text-[#99958F] hover:text-[#F5F3EF]'
+                    }`}
+                  >
+                    Plain Text
+                  </button>
+                </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-[#2E2D2B]">
+                {detailModalTab === 'html' ? (
+                  <div
+                    className="p-4 sm:p-5 rounded-2xl bg-white text-stone-900 overflow-x-auto text-sm leading-relaxed max-h-[50vh] overflow-y-auto shadow-inner border border-stone-200"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(detailModalEmail.bodyHtml || detailModalEmail.body_html) }}
+                  />
+                ) : (
+                  <div className="bg-[#121211] p-4 rounded-2xl border border-[#2E2D2B] max-h-[50vh] overflow-y-auto">
+                    <pre className="text-xs text-[#F5F3EF] whitespace-pre-wrap font-sans leading-relaxed">
+                      {detailModalEmail.bodyText || detailModalEmail.body || '(No plain text content)'}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-[#121211] p-4 rounded-2xl border border-[#2E2D2B] max-h-60 overflow-y-auto">
+                <pre className="text-xs text-[#F5F3EF] whitespace-pre-wrap font-sans leading-relaxed">
+                  {detailModalEmail.bodyText || detailModalEmail.body || detailModalEmail.snippet || '(No content)'}
+                </pre>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#2E2D2B]">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleToggleRead(detailModalEmail)}
+                  className="px-3 py-2 rounded-xl bg-[#22211F] hover:bg-[#2E2D2B] text-[#ECE8E1] text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  {detailModalEmail.isUnread || detailModalEmail.is_unread ? 'Mark as Read' : 'Mark as Unread'}
+                </button>
+                {onViewHistory && (
+                  <button
+                    onClick={() => {
+                      setDetailModalEmail(null);
+                      onViewHistory();
+                    }}
+                    className="px-3 py-2 rounded-xl bg-[#22211F] hover:bg-[#2E2D2B] text-[#D4A373] text-xs font-semibold cursor-pointer transition-colors"
+                  >
+                    Open in Mailbox →
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => setDetailModalEmail(null)}
                 className="px-5 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2E2D2B] text-[#F5F3EF] text-xs font-bold cursor-pointer transition-colors"
