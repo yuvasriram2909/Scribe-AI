@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, Trash2, Send, Mail, Tag, Plus, Check } from 'lucide-react';
+import { Users, UserPlus, Trash2, Send, Mail, Tag, Plus, Check, AlertCircle } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import { isValidEmail } from '../utils/emailValidation';
 
 const RELATIONSHIPS = [
   { name: 'Client', tone: 'Professional', badge: 'bg-[#22211F] text-[#D4A373] border-[#2E2D2B]' },
@@ -15,6 +16,7 @@ export function ContactsManager({ onQuickCompose }) {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [formError, setFormError] = useState('');
 
   // Form State
   const [name, setName] = useState('');
@@ -39,13 +41,21 @@ export function ContactsManager({ onQuickCompose }) {
 
   const handleAddContact = async (e) => {
     e.preventDefault();
-    if (!name || !email) return;
+    setFormError('');
+    if (!name || !name.trim()) {
+      setFormError('Please enter the contact full name.');
+      return;
+    }
+    if (!email || !email.trim() || !isValidEmail(email)) {
+      setFormError('Please enter a valid email address (e.g. sarah@example.com).');
+      return;
+    }
 
     try {
       const res = await apiFetch('/api/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, relationship })
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), relationship })
       });
 
       if (res.ok) {
@@ -53,10 +63,15 @@ export function ContactsManager({ onQuickCompose }) {
         setContacts(prev => [newContact, ...prev]);
         setName('');
         setEmail('');
+        setFormError('');
         setShowAddForm(false);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setFormError(errData.error || 'Failed to save contact.');
       }
     } catch (err) {
       console.error('Failed to add contact:', err);
+      setFormError(err.message || 'Network error while adding contact.');
     }
   };
 
@@ -99,6 +114,13 @@ export function ContactsManager({ onQuickCompose }) {
       {showAddForm && (
         <form onSubmit={handleAddContact} className="glass-panel p-6 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] space-y-4 animate-fadeIn shadow-xl">
           <h3 className="text-sm font-extrabold text-[#F5F3EF]">Add New Contact</h3>
+
+          {formError && (
+            <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>{formError}</span>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-bold text-[#ECE8E1] block mb-1">Full Name</label>

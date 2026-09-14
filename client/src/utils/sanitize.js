@@ -27,7 +27,11 @@ const DANGEROUS_URI_PREFIXES = [
   'javascript:',
   'vbscript:',
   'data:text/html',
-  'data:application/'
+  'data:text/javascript',
+  'data:application/javascript',
+  'data:application/x-javascript',
+  'data:application/xml',
+  'data:text/xml'
 ];
 
 /**

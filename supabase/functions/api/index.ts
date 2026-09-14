@@ -1910,6 +1910,15 @@ serve(async (req: Request) => {
       const isConnected = Boolean(activeAccount && (activeAccount.access_token_encrypted || activeAccount.encryptedAccessToken || activeAccount.refresh_token_encrypted || activeAccount.encryptedRefreshToken));
       const connectedEmail = activeAccount?.gmail_email || activeAccount?.gmailEmail || (isConnected ? user.email : null);
 
+      const sanitizeConn = (c: any) => ({
+        id: c.id,
+        email: c.gmail_email || c.gmailEmail || c.email,
+        scope: c.scope,
+        status: c.status || "CONNECTED",
+        lastSyncedAt: c.last_synced_at || c.lastSyncedAt || null,
+        isConnected: Boolean(c.access_token_encrypted || c.encryptedAccessToken || c.refresh_token_encrypted || c.encryptedRefreshToken)
+      });
+
       return jsonResponse({
         authenticated: true,
         user: {
@@ -1920,8 +1929,8 @@ serve(async (req: Request) => {
           createdAt: user.createdAt,
           lastLoginAt: user.lastLoginAt,
           signature: user.signature?.[0] || null,
-          gmailAccounts: accounts,
-          gmailConnections: conns,
+          gmailAccounts: accounts.map(sanitizeConn),
+          gmailConnections: conns.map(sanitizeConn),
           connectedEmail,
           isConnected,
         },
@@ -2487,18 +2496,21 @@ serve(async (req: Request) => {
       }
 
       // 1. Resolve connected account from gmail_connections or GmailAccount
-      let connection: any = null;
-      const { data: conns } = await supabase
-        .from("gmail_connections")
-        .select("*")
-        .eq("user_id", user.id);
-      if (conns && conns.length > 0) connection = conns[0];
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
+      let connection: any = (user.gmailConnections || [])[0] || (user.gmailAccounts || [])[0] || null;
+      if (!connection) {
+        const { data: conns } = await supabase
+          .from("gmail_connections")
+          .select("*")
+          .in("user_id", userIds);
+        if (conns && conns.length > 0) connection = conns[0];
+      }
 
       if (!connection) {
         const { data: accounts } = await supabase
           .from("GmailAccount")
           .select("*")
-          .eq("userId", user.id);
+          .in("userId", userIds);
         if (accounts && accounts.length > 0) connection = accounts[0];
       }
 
@@ -3020,10 +3032,11 @@ RECIPIENT: "${recipientName || recipient || 'Recipient'}"
 SENDER NAME: "${senderName}"`;
 
           const priorityModels = [
+            "models/gemini-2.5-flash",
+            "models/gemini-2.0-flash",
+            "models/gemini-1.5-flash",
             "models/gemini-flash-latest",
-            "models/gemini-3.6-flash",
-            "models/gemini-3.5-flash",
-            "models/gemini-3.7-flash",
+            "models/gemini-1.5-pro",
             "models/gemini-pro-latest"
           ];
           
@@ -3108,10 +3121,11 @@ SENDER NAME: "${senderName}"`;
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
 
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
       const { data: contacts } = await supabase
         .from("Contact")
         .select("*")
-        .eq("userId", user.id)
+        .in("userId", userIds)
         .order("name", { ascending: true });
 
       return jsonResponse(contacts || []);
@@ -3123,7 +3137,16 @@ SENDER NAME: "${senderName}"`;
 
       const body = await req.json().catch(() => ({}));
       const { name, email, relationship } = body;
-      if (!name || !email) return errorResponse("Name and email are required.");
+      if (!name || !name.trim() || !email || !email.trim()) {
+        return errorResponse("Name and email are required.");
+      }
+
+      if (name.trim().length > 100) return errorResponse("Name is too long (max 100 characters).");
+      if (email.trim().length > 254) return errorResponse("Email address is too long.");
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
+        return errorResponse("Please provide a valid email address.");
+      }
 
       const now = new Date().toISOString();
       const { data: contact, error: cntErr } = await supabase
@@ -3132,10 +3155,9 @@ SENDER NAME: "${senderName}"`;
           id: crypto.randomUUID(),
           userId: user.id,
           name: name.trim(),
-          email: email.trim().toLowerCase(),
+          email: cleanEmail,
           relationship: relationship || "Other",
           createdAt: now,
-          updatedAt: now,
         })
         .select()
         .single();
@@ -3148,8 +3170,9 @@ SENDER NAME: "${senderName}"`;
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
-      await supabase.from("Contact").delete().eq("id", id).eq("userId", user.id);
+      await supabase.from("Contact").delete().eq("id", id).in("userId", userIds);
       return jsonResponse({ success: true, message: "Contact deleted." });
     }
 
@@ -3468,24 +3491,25 @@ SENDER NAME: "${senderName}"`;
     // Two-Way Actions: Get Email, Read, Star, Archive, Trash, Untrash, Delete
     // ----------------------------------------------------
 
-    if (path.startsWith("/emails/") && method === "GET") {
+    if (path.startsWith("/emails/") && !path.startsWith("/emails/stats") && !path.startsWith("/emails/draft") && !path.startsWith("/emails/schedule") && !path.startsWith("/emails/pending") && !path.startsWith("/emails/trash") && method === "GET") {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
 
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
       // Find email in emails or Email
       let emailRecord: any = null;
-      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).in("user_id", userIds).maybeSingle();
       if (cData) {
         emailRecord = cData;
       } else {
-        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).in("userId", userIds).maybeSingle();
         if (lData) emailRecord = lData;
       }
 
       if (!emailRecord) {
         // Try looking up by gmail_message_id
-        const { data: gData } = await supabase.from("emails").select("*").eq("gmail_message_id", id).eq("user_id", user.id).maybeSingle();
+        const { data: gData } = await supabase.from("emails").select("*").eq("gmail_message_id", id).in("user_id", userIds).maybeSingle();
         if (gData) emailRecord = gData;
       }
 
@@ -3581,12 +3605,13 @@ SENDER NAME: "${senderName}"`;
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
       const body = await req.json().catch(() => ({}));
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
       let emailRecord: any = null;
-      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).in("user_id", userIds).maybeSingle();
       if (cData) emailRecord = cData;
       else {
-        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).in("userId", userIds).maybeSingle();
         if (lData) emailRecord = lData;
       }
       if (!emailRecord) return errorResponse("Email not found", 404);
@@ -3634,12 +3659,13 @@ SENDER NAME: "${senderName}"`;
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
       const body = await req.json().catch(() => ({}));
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
       let emailRecord: any = null;
-      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).in("user_id", userIds).maybeSingle();
       if (cData) emailRecord = cData;
       else {
-        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).in("userId", userIds).maybeSingle();
         if (lData) emailRecord = lData;
       }
       if (!emailRecord) return errorResponse("Email not found", 404);
@@ -3687,12 +3713,13 @@ SENDER NAME: "${senderName}"`;
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
       const body = await req.json().catch(() => ({}));
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
       let emailRecord: any = null;
-      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).in("user_id", userIds).maybeSingle();
       if (cData) emailRecord = cData;
       else {
-        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).in("userId", userIds).maybeSingle();
         if (lData) emailRecord = lData;
       }
       if (!emailRecord) return errorResponse("Email not found", 404);
@@ -3739,12 +3766,13 @@ SENDER NAME: "${senderName}"`;
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
       let emailRecord: any = null;
-      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).in("user_id", userIds).maybeSingle();
       if (cData) emailRecord = cData;
       else {
-        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).in("userId", userIds).maybeSingle();
         if (lData) emailRecord = lData;
       }
       if (!emailRecord) return errorResponse("Email not found", 404);
@@ -3780,12 +3808,13 @@ SENDER NAME: "${senderName}"`;
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
       let emailRecord: any = null;
-      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).in("user_id", userIds).maybeSingle();
       if (cData) emailRecord = cData;
       else {
-        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).in("userId", userIds).maybeSingle();
         if (lData) emailRecord = lData;
       }
       if (!emailRecord) return errorResponse("Email not found", 404);
@@ -3822,12 +3851,13 @@ SENDER NAME: "${senderName}"`;
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
       let emailRecord: any = null;
-      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).eq("user_id", user.id).maybeSingle();
+      const { data: cData } = await supabase.from("emails").select("*").eq("id", id).in("user_id", userIds).maybeSingle();
       if (cData) emailRecord = cData;
       else {
-        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).eq("userId", user.id).maybeSingle();
+        const { data: lData } = await supabase.from("Email").select("*").eq("id", id).in("userId", userIds).maybeSingle();
         if (lData) emailRecord = lData;
       }
 
@@ -3857,8 +3887,8 @@ SENDER NAME: "${senderName}"`;
         }
       }
 
-      await supabase.from("emails").delete().eq("id", id).eq("user_id", user.id);
-      await supabase.from("Email").delete().eq("id", id).eq("userId", user.id);
+      await supabase.from("emails").delete().eq("id", id).in("user_id", userIds);
+      await supabase.from("Email").delete().eq("id", id).in("userId", userIds);
       return jsonResponse({ success: true, message: "Email removed." });
     }
 
@@ -4009,10 +4039,11 @@ SENDER NAME: "${senderName}"`;
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
 
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
       const { data: sig } = await supabase
         .from("UserSignature")
         .select("*")
-        .eq("userId", user.id)
+        .in("userId", userIds)
         .maybeSingle();
 
       return jsonResponse(sig || { name: user.name, preferredTone: "Professional", enabled: true });
@@ -4311,12 +4342,15 @@ SENDER NAME: "${senderName}"`;
     if (path.startsWith("/emails/draft/") && method === "DELETE") {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
+      const draftId = path.split("/")[3];
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
+
       let targetDraftId = draftId;
-      const { data: dData } = await supabase.from("emails").select("gmail_draft_id").or(`id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id).maybeSingle();
+      const { data: dData } = await supabase.from("emails").select("gmail_draft_id").or(`id.eq.${draftId},gmail_draft_id.eq.${draftId}`).in("user_id", userIds).maybeSingle();
       if (dData?.gmail_draft_id) {
         targetDraftId = dData.gmail_draft_id;
       } else {
-        const { data: edData } = await supabase.from("email_drafts").select("gmail_draft_id").or(`scribe_draft_id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id).maybeSingle();
+        const { data: edData } = await supabase.from("email_drafts").select("gmail_draft_id").or(`scribe_draft_id.eq.${draftId},gmail_draft_id.eq.${draftId}`).in("user_id", userIds).maybeSingle();
         if (edData?.gmail_draft_id) targetDraftId = edData.gmail_draft_id;
       }
 
@@ -4335,11 +4369,11 @@ SENDER NAME: "${senderName}"`;
         }
       }
 
-      await supabase.from("emails").delete().or(`id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id);
+      await supabase.from("emails").delete().or(`id.eq.${draftId},gmail_draft_id.eq.${draftId}`).in("user_id", userIds);
       try {
-        await supabase.from("email_drafts").delete().or(`scribe_draft_id.eq.${draftId},id.eq.${draftId},gmail_draft_id.eq.${draftId}`).eq("user_id", user.id);
+        await supabase.from("email_drafts").delete().or(`scribe_draft_id.eq.${draftId},id.eq.${draftId},gmail_draft_id.eq.${draftId}`).in("user_id", userIds);
       } catch (_) {}
-      await supabase.from("Email").delete().or(`id.eq.${draftId},"gmailDraftId".eq.${draftId}`).eq("userId", user.id);
+      await supabase.from("Email").delete().or(`id.eq.${draftId},"gmailDraftId".eq.${draftId}`).in("userId", userIds);
       return jsonResponse({ success: true, message: "Draft deleted." });
     }
 
@@ -4466,13 +4500,13 @@ SENDER NAME: "${senderName}"`;
         supabase
           .from("email_events")
           .select("id, email_id, event_type, metadata, created_at")
-          .eq("user_id", user.id)
+          .in("user_id", userIds)
           .order("created_at", { ascending: false })
           .limit(10),
         supabase
           .from("email_sync_state")
           .select("*")
-          .eq("user_id", user.id)
+          .in("user_id", userIds)
           .maybeSingle()
       ]);
       const syncState = ss || null;
@@ -4808,8 +4842,13 @@ SENDER NAME: "${senderName}"`;
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
       const id = path.split("/")[2];
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
-      await supabase.from("Email").update({ status: "Sent", updatedAt: new Date().toISOString() }).eq("id", id).eq("userId", user.id);
+      const now = new Date().toISOString();
+      await supabase.from("emails").update({ is_trash: false, status: "Received", updated_at: now }).eq("id", id).in("user_id", userIds);
+      try {
+        await supabase.from("Email").update({ isTrash: false, status: "Sent", updatedAt: now }).eq("id", id).in("userId", userIds);
+      } catch (_) {}
       return jsonResponse({ success: true, message: "Email restored." });
     }
 
@@ -4820,8 +4859,12 @@ SENDER NAME: "${senderName}"`;
     if (path === "/emails/trash/empty" && method === "DELETE") {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
-      await supabase.from("Email").delete().eq("userId", user.id).eq("status", "Trash");
+      await supabase.from("emails").delete().in("user_id", userIds).or("is_trash.eq.true,status.eq.Trash");
+      try {
+        await supabase.from("Email").delete().in("userId", userIds).or("isTrash.eq.true,status.eq.Trash");
+      } catch (_) {}
       return jsonResponse({ success: true, message: "Trash emptied." });
     }
 
