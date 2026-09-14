@@ -3347,17 +3347,25 @@ SENDER NAME: "${senderName}"`;
       if (categoryQuery && categoryQuery !== "All") {
         const catQ = categoryQuery.toLowerCase().trim();
         result = result.filter((e: any) => {
-          const cat = ((e.category || "") + " " + (e.situation || "") + " " + (e.email_type || "")).toLowerCase();
-          if (cat.includes(catQ)) return true;
-          if ((catQ.includes("official") || catQ.includes("prof")) && (cat.includes("official") || cat.includes("professional") || cat.includes("work"))) return true;
-          if (catQ.includes("leave") && (cat.includes("leave") || cat.includes("holiday") || cat.includes("vacation") || cat.includes("sick"))) return true;
-          if (catQ.includes("meet") && (cat.includes("meet") || cat.includes("appointment") || cat.includes("sync"))) return true;
-          if ((catQ.includes("job") || catQ.includes("app")) && (cat.includes("job") || cat.includes("resume") || cat.includes("career") || cat.includes("interview") || cat.includes("application"))) return true;
-          if (catQ.includes("pay") && (cat.includes("payment") || cat.includes("fee") || cat.includes("invoice") || cat.includes("receipt") || cat.includes("billing") || cat.includes("salary"))) return true;
-          if (catQ.includes("emerg") && (cat.includes("emergency") || cat.includes("urgent"))) return true;
-          if (catQ.includes("complaint") && (cat.includes("complaint") || cat.includes("grievance"))) return true;
-          if (catQ.includes("follow") && (cat.includes("follow") || cat.includes("reminder"))) return true;
-          if (catQ.includes("request") && cat.includes("request")) return true;
+          const rawCat = ((e.category || "") + " " + (e.situation || "") + " " + (e.email_type || "")).toLowerCase();
+          if (rawCat.includes(catQ)) return true;
+          if (catQ.includes("status") && (rawCat.includes("status") || rawCat.includes("progress") || rawCat.includes("update"))) return true;
+          if (catQ.includes("job") && (rawCat.includes("job") || rawCat.includes("resume") || rawCat.includes("career") || rawCat.includes("candidate") || rawCat.includes("application"))) return true;
+          if (catQ.includes("leave") && (rawCat.includes("leave") || rawCat.includes("holiday") || rawCat.includes("vacation") || rawCat.includes("sick"))) return true;
+          if (catQ.includes("emergency") && (rawCat.includes("emergency") || rawCat.includes("urgent"))) return true;
+          if (catQ.includes("security") && (rawCat.includes("security") || rawCat.includes("account") || rawCat.includes("alert") || rawCat.includes("sign-in") || rawCat.includes("signin"))) return true;
+          if (catQ.includes("meeting") && (rawCat.includes("meeting") || rawCat.includes("appointment") || rawCat.includes("call") || rawCat.includes("sync"))) return true;
+          if (catQ.includes("payment") && (rawCat.includes("payment") || rawCat.includes("invoice") || rawCat.includes("billing") || rawCat.includes("receipt") || rawCat.includes("fee"))) return true;
+          if (catQ.includes("follow") && (rawCat.includes("follow") || rawCat.includes("reminder"))) return true;
+          if (catQ.includes("complaint") && (rawCat.includes("complaint") || rawCat.includes("grievance"))) return true;
+          if (catQ.includes("request") && rawCat.includes("request")) return true;
+          if (catQ.includes("official") && (rawCat.includes("official") || rawCat.includes("professional") || rawCat.includes("work"))) return true;
+          if (catQ.includes("marketing") && (rawCat.includes("marketing") || rawCat.includes("promotion") || rawCat.includes("promo"))) return true;
+          if (catQ.includes("announcement") && rawCat.includes("announcement")) return true;
+          if (catQ.includes("thank") && (rawCat.includes("thank") || rawCat.includes("appreciation"))) return true;
+          if (catQ.includes("apology") && (rawCat.includes("apology") || rawCat.includes("sorry"))) return true;
+          if (catQ.includes("academic") && (rawCat.includes("academic") || rawCat.includes("student") || rawCat.includes("college") || rawCat.includes("school") || rawCat.includes("university"))) return true;
+          if (catQ.includes("personal") && (rawCat.includes("personal") || rawCat.includes("casual"))) return true;
           return false;
         });
       }
@@ -3388,22 +3396,43 @@ SENDER NAME: "${senderName}"`;
         });
       }
 
-      // Date Range Filter (timezone-resilient rolling window)
+      // Date Range Filter (timezone-aware calendar days & exact intervals)
       if (dateRangeQuery && dateRangeQuery !== "All") {
-        const nowMs = Date.now();
-        let cutoffMs = 0;
-        if (dateRangeQuery === "today") {
-          cutoffMs = nowMs - 24 * 60 * 60 * 1000;
-        } else if (dateRangeQuery === "week") {
-          cutoffMs = nowMs - 7 * 24 * 60 * 60 * 1000;
-        } else if (dateRangeQuery === "month") {
-          cutoffMs = nowMs - 30 * 24 * 60 * 60 * 1000;
-        }
+        const tzOffsetParam = url.searchParams.get("tzOffset");
+        // tzOffset in minutes (e.g. -330 for IST UTC+5:30)
+        const tzOffsetMinutes = tzOffsetParam !== null ? parseInt(tzOffsetParam, 10) : 0;
+        const tzOffsetMs = (!isNaN(tzOffsetMinutes) ? tzOffsetMinutes : 0) * 60 * 1000;
+
+        // Current client-local time
+        const clientNowMs = Date.now() - tzOffsetMs;
+        const clientNow = new Date(clientNowMs);
+
+        // Start of client today (00:00:00.000)
+        const clientTodayStart = new Date(Date.UTC(clientNow.getUTCFullYear(), clientNow.getUTCMonth(), clientNow.getUTCDate(), 0, 0, 0, 0));
+        const todayStartMs = clientTodayStart.getTime() + tzOffsetMs;
+        const todayEndMs = todayStartMs + 24 * 60 * 60 * 1000;
+
+        const dQ = dateRangeQuery.toLowerCase().trim();
+
         result = result.filter((e: any) => {
           const dStr = e.sentAt || e.receivedAt || e.createdAt;
           if (!dStr) return false;
           const t = new Date(dStr).getTime();
-          return !isNaN(t) && t >= cutoffMs;
+          if (isNaN(t)) return false;
+
+          if (dQ === "today") {
+            return t >= todayStartMs && t < todayEndMs;
+          } else if (dQ === "yesterday") {
+            const yestStartMs = todayStartMs - 24 * 60 * 60 * 1000;
+            return t >= yestStartMs && t < todayStartMs;
+          } else if (dQ === "week" || dQ === "7days" || dQ === "last7") {
+            const weekStartMs = todayStartMs - 6 * 24 * 60 * 60 * 1000;
+            return t >= weekStartMs && t < todayEndMs;
+          } else if (dQ === "month" || dQ === "30days" || dQ === "last30") {
+            const monthStartMs = todayStartMs - 29 * 24 * 60 * 60 * 1000;
+            return t >= monthStartMs && t < todayEndMs;
+          }
+          return true;
         });
       }
 
@@ -3416,7 +3445,12 @@ SENDER NAME: "${senderName}"`;
           (e.recipient_email || "").toLowerCase().includes(q) ||
           (e.sender || "").toLowerCase().includes(q) ||
           (e.sender_email || "").toLowerCase().includes(q) ||
-          (e.body || "").toLowerCase().includes(q)
+          (e.sender_name || "").toLowerCase().includes(q) ||
+          (e.from_name || "").toLowerCase().includes(q) ||
+          (e.from_email || "").toLowerCase().includes(q) ||
+          (e.snippet || "").toLowerCase().includes(q) ||
+          (e.body || "").toLowerCase().includes(q) ||
+          (e.category || "").toLowerCase().includes(q)
         );
       }
 

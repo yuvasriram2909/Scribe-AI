@@ -21,14 +21,21 @@ const FOLDERS = [
 
 const CATEGORIES_FILTER = [
   'All',
-  'Leave Request',
-  'Emergency',
+  'Status / Progress Update',
   'Job Application',
-  'Official',
-  'Meeting',
-  'Payment',
+  'Security / Account',
+  'Leave Request',
+  'Academic / Student',
+  'Personal / Casual',
+  'Thank You / Appreciation',
+  'Meeting / Appointment',
+  'Payment / Invoice',
+  'Emergency',
+  'Official / Professional',
+  'Application Acknowledgment',
+  'Marketing / Promotion',
   'Follow-up',
-  'Complaint',
+  'Complaint / Grievance',
   'Request',
   'Other'
 ];
@@ -127,6 +134,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
       if (selectedImportance !== 'All') url += `importance=${encodeURIComponent(selectedImportance)}&`;
       if (selectedStatus !== 'All') url += `status=${encodeURIComponent(selectedStatus)}&`;
       if (selectedDateRange !== 'All') url += `dateRange=${encodeURIComponent(selectedDateRange)}&`;
+      url += `tzOffset=${encodeURIComponent(new Date().getTimezoneOffset())}&`;
       if (searchQuery.trim() !== '') url += `q=${encodeURIComponent(searchQuery)}`;
 
       const res = await apiFetch(url);
@@ -437,6 +445,10 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
             <span>Reset</span>
           </button>
         )}
+
+        <div className="ml-auto text-[11px] font-medium text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-lg border border-slate-800">
+          <span>{emails.length} {emails.length === 1 ? 'email' : 'emails'}</span>
+        </div>
       </div>
 
       {/* 3. Cards Grid */}
@@ -489,9 +501,17 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
                   {/* Top row: Badges + Star button */}
                   <div className="flex items-center justify-between gap-1 flex-wrap">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-bold text-[#D4A373] bg-[#D4A373]/15 px-2 py-0.5 rounded-full border border-[#D4A373]/30">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCategory(cat);
+                        }}
+                        title={`Filter by category "${cat}"`}
+                        className="text-[10px] font-bold text-[#D4A373] bg-[#D4A373]/15 hover:bg-[#D4A373]/30 px-2 py-0.5 rounded-full border border-[#D4A373]/30 transition-colors cursor-pointer"
+                      >
                         {cat}
-                      </span>
+                      </button>
                       {renderEmailBadge(email)}
                     </div>
 
