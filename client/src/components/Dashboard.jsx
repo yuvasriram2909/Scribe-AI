@@ -1256,16 +1256,22 @@ export function Dashboard({
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         
         {/* Card 1: Emails Sent */}
-        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+        <div 
+          role="button"
+          tabIndex={0}
+          title="Click to view all Sent emails"
+          onClick={() => onViewHistory && onViewHistory({ folder: 'sent', direction: 'All', status: 'All', category: 'All' })}
+          onKeyDown={(e) => e.key === 'Enter' && onViewHistory && onViewHistory({ folder: 'sent', direction: 'All', status: 'All', category: 'All' })}
+          className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between transition-all duration-200 active:scale-[0.98] ${
           theme === 'dark'
-            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
+            ? 'bg-[#1A1918] border-[#2E2D2B] hover:border-cyan-500/50 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-cyan-500/50 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
             <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Emails Sent
             </span>
-            <div className="w-7 h-7 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+            <div className="w-7 h-7 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center stat-icon-box transition-all duration-200 group-hover:scale-110">
               <Send className="w-3.5 h-3.5" />
             </div>
           </div>
@@ -1281,16 +1287,22 @@ export function Dashboard({
         </div>
 
         {/* Card 2: Emails Received */}
-        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+        <div 
+          role="button"
+          tabIndex={0}
+          title="Click to view all Received emails"
+          onClick={() => onViewHistory && onViewHistory({ folder: 'inbox', direction: 'All', status: 'All', category: 'All' })}
+          onKeyDown={(e) => e.key === 'Enter' && onViewHistory && onViewHistory({ folder: 'inbox', direction: 'All', status: 'All', category: 'All' })}
+          className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between transition-all duration-200 active:scale-[0.98] ${
           theme === 'dark'
-            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
+            ? 'bg-[#1A1918] border-[#2E2D2B] hover:border-blue-500/50 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-blue-500/50 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
             <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Emails Received
             </span>
-            <div className="w-7 h-7 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+            <div className="w-7 h-7 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center stat-icon-box transition-all duration-200 group-hover:scale-110">
               <Inbox className="w-3.5 h-3.5" />
             </div>
           </div>
@@ -1306,16 +1318,22 @@ export function Dashboard({
         </div>
 
         {/* Card 3: Drafts */}
-        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+        <div 
+          role="button"
+          tabIndex={0}
+          title="Click to view all Drafts"
+          onClick={() => onViewHistory && onViewHistory({ folder: 'drafts', direction: 'All', status: 'All', category: 'All' })}
+          onKeyDown={(e) => e.key === 'Enter' && onViewHistory && onViewHistory({ folder: 'drafts', direction: 'All', status: 'All', category: 'All' })}
+          className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between transition-all duration-200 active:scale-[0.98] ${
           theme === 'dark'
-            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
+            ? 'bg-[#1A1918] border-[#2E2D2B] hover:border-purple-500/50 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-purple-500/50 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
             <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Drafts
             </span>
-            <div className="w-7 h-7 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+            <div className="w-7 h-7 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center stat-icon-box transition-all duration-200 group-hover:scale-110">
               <FileText className="w-3.5 h-3.5" />
             </div>
           </div>
@@ -1331,16 +1349,22 @@ export function Dashboard({
         </div>
 
         {/* Card 4: Scheduled */}
-        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+        <div 
+          role="button"
+          tabIndex={0}
+          title="Click to view all Scheduled emails"
+          onClick={() => onViewHistory && onViewHistory({ folder: 'all', status: 'Scheduled', direction: 'All', category: 'All' })}
+          onKeyDown={(e) => e.key === 'Enter' && onViewHistory && onViewHistory({ folder: 'all', status: 'Scheduled', direction: 'All', category: 'All' })}
+          className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between transition-all duration-200 active:scale-[0.98] ${
           theme === 'dark'
-            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
+            ? 'bg-[#1A1918] border-[#2E2D2B] hover:border-[#D4A373]/60 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-[#D4A373]/60 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
             <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Scheduled
             </span>
-            <div className="w-7 h-7 rounded-xl bg-[#D4A373]/10 text-[#D4A373] border border-[#D4A373]/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+            <div className="w-7 h-7 rounded-xl bg-[#D4A373]/10 text-[#D4A373] border border-[#D4A373]/20 flex items-center justify-center stat-icon-box transition-all duration-200 group-hover:scale-110">
               <Clock className="w-3.5 h-3.5" />
             </div>
           </div>
@@ -1356,16 +1380,22 @@ export function Dashboard({
         </div>
 
         {/* Card 5: Emergency */}
-        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+        <div 
+          role="button"
+          tabIndex={0}
+          title="Click to view all Emergency & High Priority emails"
+          onClick={() => onViewHistory && onViewHistory({ folder: 'all', category: 'Emergency', status: 'All', direction: 'All' })}
+          onKeyDown={(e) => e.key === 'Enter' && onViewHistory && onViewHistory({ folder: 'all', category: 'Emergency', status: 'All', direction: 'All' })}
+          className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between transition-all duration-200 active:scale-[0.98] ${
           theme === 'dark'
-            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
+            ? 'bg-[#1A1918] border-[#2E2D2B] hover:border-rose-500/50 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-rose-500/50 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
             <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Emergency
             </span>
-            <div className="w-7 h-7 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+            <div className="w-7 h-7 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center stat-icon-box transition-all duration-200 group-hover:scale-110">
               <AlertTriangle className="w-3.5 h-3.5" />
             </div>
           </div>
@@ -1381,16 +1411,22 @@ export function Dashboard({
         </div>
 
         {/* Card 6: Spam */}
-        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+        <div 
+          role="button"
+          tabIndex={0}
+          title="Click to view all Spam emails"
+          onClick={() => onViewHistory && onViewHistory({ folder: 'spam', direction: 'All', status: 'All', category: 'All' })}
+          onKeyDown={(e) => e.key === 'Enter' && onViewHistory && onViewHistory({ folder: 'spam', direction: 'All', status: 'All', category: 'All' })}
+          className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between transition-all duration-200 active:scale-[0.98] ${
           theme === 'dark'
-            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
+            ? 'bg-[#1A1918] border-[#2E2D2B] hover:border-orange-500/50 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-orange-500/50 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
             <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Spam
             </span>
-            <div className="w-7 h-7 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+            <div className="w-7 h-7 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center stat-icon-box transition-all duration-200 group-hover:scale-110">
               <ShieldAlert className="w-3.5 h-3.5" />
             </div>
           </div>
@@ -1406,16 +1442,22 @@ export function Dashboard({
         </div>
 
         {/* Card 7: Pending Review */}
-        <div className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between ${
+        <div 
+          role="button"
+          tabIndex={0}
+          title="Click to view all Pending Review emails"
+          onClick={() => onViewHistory && onViewHistory({ folder: 'all', status: 'Pending', direction: 'All', category: 'All' })}
+          onKeyDown={(e) => e.key === 'Enter' && onViewHistory && onViewHistory({ folder: 'all', status: 'Pending', direction: 'All', category: 'All' })}
+          className={`p-4 rounded-2xl border relative overflow-hidden stat-card-interactive group cursor-pointer flex flex-col justify-between transition-all duration-200 active:scale-[0.98] ${
           theme === 'dark'
-            ? 'bg-[#1A1918] border-[#2E2D2B] shadow-md'
-            : 'bg-white border-amber-900/10 shadow-xs'
+            ? 'bg-[#1A1918] border-[#2E2D2B] hover:border-emerald-500/50 shadow-md'
+            : 'bg-white border-amber-900/10 hover:border-emerald-500/50 shadow-xs'
         }`}>
           <div className="flex items-center justify-between mb-2">
             <span className={`text-xs font-bold ${theme === 'dark' ? 'text-[#CBC7BF]' : 'text-stone-700'}`}>
               Pending Review
             </span>
-            <div className="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center stat-icon-box transition-all duration-200">
+            <div className="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center stat-icon-box transition-all duration-200 group-hover:scale-110">
               <CheckCircle className="w-3.5 h-3.5" />
             </div>
           </div>

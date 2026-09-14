@@ -3235,7 +3235,7 @@ SENDER NAME: "${senderName}"`;
         const rawDir = (ce.direction || "").toLowerCase();
         const isDraft = rawStatus === "draft" || rawDir === "draft" || Boolean(ce.is_draft);
         const isReceived = !isDraft && (rawDir === "received" || rawDir === "incoming" || rawStatus === "received" || rawStatus === "incoming");
-        const isSent = !isDraft && (rawDir === "sent" || rawDir === "outgoing" || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered");
+        const isSent = !isDraft && !isReceived && (rawDir === "sent" || rawDir === "outgoing" || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered");
         const direction = isDraft ? "draft" : isReceived ? "received" : isSent ? "sent" : "other";
         const status = isDraft ? "Draft" : ce.status ? (ce.status.charAt(0).toUpperCase() + ce.status.slice(1).toLowerCase()) : (isReceived ? "Received" : "Sent");
 
@@ -3299,8 +3299,8 @@ SENDER NAME: "${senderName}"`;
         const rawStatus = (le.status || "").toLowerCase();
         const rawDir = (le.direction || "").toLowerCase();
         const isDraft = rawStatus === "draft" || rawDir === "draft";
-        const isReceived = !isDraft && (le.isReceived === true || rawDir === "received" || rawStatus === "received");
-        const isSent = !isDraft && (le.isSent === true || rawDir === "sent" || rawStatus === "sent" || rawStatus === "delivered");
+        const isReceived = !isDraft && (rawDir === "received" || rawDir === "incoming" || rawStatus === "received" || rawStatus === "incoming" || le.isReceived === true);
+        const isSent = !isDraft && !isReceived && (rawDir === "sent" || rawDir === "outgoing" || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered" || le.isSent === true);
         const direction = isDraft ? "draft" : isReceived ? "received" : isSent ? "sent" : "other";
         const status = isDraft ? "Draft" : le.status ? (le.status.charAt(0).toUpperCase() + le.status.slice(1).toLowerCase()) : (isReceived ? "Received" : "Sent");
 
@@ -3342,13 +3342,13 @@ SENDER NAME: "${senderName}"`;
       if (folderQuery && folderQuery !== "all") {
         const fQ = folderQuery.toLowerCase().trim();
         result = result.filter((e: any) => {
-          if (fQ === "inbox") return !e.isDraft && !e.isTrash && !e.isSpam && !e.isArchived && (e.isReceived || (e.status || "").toLowerCase() === "received" || (e.status || "").toLowerCase() === "incoming" || (e.direction || "").toLowerCase() === "incoming");
-          if (fQ === "sent") return !e.isDraft && !e.isTrash && (e.isSent || (e.direction || "").toLowerCase() === "sent" || (e.direction || "").toLowerCase() === "outgoing" || (e.status || "").toLowerCase() === "sent" || (e.status || "").toLowerCase() === "outgoing");
+          if (fQ === "inbox") return !e.isDraft && !e.isTrash && !e.isSpam && !e.isArchived && !e.isSent && (e.isReceived || (e.status || "").toLowerCase() === "received" || (e.status || "").toLowerCase() === "incoming" || (e.direction || "").toLowerCase() === "incoming" || (e.direction || "").toLowerCase() === "received");
+          if (fQ === "sent") return !e.isDraft && !e.isTrash && !e.isReceived && !e.isSpam && (e.isSent || (e.direction || "").toLowerCase() === "sent" || (e.direction || "").toLowerCase() === "outgoing" || (e.status || "").toLowerCase() === "sent" || (e.status || "").toLowerCase() === "outgoing");
           if (fQ === "drafts" || fQ === "draft") return e.isDraft || (e.direction || "").toLowerCase() === "draft" || (e.status || "").toLowerCase() === "draft";
           if (fQ === "starred") return !e.isTrash && Boolean(e.isStarred);
           if (fQ === "archive" || fQ === "archived") return !e.isTrash && !e.isSpam && !e.isDraft && Boolean(e.isArchived);
           if (fQ === "trash") return Boolean(e.isTrash);
-          if (fQ === "spam") return Boolean(e.isSpam);
+          if (fQ === "spam") return Boolean(e.isSpam) || (e.status || "").toLowerCase() === "spam";
           return true;
         });
       }
@@ -3359,9 +3359,15 @@ SENDER NAME: "${senderName}"`;
         result = result.filter((e: any) => {
           const s = (e.status || "").toLowerCase();
           if (stQ === "draft") return e.isDraft || s === "draft";
-          if (stQ === "sent") return !e.isDraft && (s === "sent" || s === "outgoing" || s === "delivered");
-          if (stQ === "received") return !e.isDraft && (s === "received" || s === "incoming");
+          if (stQ === "sent") return !e.isDraft && !e.isReceived && (s === "sent" || s === "outgoing" || s === "delivered");
+          if (stQ === "received") return !e.isDraft && !e.isSent && (s === "received" || s === "incoming");
           if (stQ === "spam") return e.isSpam || s === "spam";
+          if (stQ === "pending" || stQ === "pending review" || stQ === "pending_review") {
+            return s === "pending" || s === "pending_review" || s === "generated";
+          }
+          if (stQ === "scheduled") {
+            return s === "scheduled" || s === "sending";
+          }
           return s === stQ;
         });
       }
@@ -3371,11 +3377,9 @@ SENDER NAME: "${senderName}"`;
         const catQ = categoryQuery.toLowerCase().trim();
         result = result.filter((e: any) => {
           const rawCat = ((e.category || "") + " " + (e.situation || "") + " " + (e.email_type || "")).toLowerCase();
+          const pri = ((e.priority || e.importance || "")).toLowerCase();
+          if (catQ.includes("emergency") && (rawCat.includes("emergency") || rawCat.includes("urgent") || pri === "high" || pri === "critical" || pri === "urgent")) return true;
           if (rawCat.includes(catQ)) return true;
-          if (catQ.includes("status") && (rawCat.includes("status") || rawCat.includes("progress") || rawCat.includes("update"))) return true;
-          if (catQ.includes("job") && (rawCat.includes("job") || rawCat.includes("resume") || rawCat.includes("career") || rawCat.includes("candidate") || rawCat.includes("application"))) return true;
-          if (catQ.includes("leave") && (rawCat.includes("leave") || rawCat.includes("holiday") || rawCat.includes("vacation") || rawCat.includes("sick"))) return true;
-          if (catQ.includes("emergency") && (rawCat.includes("emergency") || rawCat.includes("urgent"))) return true;
           if (catQ.includes("security") && (rawCat.includes("security") || rawCat.includes("account") || rawCat.includes("alert") || rawCat.includes("sign-in") || rawCat.includes("signin"))) return true;
           if (catQ.includes("meeting") && (rawCat.includes("meeting") || rawCat.includes("appointment") || rawCat.includes("call") || rawCat.includes("sync"))) return true;
           if (catQ.includes("payment") && (rawCat.includes("payment") || rawCat.includes("invoice") || rawCat.includes("billing") || rawCat.includes("receipt") || rawCat.includes("fee"))) return true;
@@ -3557,7 +3561,7 @@ SENDER NAME: "${senderName}"`;
       const rawDir = (emailRecord.direction || "").toLowerCase();
       const isDraft = rawStatus === "draft" || rawDir === "draft" || Boolean(emailRecord.is_draft);
       const isReceived = !isDraft && (rawDir === "received" || rawDir === "incoming" || rawStatus === "received" || rawStatus === "incoming" || Boolean(emailRecord.isReceived));
-      const isSent = !isDraft && (rawDir === "sent" || rawDir === "outgoing" || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered" || Boolean(emailRecord.isSent));
+      const isSent = !isDraft && !isReceived && (rawDir === "sent" || rawDir === "outgoing" || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered" || Boolean(emailRecord.isSent));
 
       return jsonResponse({
         id: emailRecord.id,
@@ -4523,7 +4527,7 @@ SENDER NAME: "${senderName}"`;
         const rawDir = (ce.direction || "").toLowerCase();
         const isDraft = rawStatus === "draft" || rawDir === "draft" || Boolean(ce.is_draft);
         const isReceived = !isDraft && (rawDir === "received" || rawDir === "incoming" || rawStatus === "received" || rawStatus === "incoming");
-        const isSent = !isDraft && (rawDir === "sent" || rawDir === "outgoing" || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered");
+        const isSent = !isDraft && !isReceived && (rawDir === "sent" || rawDir === "outgoing" || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered");
         unifiedList.push({
           ...ce,
           status: isDraft ? "draft" : ce.status || (isReceived ? "received" : "sent"),
@@ -4548,15 +4552,16 @@ SENDER NAME: "${senderName}"`;
         const rawDir = (le.direction || "").toLowerCase();
         const isDraft = rawStatus === "draft" || rawDir === "draft" || Boolean(le.isDraft);
         const isReceived = !isDraft && (le.isReceived || rawStatus === "received" || rawStatus === "incoming" || rawDir === "received" || rawDir === "incoming");
-        const isSent = !isDraft && (le.isSent || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered" || rawDir === "sent" || rawDir === "outgoing");
+        const isSent = !isDraft && !isReceived && (le.isSent || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered" || rawDir === "sent" || rawDir === "outgoing");
 
         unifiedList.push({
           ...le,
-          status: isDraft ? "draft" : le.status || (isReceived ? "Received" : "Sent"),
+          status: isDraft ? "draft" : le.status || (isReceived ? "received" : "sent"),
           direction: isDraft ? "draft" : isReceived ? "received" : isSent ? "sent" : "other",
           isDraft,
           isSent,
           isReceived,
+          isSpam: le.isSpam === true || rawStatus === "spam" || (le.spam_status || "").toLowerCase() === "spam",
         });
       }
 
@@ -4604,7 +4609,7 @@ SENDER NAME: "${senderName}"`;
         const st = (e.status || "").toLowerCase();
         const dir = (e.direction || "").toLowerCase();
         return (st === "sent" || st === "delivered" || st === "outgoing" || e.isSent === true || dir === "sent" || dir === "outgoing") &&
-          st !== "draft" && !e.isDraft && !e.isSpam && !e.isReceived && st !== "failed";
+          st !== "draft" && !e.isDraft && !e.isSpam && st !== "spam" && !e.isReceived && st !== "failed";
       }).length;
 
       const received = list.filter((e: any) => {

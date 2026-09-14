@@ -43,7 +43,7 @@ const CATEGORIES_FILTER = [
 const TONES_FILTER = ['All', 'Professional', 'Formal', 'Friendly', 'Urgent', 'Polite', 'Apologetic', 'Concise'];
 const IMPORTANCE_FILTER = ['All', 'Low', 'Normal', 'High', 'Critical'];
 const DIRECTION_FILTER = ['All', 'Sent', 'Received', 'Drafts'];
-const STATUS_FILTER = ['All', 'Sent', 'Received', 'Draft', 'Scheduled', 'Failed', 'Spam'];
+const STATUS_FILTER = ['All', 'Sent', 'Received', 'Draft', 'Scheduled', 'Pending', 'Failed', 'Spam'];
 const DATE_RANGES = [
   { id: 'All', label: 'All Time' },
   { id: 'today', label: 'Today' },
@@ -52,22 +52,36 @@ const DATE_RANGES = [
   { id: 'month', label: 'Last 30 Days' }
 ];
 
-export function EmailHistory({ onReuseEmail, onEditDraft }) {
+export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [selectedFolder, setSelectedFolder] = useState('inbox');
-  const [selectedDirection, setSelectedDirection] = useState('All');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedTone, setSelectedTone] = useState('All');
-  const [selectedImportance, setSelectedImportance] = useState('All');
-  const [selectedStatus, setSelectedStatus] = useState('All');
-  const [selectedDateRange, setSelectedDateRange] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFolder, setSelectedFolder] = useState(() => initialFilters?.folder || 'inbox');
+  const [selectedDirection, setSelectedDirection] = useState(() => initialFilters?.direction || 'All');
+  const [selectedCategory, setSelectedCategory] = useState(() => initialFilters?.category || 'All');
+  const [selectedTone, setSelectedTone] = useState(() => initialFilters?.tone || 'All');
+  const [selectedImportance, setSelectedImportance] = useState(() => initialFilters?.importance || 'All');
+  const [selectedStatus, setSelectedStatus] = useState(() => initialFilters?.status || 'All');
+  const [selectedDateRange, setSelectedDateRange] = useState(() => initialFilters?.dateRange || 'All');
+  const [searchQuery, setSearchQuery] = useState(() => initialFilters?.q || '');
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [bodyViewMode, setBodyViewMode] = useState('formatted'); // 'formatted' | 'text'
   const [retryingId, setRetryingId] = useState(null);
   const [actionInProgress, setActionInProgress] = useState({});
+
+  // Deep filter synchronization when navigated from Dashboard cards or links
+  useEffect(() => {
+    if (initialFilters) {
+      if (initialFilters.folder !== undefined) setSelectedFolder(initialFilters.folder);
+      if (initialFilters.direction !== undefined) setSelectedDirection(initialFilters.direction);
+      if (initialFilters.category !== undefined) setSelectedCategory(initialFilters.category);
+      if (initialFilters.tone !== undefined) setSelectedTone(initialFilters.tone);
+      if (initialFilters.importance !== undefined) setSelectedImportance(initialFilters.importance);
+      if (initialFilters.status !== undefined) setSelectedStatus(initialFilters.status);
+      if (initialFilters.dateRange !== undefined) setSelectedDateRange(initialFilters.dateRange);
+      if (initialFilters.q !== undefined) setSearchQuery(initialFilters.q);
+    }
+  }, [initialFilters]);
 
   const hasActiveFilters = selectedFolder !== 'inbox' || selectedDirection !== 'All' || selectedCategory !== 'All' || selectedTone !== 'All' || selectedImportance !== 'All' || selectedStatus !== 'All' || selectedDateRange !== 'All' || searchQuery.trim() !== '';
 
@@ -423,6 +437,19 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
           ))}
         </select>
 
+        {/* Status Filter */}
+        <select
+          value={selectedStatus}
+          onChange={(e) => setSelectedStatus(e.target.value)}
+          className="px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 outline-none cursor-pointer focus:border-[#D4A373]/50"
+        >
+          {STATUS_FILTER.map(s => (
+            <option key={s} value={s} className="bg-slate-900 text-slate-200">
+              {s === 'All' ? 'All Statuses' : s === 'Pending' ? 'Pending Review' : s}
+            </option>
+          ))}
+        </select>
+
         {/* Date Filter */}
         <select
           value={selectedDateRange}
@@ -450,6 +477,34 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
           <span>{emails.length} {emails.length === 1 ? 'email' : 'emails'}</span>
         </div>
       </div>
+
+      {/* Active Filter Badges */}
+      {(selectedStatus !== 'All' || selectedCategory !== 'All' || selectedFolder !== 'inbox') && (
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="text-slate-500 text-[11px] font-semibold">Active:</span>
+          {selectedFolder !== 'inbox' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#D4A373]/15 text-[#ECE8E1] border border-[#D4A373]/30 font-medium text-[11px]">
+              <span>Folder: {FOLDERS.find(f => f.id === selectedFolder)?.label || selectedFolder}</span>
+            </span>
+          )}
+          {selectedStatus !== 'All' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-medium text-[11px]">
+              <span>Status: {selectedStatus === 'Pending' ? 'Pending Review' : selectedStatus}</span>
+              <button onClick={() => setSelectedStatus('All')} className="hover:text-white ml-0.5 cursor-pointer">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+          {selectedCategory !== 'All' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 font-medium text-[11px]">
+              <span>Category: {selectedCategory}</span>
+              <button onClick={() => setSelectedCategory('All')} className="hover:text-white ml-0.5 cursor-pointer">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* 3. Cards Grid */}
       {loading ? (

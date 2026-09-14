@@ -59,6 +59,33 @@ export default function App() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const userDropdownTimeoutRef = useRef(null);
 
+  // Deep Email History Filter State for Card Clicks & Navigation
+  const [historyFilters, setHistoryFilters] = useState({
+    folder: 'inbox',
+    direction: 'All',
+    category: 'All',
+    tone: 'All',
+    importance: 'All',
+    status: 'All',
+    dateRange: 'All',
+    q: ''
+  });
+
+  const handleNavigateToHistory = (filters = {}) => {
+    setHistoryFilters({
+      folder: filters.folder || 'inbox',
+      direction: filters.direction || 'All',
+      category: filters.category || 'All',
+      tone: filters.tone || 'All',
+      importance: filters.importance || 'All',
+      status: filters.status || 'All',
+      dateRange: filters.dateRange || 'All',
+      q: filters.q || '',
+      _timestamp: Date.now()
+    });
+    setActiveTab('history');
+  };
+
   const handleUserMouseEnter = () => {
     if (userDropdownTimeoutRef.current) clearTimeout(userDropdownTimeoutRef.current);
     setUserDropdownOpen(true);
@@ -540,7 +567,7 @@ export default function App() {
             </button>
 
             <button
-              onClick={() => { setActiveTab('history'); setMobileMenuOpen(false); }}
+              onClick={() => { handleNavigateToHistory({ folder: 'inbox' }); setMobileMenuOpen(false); }}
               className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between nav-item-interactive group cursor-pointer ${
                 activeTab === 'history'
                   ? theme === 'dark'
@@ -861,7 +888,7 @@ export default function App() {
           {activeTab === 'dashboard' && (
             <Dashboard 
               onStartCompose={handleStartCompose}
-              onViewHistory={() => setActiveTab('history')}
+              onViewHistory={handleNavigateToHistory}
               onNavigateToSettings={() => setActiveTab('settings')}
               onUpdateComposeState={handleUpdateComposeState}
               currentUserName={currentUserName}
@@ -884,6 +911,7 @@ export default function App() {
           )}
           {activeTab === 'history' && (
             <EmailHistory 
+              initialFilters={historyFilters}
               onStartCompose={handleStartCompose}
               onReuseEmail={(email) => handleStartCompose({
                 subject: email.subject,
