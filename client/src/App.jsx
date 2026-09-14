@@ -786,7 +786,7 @@ export default function App() {
             >
               <div 
                 onClick={() => setUserDropdownOpen(prev => !prev)}
-                className={`flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl border cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:border-[#D4A373]/40 hover:shadow-md active:scale-[0.98] ${
+                className={`flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl border cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:shadow-md active:scale-[0.98] header-profile-pill lightning-hover ${
                   theme === 'dark'
                     ? 'bg-[#1A1918] hover:bg-[#22211F] border-[#2E2D2B]'
                     : 'bg-white hover:bg-stone-50 border-amber-900/15 shadow-xs'

@@ -1074,3 +1074,383 @@
   }
 }
 
+/* ==========================================================================
+   High-Voltage Lightning & Electric Arc Hover Suite (Full Application)
+   ========================================================================== */
+
+/* 1. Lightning Discharge / Atmospheric Strike Flash */
+@keyframes lightningStrikeFlash {
+  0% {
+    filter: brightness(1);
+  }
+  10% {
+    filter: brightness(1.36) drop-shadow(0 0 16px rgba(255, 245, 190, 0.95));
+  }
+  22% {
+    filter: brightness(1.04);
+  }
+  36% {
+    filter: brightness(1.42) drop-shadow(0 0 24px rgba(255, 235, 140, 1));
+  }
+  52% {
+    filter: brightness(1.1) drop-shadow(0 0 12px rgba(212, 163, 115, 0.7));
+  }
+  100% {
+    filter: brightness(1.14) drop-shadow(0 0 14px rgba(255, 225, 120, 0.8));
+  }
+}
+
+/* 2. Lightning High-Voltage Filament Sweep */
+@keyframes lightningArcTravel {
+  0% {
+    transform: rotate(26deg) translateX(-220%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  42% {
+    transform: rotate(26deg) translateX(400%);
+    opacity: 1;
+  }
+  43% {
+    opacity: 0;
+  }
+  100% {
+    transform: rotate(26deg) translateX(400%);
+    opacity: 0;
+  }
+}
+
+/* 3. Electric Edge Plasma Arc Pulse */
+@keyframes electricPlasmaPulse {
+  0%, 100% {
+    box-shadow: 
+      0 0 2px 1px rgba(255, 255, 255, 0.95),
+      0 0 14px 2px rgba(255, 225, 120, 0.8),
+      0 0 28px 4px rgba(212, 163, 115, 0.5),
+      inset 0 0 14px 1px rgba(255, 230, 150, 0.22);
+  }
+  50% {
+    box-shadow: 
+      0 0 3px 1px rgba(255, 255, 255, 1),
+      0 0 20px 3px rgba(255, 240, 170, 0.95),
+      0 0 36px 7px rgba(245, 195, 100, 0.65),
+      inset 0 0 18px 2px rgba(255, 240, 180, 0.35);
+  }
+}
+
+/* 4. High-Voltage Electric Micro-Jitter */
+@keyframes electricJitter {
+  0%, 100% {
+    filter: brightness(1.08) drop-shadow(0 0 8px rgba(255, 225, 120, 0.5));
+  }
+  20% {
+    filter: brightness(1.22) drop-shadow(0 0 16px rgba(255, 245, 180, 0.9));
+  }
+  40% {
+    filter: brightness(1.1) drop-shadow(0 0 10px rgba(212, 163, 115, 0.55));
+  }
+  60% {
+    filter: brightness(1.26) drop-shadow(0 0 18px rgba(255, 255, 210, 0.95));
+  }
+  80% {
+    filter: brightness(1.14) drop-shadow(0 0 12px rgba(255, 230, 140, 0.7));
+  }
+}
+
+/* Interactive Base Elements - Prepared for Lightning Arcs */
+.stat-card-interactive,
+.quick-action-tile,
+.hero-card-interactive,
+.gmail-card-interactive,
+.gold-card,
+.glass-card,
+.lightning-card,
+.lightning-hover,
+.lightning-btn {
+  position: relative;
+  overflow: hidden;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 240ms cubic-bezier(0.22, 1, 0.36, 1),
+              filter 240ms ease;
+}
+
+/* High-Voltage Lightning Sweep Filament (Diagonal Electric Flash) */
+.stat-card-interactive::before,
+.quick-action-tile::before,
+.hero-card-interactive::before,
+.gmail-card-interactive::before,
+.gold-card::before,
+.glass-card::before,
+.lightning-card::before,
+.lightning-hover::before,
+.lightning-btn::before {
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: -70%;
+  width: 50%;
+  height: 220%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 15%,
+    rgba(255, 255, 255, 0.98) 48%,
+    rgba(255, 235, 140, 1) 50%,
+    rgba(212, 163, 115, 0.85) 54%,
+    rgba(255, 255, 255, 0.2) 65%,
+    transparent 100%
+  );
+  transform: rotate(26deg);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 15;
+  filter: drop-shadow(0 0 10px rgba(255, 240, 160, 0.95));
+  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+}
+
+/* Hover Actions: Lightning Sweep Release */
+@media (hover: hover) and (pointer: fine) {
+  .stat-card-interactive:hover::before,
+  .quick-action-tile:hover::before,
+  .hero-card-interactive:hover::before,
+  .gmail-card-interactive:hover::before,
+  .gold-card:hover::before,
+  .glass-card:hover::before,
+  .lightning-card:hover::before,
+  .lightning-hover:hover::before,
+  .lightning-btn:hover::before {
+    opacity: 1;
+    transform: rotate(26deg) translateX(400%);
+  }
+}
+
+/* ==========================================================================
+   Comprehensive Element-by-Element Lightning Hover Effects
+   ========================================================================== */
+
+@media (hover: hover) and (pointer: fine) {
+  /* 1. All Pushable & Gradient Buttons: High-Voltage Lightning Ignition */
+  .gold-btn:hover,
+  .gradient-btn:hover,
+  .gradient-btn-primary:hover,
+  .lightning-btn:hover {
+    border-top: 1px solid rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 
+      0 6px 0 #9E7348,
+      0 0 14px rgba(255, 240, 160, 0.95),
+      0 0 32px rgba(212, 163, 115, 0.7),
+      0 10px 24px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+    filter: brightness(1.14) drop-shadow(0 0 12px rgba(255, 225, 120, 0.85)) !important;
+    animation: lightningStrikeFlash 0.5s ease-out forwards;
+  }
+
+  .gold-btn-outline:hover {
+    border-color: rgba(255, 235, 165, 0.85) !important;
+    box-shadow: 
+      0 0 14px rgba(255, 225, 120, 0.65),
+      0 0 28px rgba(212, 163, 115, 0.35),
+      inset 0 0 12px rgba(212, 163, 115, 0.2) !important;
+    color: #FFFFFF !important;
+  }
+
+  .interactive-btn:hover {
+    border-color: rgba(255, 235, 165, 0.8) !important;
+    box-shadow: 
+      0 0 14px rgba(255, 225, 120, 0.6),
+      0 0 26px rgba(212, 163, 115, 0.35) !important;
+    filter: brightness(1.08);
+  }
+
+  /* 2. Real-Time Stat Cards: High-Voltage Plasma Arc */
+  .stat-card-interactive:hover {
+    transform: translateY(-4px) scale(1.018);
+    border-color: rgba(255, 238, 180, 0.95) !important;
+    box-shadow: 
+      0 0 2px 1px rgba(255, 255, 255, 0.9),
+      0 0 18px 3px rgba(255, 225, 120, 0.8),
+      0 16px 36px -4px rgba(0, 0, 0, 0.8),
+      0 0 32px rgba(212, 163, 115, 0.45),
+      inset 0 0 14px rgba(255, 235, 160, 0.2) !important;
+    animation: lightningStrikeFlash 0.55s ease-out forwards;
+  }
+
+  .stat-card-interactive:hover .stat-icon-box {
+    box-shadow: 0 0 20px rgba(255, 235, 140, 0.9), inset 0 0 8px rgba(255, 255, 255, 0.5) !important;
+    border-color: rgba(255, 240, 180, 0.95) !important;
+    transform: scale(1.1) !important;
+    filter: drop-shadow(0 0 8px rgba(255, 230, 140, 0.95)) !important;
+  }
+
+  .stat-card-interactive:hover .stat-metric-number {
+    filter: brightness(1.25) drop-shadow(0 0 10px rgba(255, 235, 160, 0.9)) !important;
+    color: #FFFFFF !important;
+  }
+
+  /* 3. Quick Action Tiles: High-Voltage Lightning Glow */
+  .quick-action-tile:hover {
+    transform: translateY(-3px) scale(1.03);
+    border-color: rgba(255, 238, 180, 0.95) !important;
+    box-shadow: 
+      0 0 2px 1px rgba(255, 255, 255, 0.85),
+      0 0 18px 2px rgba(255, 225, 120, 0.8),
+      0 12px 28px -4px rgba(0, 0, 0, 0.7),
+      inset 0 0 14px rgba(255, 235, 160, 0.18) !important;
+    animation: lightningStrikeFlash 0.55s ease-out forwards;
+  }
+
+  .quick-action-tile:hover .quick-tile-icon {
+    transform: translate(2px, -2px) scale(1.14) !important;
+    box-shadow: 0 0 18px rgba(255, 235, 140, 0.9) !important;
+    border-color: rgba(255, 240, 180, 0.95) !important;
+    filter: drop-shadow(0 0 8px rgba(255, 230, 140, 0.95)) !important;
+  }
+
+  /* 4. Gold Cards & Glass Cards: Electric Border Discharge */
+  .gold-card:hover,
+  .glass-card:hover,
+  .lightning-card:hover {
+    border-color: rgba(255, 238, 180, 0.9) !important;
+    box-shadow: 
+      0 0 1px 1px rgba(255, 255, 255, 0.8),
+      0 0 18px 2px rgba(255, 220, 120, 0.75),
+      0 18px 36px -6px rgba(0, 0, 0, 0.8),
+      0 0 32px 4px rgba(212, 163, 115, 0.45),
+      inset 0 0 14px rgba(255, 235, 170, 0.18) !important;
+    animation: lightningStrikeFlash 0.55s ease-out forwards;
+  }
+
+  /* 5. Hero & Gmail Cards */
+  .hero-card-interactive:hover {
+    border-color: rgba(255, 238, 180, 0.85) !important;
+    box-shadow: 
+      0 0 2px 1px rgba(255, 255, 255, 0.75),
+      0 0 26px 3px rgba(255, 225, 120, 0.68),
+      0 20px 48px -8px rgba(0, 0, 0, 0.85),
+      inset 0 0 20px rgba(255, 235, 160, 0.15) !important;
+  }
+
+  .gmail-card-interactive:hover {
+    border-color: rgba(255, 238, 180, 0.85) !important;
+    box-shadow: 
+      0 0 1px 1px rgba(255, 255, 255, 0.75),
+      0 0 18px 2px rgba(255, 225, 120, 0.7),
+      0 12px 30px -4px rgba(0, 0, 0, 0.75),
+      inset 0 0 12px rgba(255, 235, 160, 0.15) !important;
+  }
+
+  /* 6. Sidebar Navigation Items: High-Voltage Edge Arc */
+  .nav-item-interactive:hover {
+    transform: translateX(3px) scale(1.015);
+    border-color: rgba(255, 235, 160, 0.75) !important;
+    box-shadow: 
+      -4px 0 16px rgba(255, 225, 120, 0.85),
+      0 0 20px rgba(212, 163, 115, 0.35),
+      inset 0 0 14px rgba(255, 230, 140, 0.18) !important;
+  }
+
+  .nav-item-interactive:hover .nav-icon {
+    transform: translateX(3px) scale(1.15);
+    filter: drop-shadow(0 0 8px rgba(255, 235, 150, 0.95)) brightness(1.3) !important;
+  }
+
+  /* 7. Recent Email Rows: Lightning Rim Highlight */
+  .recent-email-row:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 238, 170, 0.75) !important;
+    box-shadow: 
+      0 0 1px 1px rgba(255, 255, 255, 0.6),
+      0 0 18px rgba(255, 220, 110, 0.5),
+      0 8px 24px -4px rgba(0, 0, 0, 0.75),
+      inset 0 0 14px rgba(255, 235, 160, 0.1) !important;
+    background-color: rgba(212, 163, 115, 0.08) !important;
+  }
+
+  .recent-email-row:hover .recent-mail-icon {
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 8px rgba(255, 230, 140, 0.95)) !important;
+  }
+
+  .recent-email-row:hover .recent-row-arrow {
+    opacity: 1;
+    transform: translateX(2px);
+    filter: drop-shadow(0 0 8px rgba(255, 230, 140, 0.95)) !important;
+  }
+
+  /* 8. AI Prompt Chips: Electric Glow */
+  .chip-interactive:hover {
+    transform: translateY(-2.5px) scale(1.03);
+    border-color: rgba(255, 238, 170, 0.9) !important;
+    box-shadow: 
+      0 0 16px rgba(255, 225, 120, 0.7),
+      0 4px 16px -2px rgba(212, 163, 115, 0.5) !important;
+  }
+
+  .chip-interactive:hover .chip-emoji {
+    transform: scale(1.22) rotate(8deg);
+    filter: drop-shadow(0 0 6px rgba(255, 230, 140, 0.8));
+  }
+
+  /* 9. Top Header User Profile Pill & Bell Icon */
+  .header-profile-pill:hover {
+    transform: scale(1.025);
+    border-color: rgba(255, 238, 175, 0.9) !important;
+    box-shadow: 
+      0 0 1px 1px rgba(255, 255, 255, 0.8),
+      0 0 18px rgba(255, 225, 120, 0.7),
+      0 0 32px rgba(212, 163, 115, 0.4),
+      inset 0 0 12px rgba(255, 235, 160, 0.22) !important;
+    animation: lightningStrikeFlash 0.5s ease-out forwards;
+  }
+
+  .bell-hover:hover {
+    border-color: rgba(255, 238, 175, 0.9) !important;
+    box-shadow: 
+      0 0 18px rgba(255, 225, 120, 0.75),
+      0 0 30px rgba(212, 163, 115, 0.45) !important;
+    filter: drop-shadow(0 0 10px rgba(255, 235, 140, 0.95)) !important;
+  }
+
+  /* 10. Interactive Input Fields & Search */
+  .input-interactive:hover {
+    border-color: rgba(255, 238, 175, 0.75) !important;
+    box-shadow: 0 0 14px rgba(255, 220, 110, 0.3) !important;
+  }
+
+  .input-interactive:focus,
+  .input-interactive:focus-within {
+    border-color: rgba(255, 240, 185, 0.95) !important;
+    box-shadow: 
+      0 0 0 2px rgba(255, 225, 120, 0.35),
+      0 0 20px rgba(255, 220, 110, 0.45),
+      0 0 32px rgba(212, 163, 115, 0.3) !important;
+  }
+
+  /* 11. Generic Lightning Utility Classes */
+  .lightning-hover:hover {
+    border-color: rgba(255, 238, 180, 0.9) !important;
+    box-shadow: 
+      0 0 1px 1px rgba(255, 255, 255, 0.85),
+      0 0 18px 2px rgba(255, 220, 110, 0.75),
+      0 0 32px 4px rgba(212, 163, 115, 0.45),
+      inset 0 0 14px 1px rgba(255, 230, 150, 0.22) !important;
+    animation: lightningStrikeFlash 0.5s ease-out forwards;
+  }
+}
+
+/* Active Click Electrical Arc Discharge */
+.stat-card-interactive:active,
+.quick-action-tile:active,
+.gold-card:active,
+.gold-btn:active,
+.lightning-hover:active,
+.lightning-btn:active {
+  box-shadow: 
+    0 0 22px 4px rgba(255, 240, 170, 0.95),
+    0 0 42px 8px rgba(212, 163, 115, 0.65) !important;
+}
+
+
