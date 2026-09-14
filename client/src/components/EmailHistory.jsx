@@ -517,7 +517,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
                   {/* Sender / Recipient */}
                   <p className="text-xs text-slate-400 line-clamp-1">
                     {isReceived ? (
-                      <>From: <span className="font-semibold text-purple-300 font-mono">{email.sender || email.sender_email || email.gmailAccount || 'External Sender'}</span></>
+                      <>From: <span className="font-semibold text-purple-300 font-mono">{email.from_name || email.sender_name || email.sender || email.sender_email || email.from_email || email.gmailAccount || 'External Sender'}</span></>
                     ) : isDraft ? (
                       <>Draft To: <span className="font-semibold text-cyan-300 font-mono">{email.recipient || email.recipient_email || '(Unspecified)'}</span></>
                     ) : (
@@ -668,8 +668,12 @@ export function EmailHistory({ onReuseEmail, onEditDraft }) {
             {/* Email Metadata Grid */}
             <div className="space-y-2 text-xs text-slate-300 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 font-mono">
               <p><strong className="text-[#D4A373]">Direction:</strong> {(selectedEmail.isDraft || (selectedEmail.status || '').toLowerCase() === 'draft') ? 'Draft (Unsent)' : (selectedEmail.direction || (selectedEmail.isReceived ? 'Received' : 'Sent'))}</p>
-              {(selectedEmail.sender || selectedEmail.sender_email) && (
-                <p><strong className="text-[#D4A373]">From:</strong> {selectedEmail.sender || selectedEmail.sender_email}</p>
+              {(selectedEmail.sender || selectedEmail.sender_email || selectedEmail.from_name || selectedEmail.from_email) && (
+                <p><strong className="text-[#D4A373]">From:</strong> {
+                  (selectedEmail.from_name || selectedEmail.sender_name) && (selectedEmail.sender_email || selectedEmail.from_email)
+                    ? `${selectedEmail.from_name || selectedEmail.sender_name} <${selectedEmail.sender_email || selectedEmail.from_email}>`
+                    : (selectedEmail.from_name || selectedEmail.sender_name || selectedEmail.sender || selectedEmail.sender_email || selectedEmail.from_email)
+                }</p>
               )}
               <p><strong className="text-[#D4A373]">To:</strong> {selectedEmail.recipient || selectedEmail.recipient_email || '(Unspecified)'}</p>
               {selectedEmail.cc && <p><strong className="text-[#D4A373]">Cc:</strong> {selectedEmail.cc}</p>}

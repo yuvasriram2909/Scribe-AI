@@ -1745,8 +1745,19 @@ export function Dashboard({
                 <span className="text-[#99958F] block text-[10px] uppercase font-bold">
                   {detailModalEmail.direction === 'sent' || detailModalEmail.direction === 'outgoing' || detailModalEmail.isSent ? 'To' : 'From'}
                 </span>
-                <span className="font-mono text-[#ECE8E1] truncate block mt-0.5" title={detailModalEmail.recipient || detailModalEmail.sender}>
-                  {detailModalEmail.recipient || detailModalEmail.sender || 'Unknown'}
+                <span 
+                  className="font-mono text-[#ECE8E1] truncate block mt-0.5" 
+                  title={
+                    detailModalEmail.direction === 'sent' || detailModalEmail.direction === 'outgoing' || detailModalEmail.isSent 
+                      ? (detailModalEmail.recipient || detailModalEmail.recipient_email)
+                      : (detailModalEmail.from_name || detailModalEmail.sender_name || detailModalEmail.sender || detailModalEmail.sender_email)
+                  }
+                >
+                  {
+                    detailModalEmail.direction === 'sent' || detailModalEmail.direction === 'outgoing' || detailModalEmail.isSent 
+                      ? (detailModalEmail.recipient || detailModalEmail.recipient_email || 'Unknown')
+                      : (detailModalEmail.from_name || detailModalEmail.sender_name || detailModalEmail.sender || detailModalEmail.sender_email || 'Unknown')
+                  }
                 </span>
               </div>
               <div>
