@@ -38,6 +38,27 @@ function errorResponse(error: string, status = 400) {
   return jsonResponse({ success: false, error }, status);
 }
 
+// Ensure timestamps sent to client are strict UTC ISO strings with trailing 'Z'
+function normalizeIsoUtc(val: any): string | null {
+  if (!val) return null;
+  if (val instanceof Date) return val.toISOString();
+  if (typeof val === "number") return new Date(val).toISOString();
+  if (typeof val === "string") {
+    let s = val.trim();
+    if (!s) return null;
+    if (/^\d{10,13}$/.test(s)) {
+      const d = new Date(Number(s));
+      return isNaN(d.getTime()) ? s : d.toISOString();
+    }
+    // If format is YYYY-MM-DDTHH:MM:SS or YYYY-MM-DD HH:MM:SS without Z or +/- timezone offset
+    if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s)) {
+      return s.replace(" ", "T") + "Z";
+    }
+    return s;
+  }
+  return String(val);
+}
+
 // ----------------------------------------------------
 // Password & Token Crypto Helpers (bcrypt, AES-256-GCM)
 // ----------------------------------------------------
@@ -663,12 +684,23 @@ async function safeInsertNotification(supabase: any, payload: Record<string, any
   const { data, error } = await supabase.from("Notification").insert(payload).select().maybeSingle();
   if (!error) return { data, error: null };
 
-  const coreColumns = ["id", "userId", "emailId", "notificationType", "message", "read", "isTrashed", "createdAt"];
-  const fallbackPayload: Record<string, any> = {};
-  for (const c of coreColumns) {
-    if (payload[c] !== undefined) fallbackPayload[c] = payload[c];
+  // If initial insert fails (e.g. FK constraint on emailId), retry with emailId: null
+  const fallbackPayload: Record<string, any> = {
+    id: payload.id || crypto.randomUUID(),
+    userId: payload.userId,
+    emailId: null,
+    notificationType: payload.notificationType || "General",
+    message: payload.message || "Notification",
+    read: Boolean(payload.read),
+    isTrashed: Boolean(payload.isTrashed),
+    createdAt: payload.createdAt || new Date().toISOString(),
+  };
+
+  const { data: fbData, error: fbError } = await supabase.from("Notification").insert(fallbackPayload).select().maybeSingle();
+  if (fbError) {
+    console.warn("Notification insert fallback notice:", fbError);
   }
-  return await supabase.from("Notification").insert(fallbackPayload).select().maybeSingle();
+  return { data: fbData, error: fbError };
 }
 
 // ----------------------------------------------------
@@ -1022,6 +1054,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
         tone: detectedCat.tone,
         status: isDraft ? "Draft" : isSpam ? "Spam" : isTrash ? "Trash" : isSent ? "Sent" : "Received",
         createdAt: dateIso,
+        receivedAt: !isSent ? dateIso : null,
         sentAt: isSent ? dateIso : null,
       });
 
@@ -1048,6 +1081,95 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
       try {
         await supabase.from("Email").upsert(batch, { onConflict: "id" });
       } catch (_) {}
+    }
+
+    // 6.5. Generate Notifications for incoming emails & backfill missing
+    try {
+      const { data: existingNotifs } = await supabase
+        .from("Notification")
+        .select("id, emailId, message")
+        .in("userId", userIds);
+
+      const notifMessages = new Set((existingNotifs || []).map((n: any) => n.message));
+
+      for (const cu of canonicalUpserts) {
+        if (cu.status === "Received" || cu.direction === "incoming") {
+          const notifMsg = cu.sender 
+            ? `New email from ${cu.sender}: "${cu.subject || '(No Subject)'}"`
+            : `New email: "${cu.subject || '(No Subject)'}"`;
+
+          if (!notifMessages.has(notifMsg)) {
+            await safeInsertNotification(supabase, {
+              id: crypto.randomUUID(),
+              userId: legacyUserId,
+              emailId: null,
+              notificationType: cu.email_type || "General",
+              message: notifMsg,
+              read: Boolean(cu.is_read),
+              isTrashed: false,
+              createdAt: cu.created_at || nowIso,
+            });
+            notifMessages.add(notifMsg);
+          }
+        }
+      }
+
+      // Backfill recent incoming emails from emails and Email
+      const [canonRec, legRec] = await Promise.all([
+        supabase
+          .from("emails")
+          .select("id, sender, sender_name, from_name, from_email, sender_email, subject, email_type, status, direction, is_read, created_at")
+          .in("user_id", userIds)
+          .or("status.eq.Received,status.eq.received,direction.eq.incoming,direction.eq.received")
+          .order("created_at", { ascending: false })
+          .limit(30),
+        supabase
+          .from("Email")
+          .select("id, sender, subject, category, situation, status, isReceived, isRead, createdAt")
+          .in("userId", userIds)
+          .eq("status", "Received")
+          .order("createdAt", { ascending: false })
+          .limit(30)
+      ]);
+
+      const candidates: Array<{ sender: string; subject: string; type: string; isRead: boolean; date: string }> = [];
+      for (const ce of (canonRec.data || [])) {
+        candidates.push({
+          sender: ce.from_name || ce.sender_name || ce.sender || ce.sender_email || ce.from_email || "Client",
+          subject: ce.subject || "(No Subject)",
+          type: ce.email_type || "General",
+          isRead: ce.is_read !== false,
+          date: ce.created_at,
+        });
+      }
+      for (const le of (legRec.data || [])) {
+        candidates.push({
+          sender: le.sender || "Client",
+          subject: le.subject || "(No Subject)",
+          type: le.category || le.situation || "General",
+          isRead: le.isRead !== false,
+          date: le.createdAt,
+        });
+      }
+
+      for (const cand of candidates) {
+        const notifMsg = `New email from ${cand.sender}: "${cand.subject}"`;
+        if (!notifMessages.has(notifMsg)) {
+          await safeInsertNotification(supabase, {
+            id: crypto.randomUUID(),
+            userId: legacyUserId,
+            emailId: null,
+            notificationType: cand.type || "General",
+            message: notifMsg,
+            read: cand.isRead,
+            isTrashed: false,
+            createdAt: normalizeIsoUtc(cand.date) || nowIso,
+          });
+          notifMessages.add(notifMsg);
+        }
+      }
+    } catch (notifErr) {
+      console.warn("Incoming notifications creation notice:", notifErr);
     }
 
     // 7. Fast Drafts Sync
@@ -3283,9 +3405,9 @@ SENDER NAME: "${senderName}"`;
           gmailDraftId: ce.gmail_draft_id || null,
           gmailThreadId: ce.thread_id || ce.gmail_thread_id,
           labels: ce.labels || [],
-          sentAt: ce.sent_at,
-          receivedAt: ce.received_at,
-          createdAt: ce.created_at,
+          sentAt: normalizeIsoUtc(ce.sent_at),
+          receivedAt: normalizeIsoUtc(ce.received_at),
+          createdAt: normalizeIsoUtc(ce.created_at),
         });
       }
 
@@ -3332,6 +3454,9 @@ SENDER NAME: "${senderName}"`;
           isSpam: le.isSpam === true || rawStatus === "spam",
           gmailDraftId: le.gmailDraftId || null,
           labels: le.labels || [],
+          sentAt: normalizeIsoUtc(le.sentAt || le.sent_at),
+          receivedAt: normalizeIsoUtc(le.receivedAt || le.received_at),
+          createdAt: normalizeIsoUtc(le.createdAt || le.created_at),
         });
       }
 
@@ -3598,9 +3723,9 @@ SENDER NAME: "${senderName}"`;
         gmailMessageId: msgId || null,
         gmailDraftId: emailRecord.gmail_draft_id || emailRecord.gmailDraftId || null,
         labels: emailRecord.labels || [],
-        createdAt: emailRecord.created_at || emailRecord.createdAt,
-        sentAt: emailRecord.sent_at || emailRecord.sentAt,
-        receivedAt: emailRecord.received_at || emailRecord.receivedAt,
+        createdAt: normalizeIsoUtc(emailRecord.created_at || emailRecord.createdAt),
+        sentAt: normalizeIsoUtc(emailRecord.sent_at || emailRecord.sentAt),
+        receivedAt: normalizeIsoUtc(emailRecord.received_at || emailRecord.receivedAt),
       });
     }
 
@@ -3978,6 +4103,98 @@ SENDER NAME: "${senderName}"`;
       const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
       const isTrashed = url.searchParams.get("trashed") === "true";
 
+      let debugInfo: any = {};
+      // Auto-backfill any missing notifications for recent incoming emails
+      try {
+        const { data: existingNotifs, error: notifFetchErr } = await supabase
+          .from("Notification")
+          .select("id, emailId, message")
+          .in("userId", userIds);
+
+        const notifMessages = new Set((existingNotifs || []).map((n: any) => n.message));
+        const userEmail = (user.email || "").toLowerCase().trim();
+
+        // 1. Build canonical emails query
+        let canonQuery = supabase.from("emails").select("id, user_id, sender, sender_name, from_name, from_email, sender_email, subject, email_type, status, direction, is_read, created_at");
+        const canonOrs: string[] = [];
+        for (const uid of userIds) {
+          canonOrs.push(`user_id.eq.${uid}`);
+        }
+        if (userEmail) {
+          canonOrs.push(`recipient_email.ilike.${userEmail}`);
+        }
+        if (canonOrs.length > 0) {
+          canonQuery = canonQuery.or(canonOrs.join(","));
+        }
+
+        // 2. Build legacy Email query
+        let legacyQuery = supabase.from("Email").select("id, userId, sender, recipient, subject, category, situation, status, isReceived, isSent, createdAt");
+        const legacyOrs: string[] = [];
+        for (const uid of userIds) {
+          legacyOrs.push(`userId.eq.${uid}`);
+        }
+        if (userEmail) {
+          legacyOrs.push(`recipient.ilike.${userEmail}`);
+        }
+        if (legacyOrs.length > 0) {
+          legacyQuery = legacyQuery.or(legacyOrs.join(","));
+        }
+
+        const [canonRec, legRec] = await Promise.all([
+          canonQuery.order("created_at", { ascending: false }).limit(40),
+          legacyQuery.order("createdAt", { ascending: false }).limit(40)
+        ]);
+
+        const candidates: Array<{ sender: string; subject: string; type: string; isRead: boolean; date: string }> = [];
+        for (const ce of (canonRec.data || [])) {
+          const st = (ce.status || "").toLowerCase();
+          const dir = (ce.direction || "").toLowerCase();
+          if (st === "received" || st === "incoming" || dir === "received" || dir === "incoming") {
+            candidates.push({
+              sender: ce.from_name || ce.sender_name || ce.sender || ce.sender_email || ce.from_email || "Client",
+              subject: ce.subject || "(No Subject)",
+              type: ce.email_type || "General",
+              isRead: ce.is_read !== false,
+              date: ce.created_at,
+            });
+          }
+        }
+        for (const le of (legRec.data || [])) {
+          const st = (le.status || "").toLowerCase();
+          if (st === "received" || st === "incoming" || le.isReceived === true) {
+            candidates.push({
+              sender: le.sender || "Client",
+              subject: le.subject || "(No Subject)",
+              type: le.category || le.situation || "General",
+              isRead: false,
+              date: le.createdAt,
+            });
+          }
+        }
+
+        const legacyUserId = user.legacyId || user.id;
+        const insertedResults: any[] = [];
+
+        for (const cand of candidates) {
+          const notifMsg = `New email from ${cand.sender}: "${cand.subject}"`;
+          if (!notifMessages.has(notifMsg)) {
+            await safeInsertNotification(supabase, {
+              id: crypto.randomUUID(),
+              userId: legacyUserId,
+              emailId: null,
+              notificationType: cand.type || "General",
+              message: notifMsg,
+              read: cand.isRead,
+              isTrashed: false,
+              createdAt: normalizeIsoUtc(cand.date) || new Date().toISOString(),
+            });
+            notifMessages.add(notifMsg);
+          }
+        }
+      } catch (backfillErr: any) {
+        console.warn("Notifications backfill notice:", backfillErr);
+      }
+
       const { data: notifications } = await supabase
         .from("Notification")
         .select("*")
@@ -3994,8 +4211,13 @@ SENDER NAME: "${senderName}"`;
       const activeCount = (allNotifs || []).filter((n: any) => !n.isTrashed).length;
       const trashedCount = (allNotifs || []).filter((n: any) => !!n.isTrashed).length;
 
+      const formattedNotifications = (notifications || []).map((n: any) => ({
+        ...n,
+        createdAt: normalizeIsoUtc(n.createdAt || n.created_at),
+      }));
+
       return jsonResponse({
-        notifications: notifications || [],
+        notifications: formattedNotifications,
         unreadCount,
         activeCount,
         trashedCount,

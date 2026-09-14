@@ -58,6 +58,8 @@ export default function App() {
   const [isGmailConnected, setIsGmailConnected] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const userDropdownTimeoutRef = useRef(null);
+  const lastKnownNotifsRef = useRef(new Set());
+  const isInitialNotifLoadRef = useRef(true);
 
   // Deep Email History Filter State for Card Clicks & Navigation
   const [historyFilters, setHistoryFilters] = useState({
@@ -240,6 +242,78 @@ export default function App() {
 
     return () => {
       subscription.unsubscribe();
+    };
+  }, []);
+
+  // Real-time Background Notification Sync & Instant Alert Pipeline
+  useEffect(() => {
+    let isMounted = true;
+
+    // Request browser notification permission if available
+    if (typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission === 'default') {
+      window.Notification.requestPermission().catch(() => {});
+    }
+
+    const checkNotifications = async () => {
+      try {
+        const res = await apiFetch('/api/notifications?trashed=false');
+        if (!res.ok || !isMounted) return;
+        const data = await res.json();
+        const unread = typeof data.unreadCount === 'number' ? data.unreadCount : 0;
+        setUnreadNotifCount(unread);
+
+        const notifs = data.notifications || [];
+        if (isInitialNotifLoadRef.current) {
+          isInitialNotifLoadRef.current = false;
+          notifs.forEach(n => lastKnownNotifsRef.current.add(n.id));
+        } else {
+          // Detect new incoming unread notifications
+          const newUnreadNotifs = notifs.filter(n => !n.read && !lastKnownNotifsRef.current.has(n.id));
+          if (newUnreadNotifs.length > 0) {
+            const newest = newUnreadNotifs[0];
+            setToastMessage(`📬 ${newest.message}`);
+            setTimeout(() => setToastMessage(''), 7000);
+
+            // Native Browser Notification
+            if (typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission === 'granted') {
+              try {
+                new window.Notification('Scribe AI', {
+                  body: newest.message,
+                  icon: '/favicon.ico'
+                });
+              } catch (_) {}
+            }
+          }
+          notifs.forEach(n => lastKnownNotifsRef.current.add(n.id));
+        }
+      } catch (err) {
+        // Silent background catch
+      }
+    };
+
+    // Immediate initial check
+    checkNotifications();
+
+    // Periodic sync every 10 seconds
+    const interval = setInterval(checkNotifications, 10000);
+
+    // Reactive event listeners for immediate updates
+    const handleNotifEvent = (e) => {
+      if (typeof e?.detail?.unreadCount === 'number') {
+        setUnreadNotifCount(e.detail.unreadCount);
+      } else {
+        checkNotifications();
+      }
+    };
+
+    window.addEventListener('notifications-unread-count', handleNotifEvent);
+    window.addEventListener('gmail-synced', checkNotifications);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener('notifications-unread-count', handleNotifEvent);
+      window.removeEventListener('gmail-synced', checkNotifications);
     };
   }, []);
 

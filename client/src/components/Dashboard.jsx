@@ -9,7 +9,7 @@ import { sanitizeHtml } from '../utils/sanitize';
 import { validateEmailList, parseEmailList } from '../utils/emailValidation';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
 import { supabase, subscribeToEmailChanges, subscribeToEmailEvents, signInWithGoogle, subscribeToSyncState } from '../utils/supabaseClient';
-import { formatNormalDateTime, formatNormalTime } from '../utils/dateUtils';
+import { formatNormalDateTime, formatNormalTime, parseToValidDate } from '../utils/dateUtils';
 
 function GoldMiniBarChart() {
   return (
@@ -101,9 +101,9 @@ export function getTimeBasedGreeting(date = new Date(), userName = '') {
 }
 
 export function formatRelativeTime(dateStr) {
-  if (!dateStr) return 'Just now';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return 'Recently';
+  if (!dateStr) return 'Recently';
+  const d = parseToValidDate(dateStr);
+  if (!d) return 'Recently';
   const now = Date.now();
   const diffSec = Math.floor((now - d.getTime()) / 1000);
   if (diffSec < 60) return 'Just now';
@@ -114,7 +114,7 @@ export function formatRelativeTime(dateStr) {
   const diffDays = Math.floor(diffHour / 24);
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export function Dashboard({ 
@@ -540,6 +540,7 @@ export function Dashboard({
         setTimeout(() => setSyncToast(''), 4000);
       }
       await fetchDashboardData();
+      window.dispatchEvent(new CustomEvent('gmail-synced'));
     } catch (err) {
       console.error('Manual Gmail sync error:', err);
       setSyncToast('⚠️ Gmail sync completed.');
