@@ -4,6 +4,7 @@ import {
   RefreshCw, Check, Trash2, RotateCcw, X, Flame, AlertCircle, ShieldAlert, Filter, Lock
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
+import { formatNormalDateTime } from '../utils/dateUtils';
 
 const NOTIF_TYPES = [
   { id: 'All', label: 'All Notifications' },
@@ -232,7 +233,7 @@ export function NotificationCenter({ onUnreadCountChange }) {
                     )}
                   </div>
                   <span className="text-[10px] text-[#99958F] block font-medium">
-                    {new Date(n.createdAt).toLocaleString()}
+                    {formatNormalDateTime(n.createdAt)}
                   </span>
                 </div>
               </div>

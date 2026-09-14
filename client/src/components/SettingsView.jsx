@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { apiFetch, safeParseResponse, getApiBaseUrl, setCustomBackendUrl, DEFAULT_SUPABASE_EDGE_FUNCTION } from '../utils/api';
 import { signInWithGoogle } from '../utils/supabaseClient';
+import { formatNormalDateTime } from '../utils/dateUtils';
 
 export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
   // Current logged in user profile
@@ -404,7 +405,7 @@ export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
                   </div>
                   {authStatus.lastSyncedAt && (
                     <p className="text-[11px] text-[#99958F] mt-0.5">
-                      Last synchronized: {new Date(authStatus.lastSyncedAt).toLocaleString()}
+                      Last synchronized: {formatNormalDateTime(authStatus.lastSyncedAt)}
                     </p>
                   )}
                 </div>

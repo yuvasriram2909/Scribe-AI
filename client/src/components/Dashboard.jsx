@@ -9,6 +9,7 @@ import { sanitizeHtml } from '../utils/sanitize';
 import { validateEmailList, parseEmailList } from '../utils/emailValidation';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
 import { supabase, subscribeToEmailChanges, subscribeToEmailEvents, signInWithGoogle, subscribeToSyncState } from '../utils/supabaseClient';
+import { formatNormalDateTime, formatNormalTime } from '../utils/dateUtils';
 
 function GoldMiniBarChart() {
   return (
@@ -896,7 +897,7 @@ export function Dashboard({
                   <span className={`text-[11px] font-sans px-2 py-0.5 rounded-md ${
                     theme === 'dark' ? 'bg-[#22211F] text-[#99958F]' : 'bg-stone-100 text-stone-600'
                   }`}>
-                    🕒 Synced {new Date(syncState.last_synced_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    🕒 Synced {formatNormalTime(syncState.last_synced_at)}
                   </span>
                 )}
               </div>
@@ -1813,7 +1814,7 @@ export function Dashboard({
               <div>
                 <span className="text-[#99958F] block text-[10px] uppercase font-bold">Date</span>
                 <span className="text-[#ECE8E1] truncate block mt-0.5">
-                  {new Date(detailModalEmail.sentAt || detailModalEmail.createdAt || detailModalEmail.receivedAt || Date.now()).toLocaleDateString()}
+                  {formatNormalDateTime(detailModalEmail.sentAt || detailModalEmail.createdAt || detailModalEmail.receivedAt || Date.now())}
                 </span>
               </div>
             </div>

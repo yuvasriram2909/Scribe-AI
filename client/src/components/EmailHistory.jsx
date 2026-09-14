@@ -7,6 +7,7 @@ import {
 import { apiFetch } from '../utils/api';
 import { subscribeToEmailChanges } from '../utils/supabaseClient';
 import { sanitizeHtml } from '../utils/sanitize';
+import { formatNormalDateTime } from '../utils/dateUtils';
 
 const FOLDERS = [
   { id: 'inbox', label: 'Inbox', icon: Inbox },
@@ -536,7 +537,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
             const cat = email.category || email.email_type || 'General';
             const tone = email.tone || 'Professional';
             const priority = email.priority || email.importance || 'Normal';
-            const dateStr = new Date(email.sentAt || email.receivedAt || email.createdAt).toLocaleString();
+            const dateStr = formatNormalDateTime(email.sentAt || email.receivedAt || email.createdAt);
             const isRead = email.isRead !== false;
             const isStarred = Boolean(email.isStarred);
             const isArchived = Boolean(email.isArchived);
@@ -619,9 +620,10 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
 
                 {/* Bottom Row: Date & Action buttons */}
                 <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                  <span className="text-[10px] text-slate-500 font-mono">
-                    {dateStr}
-                  </span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium tracking-tight">
+                    <Clock className="w-3 h-3 text-[#D4A373]/80 shrink-0" />
+                    <span>{dateStr}</span>
+                  </div>
 
                   {/* Action Buttons Toolbar */}
                   <div className="flex items-center gap-1.5">
@@ -760,7 +762,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
               {selectedEmail.gmailMessageId && (
                 <p><strong className="text-purple-400">Gmail Message ID:</strong> {selectedEmail.gmailMessageId}</p>
               )}
-              <p><strong className="text-[#D4A373]">Timestamp:</strong> {new Date(selectedEmail.sentAt || selectedEmail.receivedAt || selectedEmail.createdAt).toLocaleString()}</p>
+              <p><strong className="text-[#D4A373]">Timestamp:</strong> {formatNormalDateTime(selectedEmail.sentAt || selectedEmail.receivedAt || selectedEmail.createdAt)}</p>
             </div>
 
             {/* Body View Mode Selector (Formatted HTML vs Plain Text) */}
