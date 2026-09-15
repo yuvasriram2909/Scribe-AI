@@ -224,6 +224,7 @@ export function ComposeWorkflow({
         step: 3, // Directly show Email Preview screen!
         errorMessage: ''
       });
+      setAiLoading(false); // Make UI buttons immediately clickable!
 
       // 2. Background pass-through to Gemini API if configured
       try {
@@ -394,19 +395,20 @@ export function ComposeWorkflow({
     }
 
     updateState({ recipient: valRes.formatted, errorMessage: '' });
-    setShowConfirmModal(true);
+    handleFinalConfirmedSend(valRes.formatted);
   };
 
   // STEP 4 -> STEP 5 & 6: Final Confirmed Dispatch via Gmail API
-  const handleFinalConfirmedSend = async () => {
+  const handleFinalConfirmedSend = async (validRecip) => {
+    const sendRecipient = validRecip || recipient;
     setShowConfirmModal(false);
-    updateState({ step: 5 }); // Sending progress animation
+    updateState({ step: 5, errorMessage: '' }); // Sending progress animation
 
     try {
       const formData = new FormData();
-      formData.append('recipient', recipient);
-      formData.append('cc', cc);
-      formData.append('bcc', bcc);
+      formData.append('recipient', sendRecipient);
+      formData.append('cc', cc || '');
+      formData.append('bcc', bcc || '');
       formData.append('subject', subject);
       formData.append('body', body);
       formData.append('category', detectedCategory);
@@ -864,6 +866,22 @@ export function ComposeWorkflow({
             </div>
           )}
 
+          {errorMessage && (
+            <div className="p-4 rounded-2xl bg-rose-950/85 border border-rose-500/50 text-rose-200 text-xs font-semibold flex items-center justify-between shadow-xl animate-fadeIn">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+              <button 
+                onClick={() => updateState({ errorMessage: '' })} 
+                className="text-rose-400 hover:text-white p-1 cursor-pointer"
+                title="Dismiss error"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* UPGRADED 5-FACET AI EMAIL ANALYSIS CARD */}
           <div className="p-5 sm:p-6 rounded-3xl bg-[#1A1918] backdrop-blur-xl border border-[#2E2D2B] space-y-5 shadow-2xl animate-fadeIn">
             <div className="flex items-center justify-between border-b border-[#2E2D2B] pb-3">
@@ -1202,8 +1220,8 @@ export function ComposeWorkflow({
 
               <button
                 onClick={handleStartSending}
-                disabled={aiLoading}
-                className="px-6 py-2.5 rounded-xl gold-btn light-sweep text-[#121211] font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer group"
+                className="px-6 py-2.5 rounded-xl gold-btn light-sweep text-[#121211] font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer group active:scale-95 transition-all"
+                title="Send this email now via Gmail API"
               >
                 <ShieldCheck className="w-4 h-4 text-[#121211] btn-icon-spin transition-transform" />
                 <span>Confirm & Send Email</span>

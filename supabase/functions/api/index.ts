@@ -1540,6 +1540,26 @@ function detectSituationEngine(text: string): SituationConfig {
     return SUPPORTED_SITUATIONS.find(s => s.id === 'meeting') || defaultSit;
   }
 
+  // Social invitation, date, meetup, coffee, dinner, lunch
+  if (
+    lower.includes('date') ||
+    lower.includes('go for a date') ||
+    lower.includes('go on a date') ||
+    lower.includes('dinner') ||
+    lower.includes('lunch') ||
+    lower.includes('coffee') ||
+    lower.includes('catch up') ||
+    lower.includes('hang out') ||
+    lower.includes('get together') ||
+    lower.includes('are you free') ||
+    lower.includes('free this weekend') ||
+    lower.includes('can we go') ||
+    lower.includes('would love to meet') ||
+    lower.includes('invitation')
+  ) {
+    return SUPPORTED_SITUATIONS.find(s => s.id === 'personal_casual') || SUPPORTED_SITUATIONS.find(s => s.id === 'meeting') || defaultSit;
+  }
+
   // Leave / sick
   if (lower.includes('sick') || lower.includes('leave') || lower.includes('fever') || lower.includes('illness') || lower.includes('hospital')) {
     return SUPPORTED_SITUATIONS.find(s => s.id === 'leave_request') || defaultSit;
@@ -1779,11 +1799,45 @@ I would welcome the opportunity to speak with your team in an introductory inter
 
 ${closing}`;
   }
-  // 7. General / Status / Operational Update
+  // 7. Personal / Casual / Social Invitation
+  else if (sit.id === "personal_casual" || sit.category === "Personal / Casual" || lower.includes("date") || lower.includes("dinner") || lower.includes("lunch") || lower.includes("coffee") || lower.includes("catch up") || lower.includes("get together")) {
+    const isDate = lower.includes("date");
+    const isDinner = lower.includes("dinner");
+    const isLunch = lower.includes("lunch");
+    const isCoffee = lower.includes("coffee") || lower.includes("tea");
+
+    let activity = "get together and catch up";
+    if (isDate) activity = "go out for a date and spend some quality time together";
+    else if (isDinner) activity = "get together for dinner";
+    else if (isLunch) activity = "grab lunch together";
+    else if (isCoffee) activity = "meet up over coffee";
+
+    if (!outSubject) {
+      if (isDate) outSubject = "Dinner & Catching Up / Invitation";
+      else if (isDinner || isLunch || isCoffee) outSubject = `Let's catch up – ${isDinner ? 'Dinner' : isLunch ? 'Lunch' : 'Coffee'} invitation`;
+      else outSubject = "Catching up – Getting together";
+    }
+
+    outBody = `${greeting}
+
+I hope you are having a wonderful and productive week.
+
+I would love to invite you to ${activity} sometime soon. It would be a true pleasure to spend some quality time together and have a great conversation.
+
+Please let me know what your schedule looks like over the coming days or if there is an evening that works best for you.
+
+Looking forward to hearing from you.
+
+${closing}`;
+  }
+  // 8. General / Operational / Inquiries
   else {
     let stripped = cleanInput.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:tell|inform|notify|let\s+(?:the|you|everyone)\s+know)\s+(?:that|about)?\s*/i, "").trim();
     stripped = stripped.replace(/^(?:regarding|about)[:\s-]*/i, "").trim();
     if (!stripped) stripped = "Project and Operational Update";
+
+    const isQuestion = /^(?:can\s+we|could\s+we|is\s+it\s+possible|would\s+it\s+be\s+possible|shall\s+we|are\s+you\s+free|do\s+you\s+have\s+time)\b/i.test(stripped);
+    const isDateOrMeetup = /\b(?:date|dinner|lunch|coffee|meet|catch\s*up|outing)\b/i.test(stripped);
 
     // Extract cause/context if "because" is used
     let mainAction = stripped;
@@ -1794,25 +1848,42 @@ ${closing}`;
       mainCause = splitMatch[2].trim();
     }
 
-    const titleLead = mainAction.charAt(0).toUpperCase() + mainAction.slice(1);
     if (!outSubject) {
-      outSubject = `Update: ${titleLead.slice(0, 48)}`;
+      if (isDateOrMeetup) {
+        outSubject = "Getting Together / Invitation";
+      } else if (isQuestion) {
+        const topic = mainAction.replace(/^(?:can\s+we|could\s+we|is\s+it\s+possible\s+to|shall\s+we)\s+/i, "");
+        outSubject = `Inquiry: ${topic.charAt(0).toUpperCase() + topic.slice(1, 45)}`;
+      } else {
+        const titleLead = mainAction.charAt(0).toUpperCase() + mainAction.slice(1);
+        outSubject = `${titleLead.slice(0, 48)}`;
+      }
+    }
+
+    let openingSentence = "";
+    if (isDateOrMeetup) {
+      openingSentence = "I would love to invite you to connect and spend some time together. I was wondering if you might be free sometime soon to catch up.";
+    } else if (isQuestion) {
+      const cleanAction = mainAction.replace(/^(?:can\s+we|could\s+we|is\s+it\s+possible\s+to|shall\s+we)\s+/i, "");
+      openingSentence = `I am writing to kindly inquire whether it might be possible to ${cleanAction}.`;
+    } else {
+      openingSentence = `I am reaching out to provide an update regarding ${mainAction}.`;
     }
 
     let causeSentence = "";
     if (mainCause) {
-      causeSentence = `\n\nThis is primarily due to ${mainCause}. Our team is actively managing all related workstreams to ensure minimal disruption and swift resolution.`;
+      causeSentence = `\n\nThis is primarily in context of ${mainCause}. We want to ensure everything is coordinated smoothly and all dependencies proceed with clarity.`;
     }
 
     outBody = `${greeting}
 
 I hope this message finds you well.
 
-I am writing to share an important update regarding ${mainAction}.${causeSentence}
+${openingSentence}${causeSentence}
 
-Please review the context above and let me know if you have any questions or require additional details. We are committed to keeping you informed and will provide further updates as needed.
+Please let me know if you have any questions or if there is a convenient time for us to discuss this further. I appreciate your time and consideration.
 
-Thank you for your continued partnership and support.
+Thank you very much,
 
 ${closing}`;
   }
@@ -3154,30 +3225,12 @@ RECIPIENT: "${recipientName || recipient || 'Recipient'}"
 SENDER NAME: "${senderName}"`;
 
           const priorityModels = [
-            "models/gemini-2.5-flash",
             "models/gemini-2.0-flash",
             "models/gemini-1.5-flash",
-            "models/gemini-flash-latest",
-            "models/gemini-1.5-pro",
-            "models/gemini-pro-latest"
+            "models/gemini-2.5-flash"
           ];
-          
-          let candidatesToTry = priorityModels;
-          try {
-            const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`);
-            const listData = await listRes.json();
-            const validModels = (listData?.models || [])
-              .filter((m: any) => m.supportedGenerationMethods?.includes("generateContent"))
-              .map((m: any) => m.name);
-            if (validModels.length > 0) {
-              const matched = priorityModels.filter(pm => validModels.includes(pm));
-              candidatesToTry = matched.length > 0 ? matched : validModels;
-            }
-          } catch (listErr) {
-            geminiDebug = { listException: String(listErr) };
-          }
 
-          for (const modelCandidate of candidatesToTry) {
+          for (const modelCandidate of priorityModels) {
             try {
               const modelEndpoint = modelCandidate.startsWith("models/") ? modelCandidate : `models/${modelCandidate}`;
               const aiRes = await fetch(
@@ -3189,10 +3242,17 @@ SENDER NAME: "${senderName}"`;
                     contents: [{ parts: [{ text: geminiPrompt }] }],
                     generationConfig: { responseMimeType: "application/json" }
                   }),
+                  signal: AbortSignal.timeout(3500)
                 }
               );
               aiData = await aiRes.json();
               geminiDebug = { modelUsed: modelEndpoint, aiStatus: aiRes.status, aiDataError: aiData?.error || null };
+              
+              if (aiRes.status === 429) {
+                // Quota exceeded on this API key: break immediately to avoid delaying the user
+                break;
+              }
+
               const genText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
               if (genText) {
                 rawText = genText;

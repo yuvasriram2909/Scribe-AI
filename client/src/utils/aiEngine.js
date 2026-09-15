@@ -399,6 +399,27 @@ export function classifyEmailIntent(input = '', subject = '') {
     return EMAIL_CATEGORIES.find(c => c.id === 'thank_you');
   }
 
+  // Social invitation, date, meetup, coffee, dinner, lunch
+  if (
+    text.includes('date') || 
+    text.includes('go for a date') || 
+    text.includes('go on a date') || 
+    text.includes('dinner') || 
+    text.includes('lunch') || 
+    text.includes('coffee') || 
+    text.includes('catch up') || 
+    text.includes('hang out') || 
+    text.includes('get together') || 
+    text.includes('are you free') || 
+    text.includes('free this weekend') || 
+    text.includes('can we go') || 
+    text.includes('would love to meet') ||
+    text.includes('outing') ||
+    text.includes('invitation')
+  ) {
+    return EMAIL_CATEGORIES.find(c => c.id === 'personal_casual') || EMAIL_CATEGORIES.find(c => c.id === 'meeting');
+  }
+
   // 2. Keyword Scoring Match
   let bestCategory = null;
   let maxScore = 0;
@@ -1203,10 +1224,69 @@ ${closing}`;
       break;
     }
 
+    case 'personal_casual': {
+      const isDate = lower.includes('date');
+      const isDinner = lower.includes('dinner');
+      const isLunch = lower.includes('lunch');
+      const isCoffee = lower.includes('coffee') || lower.includes('tea');
+
+      let activity = 'get together and catch up';
+      if (isDate) activity = 'go out for a date and spend some quality time together';
+      else if (isDinner) activity = 'get together for dinner';
+      else if (isLunch) activity = 'grab lunch together';
+      else if (isCoffee) activity = 'meet up over coffee';
+
+      if (!finalSubject) {
+        if (isDate) finalSubject = 'Dinner & Catching Up / Invitation';
+        else if (isDinner || isLunch || isCoffee) finalSubject = `Let's catch up – ${isDinner ? 'Dinner' : isLunch ? 'Lunch' : 'Coffee'} invitation`;
+        else finalSubject = 'Catching up – Getting together';
+      }
+
+      if (toneId === 'polite_diplomatic' || toneId === 'corporate_professional') {
+        bodyContent = `${greeting}
+
+I hope you are having a wonderful and productive week.
+
+I would love to invite you to ${activity} sometime soon. It would be a true pleasure to spend some quality time together and have a great conversation.
+
+Please let me know what your schedule looks like over the coming days or if there is an evening that works best for you.
+
+Looking forward to hearing from you.
+
+${closing}`;
+      } else if (toneId === 'action_concise') {
+        bodyContent = `${greeting}
+
+I hope you're having a great week!
+
+Would love to ${activity} sometime soon. Let me know if you are free in the coming days or what day and time works best for you.
+
+Looking forward to it!
+
+${closing}`;
+      } else {
+        // Warm & Collaborative / Friendly
+        bodyContent = `${greeting}
+
+I hope you're having a wonderful week!
+
+I was wondering if you might be free sometime soon to ${activity}. It would be really wonderful to see you and catch up properly.
+
+Let me know what your week looks like or if there's a day that suits you best. No pressure at all—looking forward to hearing from you!
+
+${closing}`;
+      }
+      break;
+    }
+
     default: {
       let stripped = input.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:tell|inform|notify|let\s+(?:the|you|everyone)\s+know)\s+(?:that|about)?\s*/i, '').trim();
       stripped = stripped.replace(/^(?:regarding|about)[:\s-]*/i, '').trim();
       if (!stripped) stripped = 'Project and Operational Update';
+
+      // Clean conversational question starters
+      const isQuestion = /^(?:can\s+we|could\s+we|is\s+it\s+possible|would\s+it\s+be\s+possible|shall\s+we|are\s+you\s+free|do\s+you\s+have\s+time)\b/i.test(stripped);
+      const isDateOrMeetup = /\b(?:date|dinner|lunch|coffee|meet|catch\s*up|outing)\b/i.test(stripped);
 
       // Extract cause / background if "because" or "due to" is present
       let mainAction = stripped;
@@ -1217,24 +1297,41 @@ ${closing}`;
         mainCause = splitMatch[2].trim();
       }
 
-      const titleLead = mainAction.charAt(0).toUpperCase() + mainAction.slice(1);
       if (!finalSubject) {
-        finalSubject = `Update: ${titleLead.slice(0, 48)}`;
+        if (isDateOrMeetup) {
+          finalSubject = 'Getting Together / Invitation';
+        } else if (isQuestion) {
+          const topic = mainAction.replace(/^(?:can\s+we|could\s+we|is\s+it\s+possible\s+to|shall\s+we)\s+/i, '');
+          finalSubject = `Inquiry: ${topic.charAt(0).toUpperCase() + topic.slice(1, 45)}`;
+        } else {
+          const titleLead = mainAction.charAt(0).toUpperCase() + mainAction.slice(1);
+          finalSubject = `${titleLead.slice(0, 48)}`;
+        }
+      }
+
+      let openingSentence = '';
+      if (isDateOrMeetup) {
+        openingSentence = `I would love to invite you to connect and spend some time together. I was wondering if you might be free sometime soon to catch up.`;
+      } else if (isQuestion) {
+        const cleanAction = mainAction.replace(/^(?:can\s+we|could\s+we|is\s+it\s+possible\s+to|shall\s+we)\s+/i, '');
+        openingSentence = `I am writing to kindly inquire whether it might be possible to ${cleanAction}.`;
+      } else {
+        openingSentence = `I am reaching out to provide an update regarding ${mainAction}.`;
       }
 
       let causeParagraph = '';
       if (mainCause) {
-        causeParagraph = `\n\nThis development is primarily driven by ${mainCause}. Our team is actively managing all dependencies to ensure workstreams proceed smoothly with minimum disruption.`;
+        causeParagraph = `\n\nThis is primarily in context of ${mainCause}. We want to ensure everything is coordinated smoothly and all milestones proceed with clarity.`;
       }
 
       if (toneId === 'action_concise') {
         bodyContent = `${greeting}
 
-Operational Update: ${mainAction}
+${openingSentence}${causeParagraph}
 
-- Key Context: ${mainCause || mainAction}
-- Current Status: Action underway / actively monitored
-- Next Steps: Please review and let me know if any questions arise
+Next Steps:
+- Please review and let me know your thoughts or availability
+- Happy to answer any questions or align on details
 
 Best,
 
@@ -1242,9 +1339,9 @@ ${closing}`;
       } else if (toneId === 'executive') {
         bodyContent = `${greeting}
 
-I am reaching out to provide an executive update regarding ${mainAction}.${causeParagraph}
+${openingSentence}${causeParagraph}
 
-Please review the context above and let me know if your team requires further strategic alignment or executive briefing. We remain focused on ensuring our milestones proceed smoothly.
+Please let me know if this aligns with your schedule and current priorities. I welcome the opportunity to discuss further at your earliest convenience.
 
 Sincerely,
 
@@ -1252,24 +1349,24 @@ ${closing}`;
       } else if (toneId === 'polite_diplomatic') {
         bodyContent = `${greeting}
 
-I hope you are having a productive week.
+I hope you are having a productive and pleasant week.
 
-I wanted to take a moment to share an update regarding ${mainAction}.${causeParagraph}
+${openingSentence}${causeParagraph}
 
-Please feel free to reach out if you need any additional context or clarification. I truly appreciate your continued support and collaboration.
+Please feel free to share your thoughts at your convenience. I truly appreciate your time, consideration, and continued collaboration.
 
 ${closing}`;
       } else {
-        // Corporate Professional standard
+        // Corporate Professional standard - elegant, articulate, authentic
         bodyContent = `${greeting}
 
 I hope this message finds you well.
 
-I am writing to provide an important update regarding ${mainAction}.${causeParagraph}
+${openingSentence}${causeParagraph}
 
-Please let me know if you need any additional details or have any questions. I am happy to hop on a quick call or provide further information at your convenience.
+Please let me know if you have any questions or if there is a convenient time for us to discuss this further. I appreciate your time and consideration.
 
-Thank you very much for your time and continued support.
+Thank you very much,
 
 ${closing}`;
       }
