@@ -1036,6 +1036,8 @@ export default function App() {
           {activeTab === 'notifications' && (
             <NotificationCenter 
               onUnreadCountChange={(count) => setUnreadNotifCount(count)}
+              onViewHistory={handleNavigateToHistory}
+              theme={theme}
             />
           )}
           {activeTab === 'settings' && (
