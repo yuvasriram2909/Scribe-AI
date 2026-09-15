@@ -28,7 +28,6 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
 
   // Hover & Cursor Spotlight Tracking
   const [hoveredId, setHoveredId] = useState(null);
-  const isAnyHovered = Boolean(hoveredId);
 
   useEffect(() => {
     fetchNotifications();
@@ -168,7 +167,7 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
     if (raw.includes('security') || raw.includes('sign-in') || raw.includes('signin') || raw.includes('alert')) {
       return {
         icon: ShieldAlert,
-        color: 'text-amber-400 bg-amber-400/15 border-amber-400/30',
+        color: 'text-amber-300 bg-amber-400/25 border-amber-300/45 shadow-[0_0_15px_rgba(251,191,36,0.35)]',
         glow: 'rgba(251, 191, 36, 0.4)',
         typeLabel: 'Security Alert'
       };
@@ -176,7 +175,7 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
     if (raw.includes('emergency') || raw.includes('urgent')) {
       return {
         icon: Flame,
-        color: 'text-rose-400 bg-rose-400/15 border-rose-400/30',
+        color: 'text-rose-300 bg-rose-400/25 border-rose-300/45 shadow-[0_0_15px_rgba(244,63,94,0.35)]',
         glow: 'rgba(244, 63, 94, 0.4)',
         typeLabel: 'Emergency'
       };
@@ -184,7 +183,7 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
     if (raw.includes('sent to') || raw.includes('successfully sent')) {
       return {
         icon: Send,
-        color: 'text-emerald-400 bg-emerald-400/15 border-emerald-400/30',
+        color: 'text-emerald-300 bg-emerald-400/25 border-emerald-300/45 shadow-[0_0_15px_rgba(52,211,153,0.35)]',
         glow: 'rgba(52, 211, 153, 0.4)',
         typeLabel: 'Sent Receipt'
       };
@@ -192,14 +191,14 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
     if (raw.includes('application') || raw.includes('job') || raw.includes('career') || raw.includes('resume')) {
       return {
         icon: Briefcase,
-        color: 'text-cyan-400 bg-cyan-400/15 border-cyan-400/30',
+        color: 'text-cyan-300 bg-cyan-400/25 border-cyan-300/45 shadow-[0_0_15px_rgba(34,211,238,0.35)]',
         glow: 'rgba(34, 211, 238, 0.4)',
         typeLabel: 'Application'
       };
     }
     return {
       icon: Mail,
-      color: 'text-[#D4A373] bg-[#D4A373]/15 border-[#D4A373]/30',
+      color: 'text-[#F3D5B5] bg-[#D4A373]/25 border-[#D4A373]/45 shadow-[0_0_15px_rgba(212,163,115,0.3)]',
       glow: 'rgba(212, 163, 115, 0.4)',
       typeLabel: n.notificationType || 'Mail'
     };
@@ -335,20 +334,8 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
           className="space-y-3 relative"
           onMouseLeave={() => setHoveredId(null)}
         >
-          {/* Ambient Spotlight Background Dimming Scrim:
-              When any notification card is hovered, the surrounding background subtly dims 
-              and softens to make the hovered card pop in full 3D floating glass brilliance. */}
-          <div 
-            className={`pointer-events-none absolute -inset-6 rounded-3xl transition-all duration-500 -z-10 ${
-              isAnyHovered 
-                ? 'bg-black/45 backdrop-brightness-[0.7] backdrop-blur-[1px] opacity-100' 
-                : 'opacity-0'
-            }`} 
-          />
-
           {filteredNotifs.map(n => {
             const isHovered = hoveredId === n.id;
-            const isDimmed = isAnyHovered && !isHovered;
             const badge = getNotificationBadge(n);
             const BadgeIcon = badge.icon;
 
@@ -358,11 +345,11 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
                 onMouseEnter={() => setHoveredId(n.id)}
                 onClick={(e) => handleOpenEmail(n, e)}
                 className={`floating-glass-card p-5 sm:p-6 rounded-2xl cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 select-none ${
-                  isHovered ? 'is-hovered' : ''
-                } ${isDimmed ? 'is-dimmed' : ''} ${
-                  !n.read 
-                    ? 'border-[#D4A373]/50 shadow-[0_12px_32px_-6px_rgba(0,0,0,0.6),0_0_15px_rgba(212,163,115,0.15)]' 
-                    : 'border-white/[0.07]'
+                  isHovered 
+                    ? 'is-hovered' 
+                    : !n.read 
+                      ? 'border-[#D4A373]/60 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.4),0_0_16px_rgba(212,163,115,0.2)]' 
+                      : 'border-white/[0.14] hover:border-white/30'
                 }`}
               >
                 {/* Left Area: Icon & Enlarged Message */}
@@ -370,21 +357,21 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
                   {/* Floating Glass Icon Badge */}
                   <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl border flex items-center justify-center shrink-0 mt-0.5 transition-all duration-300 shadow-md ${
                     badge.color
-                  } ${isHovered ? 'scale-115 rotate-3 shadow-[0_0_20px_rgba(212,163,115,0.4)]' : ''}`}>
+                  } ${isHovered ? 'scale-115 rotate-3 shadow-[0_0_22px_rgba(212,163,115,0.5)]' : ''}`}>
                     <BadgeIcon className={`w-5 h-5 transition-transform duration-300 ${isHovered ? 'scale-110' : ''}`} />
                   </div>
 
                   {/* Message & Details */}
                   <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {/* Notification Message: Enlarges, expands, and brightens on cursor hover */}
+                      {/* Notification Message: Stays bright and clear at all times; smoothly enlarges on hover */}
                       <p 
                         className={`transition-all duration-300 ease-out ${
                           isHovered
-                            ? 'text-sm sm:text-[16px] font-extrabold text-white tracking-normal leading-snug drop-shadow-md'
+                            ? 'text-sm sm:text-[17px] font-extrabold text-white tracking-normal leading-snug drop-shadow-md'
                             : !n.read
-                              ? 'text-xs sm:text-[13.5px] font-bold text-[#F5F3EF]'
-                              : 'text-xs sm:text-[13px] font-medium text-[#ECE8E1]/85'
+                              ? 'text-xs sm:text-[14px] font-bold text-white'
+                              : 'text-xs sm:text-[13.5px] font-semibold text-[#F5F3EF]'
                         }`}
                       >
                         {n.message}
@@ -402,20 +389,20 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
                       )}
 
                       {/* Type Badge Tag */}
-                      <span className="text-[10px] px-2 py-0.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[#99958F] font-semibold">
+                      <span className="text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded-lg bg-white/[0.08] border border-white/[0.16] text-[#F5F3EF] font-semibold">
                         {badge.typeLabel}
                       </span>
                     </div>
 
                     {/* Timestamp & Hover Context Hint */}
-                    <div className="flex items-center gap-3 text-[11px] transition-colors duration-300">
-                      <span className={`font-medium ${isHovered ? 'text-[#D4A373] font-semibold' : 'text-[#99958F]'}`}>
+                    <div className="flex items-center gap-3 text-[11px] sm:text-xs transition-colors duration-300">
+                      <span className={`font-semibold ${isHovered ? 'text-[#D4A373]' : 'text-[#C5BDB2]'}`}>
                         {formatNormalDateTime(n.createdAt)}
                       </span>
 
                       {isHovered && typeof onViewHistory === 'function' && (
-                        <span className="hidden sm:inline-flex items-center gap-1 text-[#D4A373]/90 text-[11px] font-bold animate-fadeIn">
-                          <Sparkles className="w-3 h-3 text-[#D4A373] animate-pulse" />
+                        <span className="hidden sm:inline-flex items-center gap-1 text-[#D4A373] text-xs font-bold animate-fadeIn">
+                          <Sparkles className="w-3.5 h-3.5 text-[#D4A373] animate-pulse" />
                           <span>Click to open in Email History</span>
                         </span>
                       )}
@@ -425,19 +412,19 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
 
                 {/* Right Area: Floating Glass Action Buttons */}
                 <div className="flex items-center gap-2 self-end sm:self-center shrink-0 pt-2 sm:pt-0">
-                  {/* View Email Button (prominent on hover) */}
+                  {/* View Email Button */}
                   {typeof onViewHistory === 'function' && (
                     <button
                       onClick={(e) => handleOpenEmail(n, e)}
-                      className={`floating-glass-pill px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      className={`floating-glass-pill px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                         isHovered 
-                          ? 'bg-[#D4A373] text-[#121211] border-amber-300 shadow-[0_0_15px_rgba(212,163,115,0.4)] scale-105' 
-                          : 'text-[#ECE8E1] hover:text-white'
+                          ? 'bg-[#D4A373] text-[#121211] border-amber-300 shadow-[0_0_18px_rgba(212,163,115,0.5)] scale-105' 
+                          : 'text-[#F5F3EF] hover:text-white hover:border-[#D4A373]/60'
                       }`}
                       title="Open and view this email"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      <span className={isHovered ? 'inline' : 'hidden sm:inline'}>Open Mail</span>
+                      <span>Open Mail</span>
                     </button>
                   )}
 
@@ -457,7 +444,7 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
                   {viewMode === 'active' ? (
                     <button
                       onClick={(e) => handleMoveToTrash(n.id, e)}
-                      className="floating-glass-pill p-2 rounded-xl text-[#99958F] hover:text-rose-400 hover:border-rose-500/40 transition-colors cursor-pointer"
+                      className="floating-glass-pill p-2 rounded-xl text-[#C5BDB2] hover:text-rose-400 hover:border-rose-500/50 transition-colors cursor-pointer"
                       title="Move to trash"
                     >
                       <Trash2 className="w-4 h-4" />

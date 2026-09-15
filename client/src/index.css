@@ -1457,36 +1457,34 @@
    Floating Glass Design System & Notification Spotlight Engine
    ============================================================ */
 
-/* 1. Floating Glass Panel */
+/* 1. Floating Glass Panel - Radiant Frosted Glass */
 .floating-glass-panel {
   position: relative;
-  background: rgba(22, 21, 20, 0.72);
+  background: rgba(32, 30, 28, 0.88);
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 
-    0 20px 50px -15px rgba(0, 0, 0, 0.75),
-    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
-    0 1px 0 0 rgba(255, 255, 255, 0.16) inset;
+    0 20px 50px -15px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.22) inset;
 }
 
-/* 2. Floating Glass Card Base */
+/* 2. Floating Glass Card Base - Bright, Clear, Luminous Surface */
 .floating-glass-card {
   position: relative;
-  background: linear-gradient(135deg, rgba(28, 27, 25, 0.75) 0%, rgba(18, 17, 16, 0.85) 100%);
+  background: linear-gradient(135deg, rgba(42, 40, 37, 0.92) 0%, rgba(30, 29, 27, 0.96) 100%);
   backdrop-filter: blur(22px) saturate(180%);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: 
-    0 10px 28px -6px rgba(0, 0, 0, 0.55),
-    0 1px 0 0 rgba(255, 255, 255, 0.08) inset;
-  transition: transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1),
-              box-shadow 320ms cubic-bezier(0.2, 0.9, 0.3, 1),
-              border-color 280ms ease,
-              background 280ms ease,
-              opacity 300ms ease,
-              filter 300ms ease;
-  will-change: transform, box-shadow, opacity, filter;
+    0 8px 24px -4px rgba(0, 0, 0, 0.35),
+    0 1px 0 0 rgba(255, 255, 255, 0.16) inset;
+  transition: transform 260ms cubic-bezier(0.2, 0.9, 0.3, 1),
+              box-shadow 260ms cubic-bezier(0.2, 0.9, 0.3, 1),
+              border-color 220ms ease,
+              background 220ms ease;
+  will-change: transform, box-shadow;
   transform-style: preserve-3d;
 }
 
@@ -1498,60 +1496,54 @@
   border-radius: inherit;
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.07) 0%,
-    rgba(255, 255, 255, 0.02) 40%,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.03) 40%,
     transparent 100%
   );
   pointer-events: none;
-  transition: opacity 300ms ease;
+  transition: opacity 260ms ease;
 }
 
-/* Spotlight Hovered State: Elevates, Enlarges, and Emits Warm Gold Glass Halo */
+/* Hovered State: Elevates, Enlarges, and Highlights with Warm Gold Glass Glow WITHOUT darkening any other card */
 .floating-glass-card.is-hovered {
-  transform: translateY(-6px) scale(1.018) translateZ(20px);
-  background: linear-gradient(135deg, rgba(38, 35, 31, 0.92) 0%, rgba(22, 20, 18, 0.96) 100%);
-  border-color: rgba(212, 163, 115, 0.8) !important;
+  transform: translateY(-5px) scale(1.012) translateZ(15px);
+  background: linear-gradient(135deg, rgba(54, 50, 44, 0.98) 0%, rgba(38, 35, 31, 1) 100%);
+  border-color: rgba(212, 163, 115, 0.85) !important;
   box-shadow: 
-    0 28px 60px -12px rgba(0, 0, 0, 0.9),
-    0 0 32px -2px rgba(212, 163, 115, 0.38),
-    0 0 0 1px rgba(212, 163, 115, 0.4),
-    0 1px 0 0 rgba(255, 255, 255, 0.25) inset !important;
-  z-index: 30;
+    0 22px 50px -10px rgba(0, 0, 0, 0.65),
+    0 0 28px -2px rgba(212, 163, 115, 0.4),
+    0 0 0 1px rgba(212, 163, 115, 0.45),
+    0 1px 0 0 rgba(255, 255, 255, 0.3) inset !important;
+  z-index: 20;
 }
 
 .floating-glass-card.is-hovered::before {
   opacity: 1;
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.14) 0%,
-    rgba(212, 163, 115, 0.08) 50%,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(212, 163, 115, 0.14) 50%,
     transparent 100%
   );
 }
 
-/* Background Dimming: Non-hovered siblings recede softly */
-.floating-glass-card.is-dimmed {
-  opacity: 0.42 !important;
-  filter: brightness(0.65) saturate(0.8) blur(0.3px) !important;
-  transform: scale(0.992) !important;
-}
-
-/* 3. Floating Glass Button & Action Pill */
+/* 3. Floating Glass Button & Action Pill - Crisp, Bright & Tactile */
 .floating-glass-pill {
-  background: rgba(36, 34, 31, 0.7);
+  background: rgba(48, 46, 42, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), 0 1px 0 0 rgba(255, 255, 255, 0.08) inset;
-  transition: all 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), 0 1px 0 0 rgba(255, 255, 255, 0.15) inset;
+  transition: all 200ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  color: #F5F3EF;
 }
 
 .floating-glass-pill:hover {
-  background: linear-gradient(135deg, rgba(212, 163, 115, 0.25) 0%, rgba(197, 147, 98, 0.35) 100%);
-  border-color: rgba(212, 163, 115, 0.7);
+  background: linear-gradient(135deg, rgba(212, 163, 115, 0.35) 0%, rgba(197, 147, 98, 0.5) 100%);
+  border-color: rgba(212, 163, 115, 0.9);
   color: #FFFFFF !important;
-  box-shadow: 0 8px 22px rgba(212, 163, 115, 0.3), 0 1px 0 0 rgba(255, 255, 255, 0.2) inset;
-  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 8px 24px rgba(212, 163, 115, 0.4), 0 1px 0 0 rgba(255, 255, 255, 0.28) inset;
+  transform: translateY(-2px) scale(1.03);
 }
 
 .floating-glass-pill:active {
@@ -1571,6 +1563,7 @@
 .floating-glass-pulse {
   animation: glassFloatGlow 3.5s ease-in-out infinite;
 }
+
 
 
 
