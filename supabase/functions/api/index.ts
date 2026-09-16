@@ -2648,10 +2648,31 @@ serve(async (req: Request) => {
           .catch((err: any) => console.warn("Post-OAuth initial sync notice:", err));
       } catch (_) {}
 
-      // Generate instant JWT session token for seamless authentication
-      const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-      const payload = btoa(JSON.stringify({ id: effectiveUserId, email: authorizedEmail.toLowerCase(), name: googleName, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }));
-      const sessionToken = `${header}.${payload}.signature`;
+      // Generate genuine Supabase Auth session token for seamless authentication
+      let sessionToken = "";
+      try {
+        const { data: linkData } = await supabase.auth.admin.generateLink({
+          type: "magiclink",
+          email: authorizedEmail.toLowerCase(),
+        });
+        if (linkData?.action_link) {
+          const verifyRes = await fetch(linkData.action_link, { redirect: "manual" });
+          const loc = verifyRes.headers.get("location");
+          if (loc && loc.includes("access_token=")) {
+            const hash = loc.split("#")[1];
+            const p = new URLSearchParams(hash);
+            sessionToken = p.get("access_token") || "";
+          }
+        }
+      } catch (tokenErr: any) {
+        console.warn("OAuth genuine Supabase session notice:", tokenErr?.message);
+      }
+
+      if (!sessionToken) {
+        const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+        const payload = btoa(JSON.stringify({ id: effectiveUserId, email: authorizedEmail.toLowerCase(), name: googleName, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }));
+        sessionToken = `${header}.${payload}.signature`;
+      }
 
       return Response.redirect(
         `${frontendUrl}/app?gmail=connected&auth=success&email=${encodeURIComponent(authorizedEmail)}&name=${encodeURIComponent(googleName)}&user_id=${effectiveUserId}&token=${encodeURIComponent(sessionToken)}`,

@@ -29,22 +29,18 @@ export function LoginPage({ onLoginSuccess }) {
       setGoogleLoading(true);
       setError('');
 
-      // 1. Primary: Direct Supabase Auth Google OAuth flow
-      try {
-        await signInWithGoogle();
-        return;
-      } catch (directOAuthErr) {
-        console.warn('Direct Supabase OAuth notice, falling back to Edge Function OAuth:', directOAuthErr?.message);
-      }
-
-      // 2. Fallback: Edge Function Google OAuth
+      // Use the verified Google OAuth backend endpoint which uses the authorized redirect_uri:
+      // https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api/auth/google/callback
+      // This prevents "Error 400: redirect_uri_mismatch" on mobile and desktop browsers
       const res = await apiFetch('/api/auth/google/start');
       const data = await safeParseResponse(res);
       if (data && data.url) {
         window.location.href = data.url;
-      } else {
-        throw new Error(data?.message || 'Google OAuth is not configured in backend environment.');
+        return;
       }
+
+      // Fallback: Direct Supabase OAuth if backend endpoint is unavailable
+      await signInWithGoogle();
     } catch (err) {
       console.error('Google Sign-In error:', err);
       setError(err.message || 'Failed to start Google Sign-In.');
@@ -86,18 +82,7 @@ export function LoginPage({ onLoginSuccess }) {
 
     try {
       if (isSignUpMode) {
-        // Register flow with Supabase Auth (auth.users)
-        let registeredViaSupabase = false;
-        try {
-          const res = await signUpWithPassword(email.trim(), password.trim(), name.trim());
-          if (res?.user) {
-            registeredViaSupabase = true;
-          }
-        } catch (supaSignUpErr) {
-          console.warn('Supabase signUp notice, trying API registration:', supaSignUpErr?.message);
-        }
-
-        // Also register with API for dual-table compatibility
+        // Register flow: call Edge Function register endpoint which uses Supabase admin to auto-confirm email
         const res = await apiFetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -110,11 +95,11 @@ export function LoginPage({ onLoginSuccess }) {
         });
 
         const data = await safeParseResponse(res);
-        if (!res.ok && !registeredViaSupabase && data.error) {
+        if (!res.ok || data.error) {
           throw new Error(data.error || 'Registration failed. Please try again.');
         }
 
-        setSuccessMessage('Account created successfully in Supabase Auth! You can now log in.');
+        setSuccessMessage('Account created successfully! You can now log in.');
         setIsSignUpMode(false);
         setPassword('');
         setConfirmPassword('');
