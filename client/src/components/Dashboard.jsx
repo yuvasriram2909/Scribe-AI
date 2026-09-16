@@ -437,7 +437,11 @@ export function Dashboard({
       const res = await apiFetch('/api/auth/status');
       if (res.ok) {
         const data = await res.json();
-        setConnectionStatus(data);
+        setConnectionStatus({
+          ...data,
+          isConnected: !!data.isConnected,
+          mailboxEmail: data.mailboxEmail || data.connectedEmail || (data.isConnected ? (currentUserEmail || 'Active') : null),
+        });
         if (data.connectedEmail && !localStorage.getItem('userEmail')) {
           localStorage.setItem('userEmail', data.connectedEmail);
         }

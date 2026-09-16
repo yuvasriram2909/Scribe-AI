@@ -179,6 +179,7 @@ export default function App() {
           }).catch((e) => console.warn('Sync session tokens notice:', e));
         }
 
+        checkGmailConnection();
         apiFetch('/api/gmail/sync', { method: 'POST' }).catch(() => {});
       }
     }).catch(() => {});
@@ -232,11 +233,18 @@ export default function App() {
         }
 
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          checkGmailConnection();
           apiFetch('/api/gmail/sync', { method: 'POST' }).catch(() => {});
         }
       } else if (event === 'SIGNED_OUT') {
         setCurrentUserEmail('');
         setCurrentUserName('');
+        localStorage.removeItem('userEmail');
+        localStorage.removeItem('userName');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('authToken');
+        setIsGmailConnected(false);
+        setUnreadNotifCount(0);
       }
     });
 
@@ -855,10 +863,10 @@ export default function App() {
             <div className={`hidden sm:inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
               isGmailConnected
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-xs'
-                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-xs'
+                : 'bg-stone-500/10 border-stone-500/30 text-stone-400 shadow-xs'
             }`}>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-xs shadow-emerald-400/50"></span>
-              <span>Gmail Connected</span>
+              <span className={`w-2 h-2 rounded-full ${isGmailConnected ? 'bg-emerald-400 animate-pulse shadow-xs shadow-emerald-400/50' : 'bg-stone-500'}`}></span>
+              <span>{isGmailConnected ? 'Gmail Connected' : 'Gmail Disconnected'}</span>
             </div>
 
             {/* Notification Bell with Bell-Hover Shake Animation */}

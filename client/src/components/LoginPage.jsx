@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Mail, ArrowRight, ShieldCheck, User, Eye, EyeOff, KeyRound, CheckCircle2 } from 'lucide-react';
 import { apiFetch, safeParseResponse } from '../utils/api';
-import { signInWithGoogle, signUpWithPassword, signInWithPassword } from '../utils/supabaseClient';
+import { supabase, signInWithGoogle, signUpWithPassword, signInWithPassword } from '../utils/supabaseClient';
 
 export function LoginPage({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
@@ -29,7 +29,15 @@ export function LoginPage({ onLoginSuccess }) {
       setGoogleLoading(true);
       setError('');
 
-      // Use Edge Function Google OAuth which auto-provisions user in auth.users and matches Google Console Redirect URI
+      // 1. Primary: Direct Supabase Auth Google OAuth flow
+      try {
+        await signInWithGoogle();
+        return;
+      } catch (directOAuthErr) {
+        console.warn('Direct Supabase OAuth notice, falling back to Edge Function OAuth:', directOAuthErr?.message);
+      }
+
+      // 2. Fallback: Edge Function Google OAuth
       const res = await apiFetch('/api/auth/google/start');
       const data = await safeParseResponse(res);
       if (data && data.url) {
@@ -146,7 +154,17 @@ export function LoginPage({ onLoginSuccess }) {
             throw new Error(data.error || 'Invalid email or password.');
           }
 
-          if (data.token) localStorage.setItem('authToken', data.token);
+          if (data.token) {
+            localStorage.setItem('authToken', data.token);
+            try {
+              if (data.token.split('.').length === 3) {
+                await supabase.auth.setSession({
+                  access_token: data.token,
+                  refresh_token: data.token,
+                });
+              }
+            } catch (_) {}
+          }
           loggedInUser = data.user || { email: email.trim(), name: email.split('@')[0] };
         }
 

@@ -4,6 +4,8 @@
  * dynamic Supabase Edge Function endpoint resolution, and detailed error handling.
  */
 
+import { supabase } from './supabaseClient';
+
 // Default Supabase Edge Function backend endpoint
 export const DEFAULT_SUPABASE_EDGE_FUNCTION = 'https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api';
 
@@ -68,21 +70,37 @@ export function setCustomBackendUrl(url) {
  * Performs authenticated API request to the active Supabase Edge Function backend
  */
 export async function apiFetch(url, options = {}) {
+  let authToken = null;
   const userEmail = localStorage.getItem('userEmail') || '';
-  let authToken = localStorage.getItem('authToken');
+
+  // 1. Retrieve genuine, automatically refreshed session token from Supabase client
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData?.session?.access_token) {
+      authToken = sessionData.session.access_token;
+      localStorage.setItem('authToken', authToken);
+    }
+  } catch (_) {}
+
+  // 2. Fallback to localStorage authToken
+  if (!authToken) {
+    authToken = localStorage.getItem('authToken');
+  }
+
+  // 3. Fallback to Supabase localStorage auth token pattern
   if (!authToken) {
     try {
-      const supaAuth = localStorage.getItem('sb-bjxjorlxjijssrqjosed-auth-token');
-      if (supaAuth) {
-        const parsed = JSON.parse(supaAuth);
-        if (parsed?.access_token) {
-          authToken = parsed.access_token;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          const item = JSON.parse(localStorage.getItem(key));
+          if (item?.access_token) {
+            authToken = item.access_token;
+            break;
+          }
         }
       }
     } catch (_) {}
-  }
-  if (!authToken && userEmail) {
-    authToken = btoa(userEmail);
   }
 
   const rawBase = getApiBaseUrl().replace(/\/+$/, '');
@@ -101,8 +119,8 @@ export async function apiFetch(url, options = {}) {
   const customHeaders = options.headers || {};
 
   const headers = {
-    'x-user-email': userEmail,
-    'Authorization': `Bearer ${authToken || ''}`,
+    ...(userEmail ? { 'x-user-email': userEmail } : {}),
+    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
     ...customHeaders
   };
 

@@ -13,7 +13,7 @@ export const SUPABASE_URL =
 // Default Supabase Anon / Public Key
 export const SUPABASE_ANON_KEY = 
   (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY)) || 
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqeGpvcmx4amlqc3NycWpvc2VkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk4NTYwMDAsImV4cCI6MjAyNTQzMjAwMH0.placeholder';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqeGpvcmx4amlqc3NycWpvc2VkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMzgxOTQsImV4cCI6MjEwMzgxNDE5NH0.YEgGYGeaAG3i-9ac1IvZdnC3RZtYaLPSKJWhO8UmEqU';
 
 // Create Supabase Client instance
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -88,6 +88,7 @@ export async function signOutUser() {
   } catch (_) {}
   localStorage.removeItem('userEmail');
   localStorage.removeItem('userName');
+  localStorage.removeItem('userId');
   localStorage.removeItem('authToken');
 }
 

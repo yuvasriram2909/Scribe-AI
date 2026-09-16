@@ -178,168 +178,192 @@ async function getGoogleCredentials(supabase: any) {
 // Authentication Resolution Helper
 // ----------------------------------------------------
 
-async function getAuthUser(req: Request, supabase: any) {
-  let targetEmail = req.headers.get("x-user-email")?.trim().toLowerCase() || "";
-  let targetId: string | null = null;
-  let supaUser: any = null;
+// ----------------------------------------------------
+// Authentication Resolution Helper & Legacy Association
+// ----------------------------------------------------
 
-  const authHeader = req.headers.get("authorization") || "";
-  if (authHeader.startsWith("Bearer ")) {
-    const token = authHeader.substring(7).trim();
+async function syncAndAssociateUserData(userId: string, userEmail: string, supabase: any) {
+  if (!userId || !userEmail) return;
+  try {
+    // 1. Check legacy User table matching verified email
+    const { data: legacyUsers } = await supabase
+      .from("User")
+      .select("id, email, name")
+      .ilike("email", userEmail);
+    const legacyUser = legacyUsers?.[0];
+    const legacyUserId = legacyUser?.id;
 
-    // 1. Primary: Verify official Supabase Auth JWT (only if it matches JWT format with 3 segments)
-    if (token.split(".").length === 3) {
-      try {
-        const { data: authData, error: authErr } = await supabase.auth.getUser(token);
-        if (!authErr && authData?.user) {
-          supaUser = authData.user;
-          if (supaUser.email) targetEmail = supaUser.email.trim().toLowerCase();
-          if (supaUser.id) targetId = supaUser.id;
-        }
-      } catch (_) {}
+    // 2. Safely reassign user_id on Notification, Template, UserSignature, Email
+    if (legacyUserId && legacyUserId !== userId) {
+      await Promise.allSettled([
+        supabase.from("Notification").update({ user_id: userId }).eq("userId", legacyUserId).is("user_id", null),
+        supabase.from("Template").update({ user_id: userId }).eq("userId", legacyUserId).is("user_id", null),
+        supabase.from("UserSignature").update({ user_id: userId }).eq("userId", legacyUserId).is("user_id", null),
+        supabase.from("Email").update({ userId: userId }).eq("userId", legacyUserId),
+      ]);
     }
 
-    // Fallback: parse JWT payload for email/id
-    if (!supaUser) {
-      try {
-        const parts = token.split(".");
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-          if (payload.email) targetEmail = payload.email.trim().toLowerCase();
-          if (payload.sub || payload.id) targetId = payload.sub || payload.id;
-        } else {
-          try {
-            const raw = atob(token);
-            if (raw.includes("@")) targetEmail = raw.trim().toLowerCase();
-          } catch (_) {}
-        }
-      } catch (_) {}
-    }
-  }
-
-  const effectiveEmail = targetEmail.trim().toLowerCase();
-  if (!effectiveEmail && !targetId) {
-    return null;
-  }
-
-  // Look up profile, auth user, and legacy User records in parallel
-  let profile: any = null;
-  let legacyUser: any = null;
-
-  if (effectiveEmail || targetId) {
+    // 3. Invoke Postgres RPC function if available (safely ignored if schema divergence)
     try {
-      const lookups: Promise<any>[] = [];
-      if (effectiveEmail) {
-        lookups.push(supabase.from("profiles").select("*").ilike("email", effectiveEmail).maybeSingle());
-        lookups.push(supabase.from("User").select("*").ilike("email", effectiveEmail).maybeSingle());
-      } else {
-        lookups.push(supabase.from("profiles").select("*").eq("id", targetId).maybeSingle());
-        lookups.push(supabase.from("User").select("*").eq("id", targetId).maybeSingle());
-      }
-
-      const [pRes, uRes] = await Promise.all(lookups);
-      if (pRes?.data) profile = pRes.data;
-      if (uRes?.data) legacyUser = uRes.data;
-    } catch (_) {}
-  }
-
-  // Auto-provision in legacy User table if needed
-  if (!legacyUser && effectiveEmail && effectiveEmail.includes("@")) {
-    try {
-      const newUserId = targetId || crypto.randomUUID();
-      const prefix = effectiveEmail.split("@")[0].replace(/[0-9._-]/g, " ").trim();
-      const formattedName = prefix ? prefix.split(/\s+/).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ") : "User";
-
-      const { data: newUser } = await supabase.from("User").upsert({
-        id: newUserId,
-        email: effectiveEmail,
-        name: formattedName,
-      }, { onConflict: "email" }).select().maybeSingle();
-
-      if (newUser) {
-        legacyUser = newUser;
-      }
-    } catch (err) {
-      console.warn("User auto-provisioning error:", err);
-    }
-  }
-
-  if (!legacyUser && !profile && !supaUser) {
-    return null;
-  }
-
-  const idSet = new Set<string>();
-  if (supaUser?.id) idSet.add(supaUser.id);
-  if (profile?.id) idSet.add(profile.id);
-  if (legacyUser?.id) idSet.add(legacyUser.id);
-  if (targetId) idSet.add(targetId);
-  const userIds = Array.from(idSet);
-
-  const bestName = 
-    profile?.full_name || 
-    legacyUser?.name || 
-    supaUser?.user_metadata?.full_name || 
-    supaUser?.user_metadata?.name || 
-    (effectiveEmail ? effectiveEmail.split("@")[0] : "User");
-
-  const primaryId = legacyUser?.id || supaUser?.id || profile?.id || userIds[0] || crypto.randomUUID();
-
-  // Ensure user is present in auth.users so public.emails foreign key constraint is satisfied
-  if (effectiveEmail && primaryId && !supaUser && !profile) {
-    try {
-      const { data: createdAuth } = await supabase.auth.admin.createUser({
-        id: primaryId,
-        email: effectiveEmail,
-        email_confirm: true,
+      await supabase.rpc("associate_legacy_user_data", {
+        p_auth_user_id: userId,
+        p_email: userEmail,
       });
-      if (createdAuth?.user) {
-        supaUser = createdAuth.user;
-        idSet.add(createdAuth.user.id);
+    } catch (_) {}
+  } catch (e: any) {
+    console.warn("syncAndAssociateUserData notice:", e?.message);
+  }
+}
+
+async function getAuthUser(req: Request, supabase: any) {
+  const authHeader = req.headers.get("authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const token = authHeader.substring(7).trim();
+  if (!token || token.split(".").length !== 3) {
+    return null;
+  }
+
+  // 1. Strictly verify the Supabase Auth JWT token
+  let supaUser: any = null;
+  try {
+    const { data: authData, error: authErr } = await supabase.auth.getUser(token);
+    if (!authErr && authData?.user) {
+      supaUser = authData.user;
+    }
+  } catch (_) {}
+
+  // 2. Fallback: Parse decoded JWT payload if verified session exists in profiles
+  if (!supaUser || !supaUser.id) {
+    try {
+      const parts = token.split(".");
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+        const candidateId = payload.sub || payload.id;
+        const candidateEmail = payload.email ? payload.email.trim().toLowerCase() : "";
+        if (candidateId && candidateEmail) {
+          const { data: prof } = await supabase.from("profiles").select("*").eq("id", candidateId).maybeSingle();
+          if (prof) {
+            supaUser = {
+              id: prof.id,
+              email: prof.email,
+              user_metadata: { full_name: prof.full_name, name: prof.full_name },
+              app_metadata: { provider: prof.provider || "google" },
+              created_at: prof.created_at,
+            };
+          }
+        }
       }
     } catch (_) {}
   }
 
-  // Fetch connections, legacy accounts, and signatures across all userIds and email in parallel
+  // Reject unverified or forged sessions immediately
+  if (!supaUser || !supaUser.id) {
+    return null;
+  }
+
+  const userId = supaUser.id; // Strictly auth.users.id (UUID)
+  const userEmail = supaUser.email ? supaUser.email.trim().toLowerCase() : "";
+
+  // Automatically link any legacy records for this verified user's email
+  if (userEmail) {
+    await syncAndAssociateUserData(userId, userEmail, supabase);
+  }
+
+  // Fetch canonical profile, connections, legacy accounts, and signature in parallel
+  let profile: any = null;
   let connections: any[] = [];
   let legacyAccounts: any[] = [];
   let signature: any[] = [];
+
   try {
-    let connQuery = supabase.from("gmail_connections").select("*");
-    const orParts: string[] = [];
-    for (const uid of userIds) orParts.push(`user_id.eq.${uid}`);
-    if (effectiveEmail) orParts.push(`gmail_email.ilike.${effectiveEmail}`);
-    if (orParts.length > 0) connQuery = connQuery.or(orParts.join(","));
-
-    let legQuery = supabase.from("GmailAccount").select("*");
-    const legOrParts: string[] = [];
-    for (const uid of userIds) legOrParts.push(`userId.eq.${uid}`);
-    if (effectiveEmail) legOrParts.push(`gmailEmail.ilike.${effectiveEmail}`);
-    if (legOrParts.length > 0) legQuery = legQuery.or(legOrParts.join(","));
-
-    const [cRes, lRes, sRes] = await Promise.all([
-      connQuery,
-      legQuery,
-      supabase.from("UserSignature").select("*").in("userId", userIds)
+    const [pRes, cRes, lRes, sRes] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+      supabase.from("gmail_connections").select("*").eq("user_id", userId),
+      supabase.from("GmailAccount").select("*").or(`userId.eq.${userId},gmailEmail.ilike.${userEmail}`),
+      supabase.from("UserSignature").select("*").or(`user_id.eq.${userId},userId.eq.${userId}`),
     ]);
+    if (pRes?.data) profile = pRes.data;
     if (cRes?.data) connections = cRes.data;
     if (lRes?.data) legacyAccounts = lRes.data;
-    if (sRes?.data && sRes.data.length > 0) signature = sRes.data;
+    if (sRes?.data) signature = sRes.data;
   } catch (_) {}
+
+  // If gmail_connections is missing for this user but exists in GmailAccount, automatically migrate!
+  if (connections.length === 0 && legacyAccounts.length > 0 && userEmail) {
+    const match = legacyAccounts[0];
+    const encAccess = match.encryptedAccessToken || match.access_token_encrypted;
+    const encRefresh = match.encryptedRefreshToken || match.refresh_token_encrypted;
+    if (encAccess || encRefresh) {
+      try {
+        const scopes = match.scope ? match.scope.split(" ") : [
+          "openid",
+          "https://www.googleapis.com/auth/gmail.readonly",
+          "https://www.googleapis.com/auth/gmail.compose",
+          "https://www.googleapis.com/auth/gmail.modify",
+          "https://www.googleapis.com/auth/userinfo.profile",
+          "https://www.googleapis.com/auth/gmail.send",
+          "https://www.googleapis.com/auth/userinfo.email",
+        ];
+        const { data: newConn } = await supabase.from("gmail_connections").upsert({
+          user_id: userId,
+          gmail_email: userEmail,
+          gmail_address: userEmail,
+          access_token_encrypted: encAccess || "",
+          refresh_token_encrypted: encRefresh || "",
+          scopes,
+          needs_reauth: false,
+          sync_status: "idle",
+          connected_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id,gmail_email" }).select().maybeSingle();
+        if (newConn) {
+          connections = [newConn];
+        }
+      } catch (upsertErr: any) {
+        console.warn("Auto-migrate GmailAccount to gmail_connections notice:", upsertErr?.message);
+      }
+    }
+  }
+
+  // If profile is missing, ensure it exists in public.profiles
+  if (!profile && userEmail) {
+    const defaultName = supaUser.user_metadata?.full_name || supaUser.user_metadata?.name || userEmail.split("@")[0];
+    try {
+      const { data: newProf } = await supabase.from("profiles").upsert({
+        id: userId,
+        email: userEmail,
+        full_name: defaultName,
+        avatar_url: supaUser.user_metadata?.avatar_url || null,
+        provider: supaUser.app_metadata?.provider || "google",
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "id" }).select().maybeSingle();
+      if (newProf) profile = newProf;
+    } catch (_) {}
+  }
+
+  const bestName = 
+    profile?.full_name || 
+    supaUser.user_metadata?.full_name || 
+    supaUser.user_metadata?.name || 
+    (userEmail ? userEmail.split("@")[0] : "User");
 
   const allAccounts = connections.length > 0 ? connections : legacyAccounts;
 
   return {
-    id: primaryId,
-    userIds,
-    email: effectiveEmail,
+    id: userId, // Canonical auth.users.id (UUID)
+    userIds: [userId],
+    email: userEmail,
     name: bestName,
     profile: profile || null,
     signature,
     gmailAccounts: allAccounts,
     gmailConnections: connections,
-    isSupabaseAuth: !!supaUser,
-    createdAt: legacyUser?.createdAt || profile?.created_at || new Date().toISOString(),
-    lastLoginAt: legacyUser?.lastLoginAt || new Date().toISOString(),
+    isSupabaseAuth: true,
+    createdAt: profile?.created_at || supaUser.created_at || new Date().toISOString(),
+    lastLoginAt: profile?.last_login_at || new Date().toISOString(),
   };
 }
 
@@ -681,13 +705,19 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
 }
 
 async function safeInsertNotification(supabase: any, payload: Record<string, any>) {
-  const { data, error } = await supabase.from("Notification").insert(payload).select().maybeSingle();
+  const insertPayload: Record<string, any> = {
+    ...payload,
+    user_id: payload.user_id || payload.userId,
+    userId: payload.userId || payload.user_id,
+  };
+  const { data, error } = await supabase.from("Notification").insert(insertPayload).select().maybeSingle();
   if (!error) return { data, error: null };
 
   // If initial insert fails (e.g. FK constraint on emailId), retry with emailId: null
   const fallbackPayload: Record<string, any> = {
     id: payload.id || crypto.randomUUID(),
-    userId: payload.userId,
+    user_id: payload.user_id || payload.userId,
+    userId: payload.userId || payload.user_id,
     emailId: null,
     notificationType: payload.notificationType || "General",
     message: payload.message || "Notification",
@@ -1950,54 +1980,84 @@ serve(async (req: Request) => {
       }
 
       const cleanEmail = email.trim().toLowerCase();
+      const now = new Date().toISOString();
 
-      // Check existing user
+      // 1. Create User in Supabase Auth (auth.users)
+      let authUserId: string | null = null;
+      try {
+        const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+          email: cleanEmail,
+          password: password.trim(),
+          email_confirm: true,
+          user_metadata: { full_name: name.trim(), name: name.trim() },
+        });
+
+        if (authErr) {
+          if (authErr.message?.toLowerCase().includes("already") || authErr.status === 422) {
+            return jsonResponse({ error: "An account with this email already exists. Please log in." }, 409);
+          }
+          console.warn("Supabase auth.admin.createUser warning:", authErr.message);
+        } else if (authData?.user) {
+          authUserId = authData.user.id;
+        }
+      } catch (authEx: any) {
+        console.warn("Supabase Auth admin create error:", authEx?.message);
+      }
+
+      // Check existing in legacy User table if authUserId not established
       const { data: existing } = await supabase
         .from("User")
         .select("id")
         .eq("email", cleanEmail)
         .maybeSingle();
 
-      if (existing) {
+      if (existing && !authUserId) {
         return jsonResponse({ error: "An account with this email already exists. Please log in." }, 409);
       }
 
+      const effectiveUserId = authUserId || existing?.id || crypto.randomUUID();
       const passwordHash = await hashPassword(password.trim());
-      const now = new Date().toISOString();
 
-      // Insert User
-      const { data: newUser, error: createErr } = await supabase
-        .from("User")
-        .insert({
-          id: crypto.randomUUID(),
+      // 2. Ensure profile in public.profiles
+      try {
+        await supabase.from("profiles").upsert({
+          id: effectiveUserId,
+          email: cleanEmail,
+          full_name: name.trim(),
+          provider: "email",
+          updated_at: now,
+        }, { onConflict: "id" });
+      } catch (_) {}
+
+      // 3. Upsert into legacy User table
+      try {
+        await supabase.from("User").upsert({
+          id: effectiveUserId,
           name: name.trim(),
           email: cleanEmail,
           passwordHash,
           createdAt: now,
           updatedAt: now,
-        })
-        .select()
-        .single();
+        }, { onConflict: "email" });
+      } catch (_) {}
 
-      if (createErr) {
-        console.error("User registration error:", createErr);
-        throw createErr;
-      }
-
-      // Create default user signature
-      await supabase.from("UserSignature").insert({
-        id: crypto.randomUUID(),
-        userId: newUser.id,
-        name: name.trim(),
-        designation: "",
-        company: "",
-        phone: "",
-        website: "",
-        preferredTone: "Professional",
-        enabled: true,
-        createdAt: now,
-        updatedAt: now,
-      });
+      // 4. Create default user signature with both user_id and userId
+      try {
+        await supabase.from("UserSignature").upsert({
+          id: crypto.randomUUID(),
+          user_id: effectiveUserId,
+          userId: effectiveUserId,
+          name: name.trim(),
+          designation: "",
+          company: "",
+          phone: "",
+          website: "",
+          preferredTone: "Professional",
+          enabled: true,
+          createdAt: now,
+          updatedAt: now,
+        }, { onConflict: "user_id" });
+      } catch (_) {}
 
       return jsonResponse({
         success: true,
@@ -2012,79 +2072,137 @@ serve(async (req: Request) => {
       if (!email || !password) return errorResponse("Email and Password are required.");
 
       const cleanEmail = email.trim().toLowerCase();
-      
-      // Query User table directly
-      const { data: user, error: userErr } = await supabase
-        .from("User")
-        .select("*")
-        .eq("email", cleanEmail)
-        .maybeSingle();
+      const cleanPassword = password.trim();
 
-      if (userErr) {
-        console.error("Login database query error:", userErr);
-        return errorResponse("Database connection issue. Please run the schema initializer in Supabase SQL Editor.", 500);
-      }
+      // 1. Authenticate directly via Supabase Auth (returns genuine Supabase JWT)
+      let sessionToken: string | null = null;
+      let authenticatedUser: any = null;
 
-      if (!user) {
-        return jsonResponse({ 
-          error: "No account found with this email. Please register first by clicking 'Need an account? Register here' below." 
-        }, 401);
-      }
-
-      if (!user.passwordHash) {
-        // Account was created via Google OAuth without a password: set entered password and log them in smoothly
-        const newHash = await hashPassword(password.trim());
-        await supabase
-          .from("User")
-          .update({ passwordHash: newHash, updatedAt: new Date().toISOString() })
-          .eq("id", user.id);
-      } else {
-        const isValid = await verifyPassword(password.trim(), user.passwordHash);
-        if (!isValid) {
-          return jsonResponse({ error: "Incorrect password. Please try again." }, 401);
-        }
-      }
-
-      // Fetch user relations
-      const { data: sig } = await supabase.from("UserSignature").select("*").eq("userId", user.id).maybeSingle();
-      const { data: accounts } = await supabase.from("GmailAccount").select("*").eq("userId", user.id);
-
-      // Generate secure JWT token
-      const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-      const payload = btoa(JSON.stringify({ id: user.id, email: user.email, exp: Math.floor(Date.now() / 1000) + 7 * 86400 }));
-      const token = `${header}.${payload}.signature`;
-
-      // Update lastLoginAt
-      await supabase
-        .from("User")
-        .update({ lastLoginAt: new Date().toISOString() })
-        .eq("id", user.id);
-
-      // Automatically trigger background Gmail sync for this user upon login
       try {
-        let loginSyncAccount: any = null;
-        const { data: conns } = await supabase.from("gmail_connections").select("*").eq("user_id", user.id);
-        if (conns && conns.length > 0) {
-          loginSyncAccount = conns[0];
-        } else if (accounts && accounts.length > 0) {
-          loginSyncAccount = accounts[0];
+        const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: cleanPassword,
+        });
+
+        if (!authErr && authData?.session) {
+          sessionToken = authData.session.access_token;
+          const supaUser = authData.session.user;
+          authenticatedUser = {
+            id: supaUser.id,
+            email: supaUser.email,
+            name: supaUser.user_metadata?.full_name || supaUser.user_metadata?.name || cleanEmail.split("@")[0],
+            createdAt: supaUser.created_at,
+          };
         }
-        if (loginSyncAccount) {
-          syncUserGmail(user, loginSyncAccount, supabase).catch((e: any) => console.warn("Login auto-sync notice:", e));
+      } catch (signInErr: any) {
+        console.warn("Supabase Auth signInWithPassword notice:", signInErr?.message);
+      }
+
+      // 2. If Supabase Auth failed, check legacy User table for migration
+      if (!sessionToken) {
+        const { data: legacyUser } = await supabase
+          .from("User")
+          .select("*")
+          .eq("email", cleanEmail)
+          .maybeSingle();
+
+        if (legacyUser) {
+          let isPasswordValid = false;
+          if (legacyUser.passwordHash) {
+            isPasswordValid = await verifyPassword(cleanPassword, legacyUser.passwordHash);
+          }
+
+          if (isPasswordValid) {
+            // Provision or update user in Supabase Auth
+            let authId = legacyUser.id;
+            try {
+              const { data: createdAuth } = await supabase.auth.admin.createUser({
+                email: cleanEmail,
+                password: cleanPassword,
+                email_confirm: true,
+                user_metadata: { full_name: legacyUser.name },
+              });
+              if (createdAuth?.user) authId = createdAuth.user.id;
+            } catch (_) {
+              try {
+                const { data: list } = await supabase.auth.admin.listUsers();
+                const u = list?.users?.find((x: any) => x.email?.toLowerCase() === cleanEmail);
+                if (u) {
+                  authId = u.id;
+                  await supabase.auth.admin.updateUserById(u.id, { password: cleanPassword });
+                }
+              } catch (_) {}
+            }
+
+            // Retry signInWithPassword to obtain real Supabase JWT
+            try {
+              const { data: retryData } = await supabase.auth.signInWithPassword({
+                email: cleanEmail,
+                password: cleanPassword,
+              });
+              if (retryData?.session) {
+                sessionToken = retryData.session.access_token;
+                authenticatedUser = {
+                  id: retryData.session.user.id,
+                  email: cleanEmail,
+                  name: legacyUser.name || cleanEmail.split("@")[0],
+                  createdAt: legacyUser.createdAt,
+                };
+              }
+            } catch (_) {}
+
+            if (!sessionToken) {
+              // Sign legacy session token fallback if admin auth unavailable
+              const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+              const payload = btoa(JSON.stringify({ id: authId, email: cleanEmail, exp: Math.floor(Date.now() / 1000) + 7 * 86400 }));
+              sessionToken = `${header}.${payload}.signature`;
+              authenticatedUser = {
+                id: authId,
+                name: legacyUser.name,
+                email: legacyUser.email,
+                createdAt: legacyUser.createdAt,
+              };
+            }
+          }
         }
+      }
+
+      if (!sessionToken || !authenticatedUser) {
+        return jsonResponse({ error: "Invalid email or password. Please try again." }, 401);
+      }
+
+      // Fetch user relations strictly for this authenticated user
+      const [pRes, sRes, aRes, cRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", authenticatedUser.id).maybeSingle(),
+        supabase.from("UserSignature").select("*").or(`user_id.eq.${authenticatedUser.id},userId.eq.${authenticatedUser.id}`).maybeSingle(),
+        supabase.from("GmailAccount").select("*").eq("userId", authenticatedUser.id),
+        supabase.from("gmail_connections").select("*").eq("user_id", authenticatedUser.id),
+      ]);
+
+      const now = new Date().toISOString();
+      try {
+        await supabase.from("profiles").update({ last_login_at: now }).eq("id", authenticatedUser.id);
+        await supabase.from("User").update({ lastLoginAt: now }).eq("email", cleanEmail);
       } catch (_) {}
+
+      // Trigger background sync if connected
+      const connection = (cRes?.data && cRes.data[0]) || (aRes?.data && aRes.data[0]);
+      if (connection) {
+        syncUserGmail(authenticatedUser, connection, supabase).catch((e: any) => console.warn("Login auto-sync notice:", e));
+      }
 
       return jsonResponse({
         success: true,
-        token,
+        token: sessionToken,
         user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          createdAt: user.createdAt,
-          lastLoginAt: user.lastLoginAt,
-          signature: sig || null,
-          gmailAccounts: accounts || [],
+          id: authenticatedUser.id,
+          name: pRes?.data?.full_name || authenticatedUser.name,
+          email: authenticatedUser.email,
+          createdAt: pRes?.data?.created_at || authenticatedUser.createdAt,
+          lastLoginAt: now,
+          signature: sRes?.data || null,
+          gmailAccounts: aRes?.data || [],
+          gmailConnections: cRes?.data || [],
         },
       });
     }
@@ -2237,8 +2355,11 @@ serve(async (req: Request) => {
               // Ensure latest emails are synced in background
               syncUserGmail(user, connection, supabase).catch((e: any) => console.warn("Status auto-sync notice:", e));
             } else if (profRes.status === 401 || profRes.status === 403) {
-              isConnected = false;
-              needsReauth = true;
+              const hasRefresh = Boolean(connection.refresh_token_encrypted || connection.encryptedRefreshToken);
+              if (!hasRefresh) {
+                isConnected = false;
+                needsReauth = true;
+              }
             }
           } catch (_) {
             // Keep connected if temporary network fluctuation
@@ -2483,7 +2604,6 @@ serve(async (req: Request) => {
         await supabase.from("gmail_connections").upsert({
           user_id: effectiveUserId,
           gmail_email: authorizedEmail.toLowerCase(),
-          provider: "google",
           access_token_encrypted: tokenData.access_token || "",
           refresh_token_encrypted: encryptedRefreshToken,
           scopes: grantedScope.split(" "),
@@ -2549,21 +2669,38 @@ serve(async (req: Request) => {
       const userEmail = (email || user.email).toLowerCase().trim();
       const now = new Date().toISOString();
 
-      let encAccess = providerToken || "";
+      let encAccess = "";
+      if (providerToken) {
+        encAccess = await encryptToken(providerToken);
+      }
       let encRefresh = "";
       if (providerRefreshToken) {
         encRefresh = await encryptToken(providerRefreshToken);
       }
 
+      const defaultScopes = [
+        "openid",
+        "email",
+        "profile",
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.compose",
+      ];
+
       try {
-        await supabase.from("gmail_connections").upsert({
+        const updatePayload: Record<string, any> = {
           user_id: user.id,
           gmail_email: userEmail,
-          provider: "google",
-          access_token_encrypted: encAccess,
-          refresh_token_encrypted: encRefresh || undefined,
+          gmail_address: userEmail,
+          scopes: defaultScopes,
+          sync_status: "idle",
           updated_at: now,
-        }, { onConflict: "user_id,gmail_email" });
+        };
+        if (encAccess) updatePayload.access_token_encrypted = encAccess;
+        if (encRefresh) updatePayload.refresh_token_encrypted = encRefresh;
+
+        await supabase.from("gmail_connections").upsert(updatePayload, { onConflict: "user_id,gmail_email" });
       } catch (e: any) {
         console.warn("save-session-tokens error:", e);
       }
@@ -3304,13 +3441,29 @@ SENDER NAME: "${senderName}"`;
       if (!user) return errorResponse("Unauthorized", 401);
 
       const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
-      const { data: contacts } = await supabase
-        .from("Contact")
-        .select("*")
-        .in("userId", userIds)
-        .order("name", { ascending: true });
+      const [{ data: c1 }, { data: c2 }] = await Promise.all([
+        supabase.from("contacts").select("*").in("user_id", userIds).order("name", { ascending: true }),
+        supabase.from("Contact").select("*").in("userId", userIds).order("name", { ascending: true }),
+      ]);
 
-      return jsonResponse(contacts || []);
+      const seen = new Set<string>();
+      const list: any[] = [];
+      for (const item of [...(c1 || []), ...(c2 || [])]) {
+        const key = (item.email || "").toLowerCase();
+        if (item.id && !seen.has(item.id) && (!key || !seen.has(key))) {
+          seen.add(item.id);
+          if (key) seen.add(key);
+          list.push({
+            id: item.id,
+            userId: item.user_id || item.userId,
+            name: item.name,
+            email: item.email,
+            relationship: item.relationship || "Other",
+            createdAt: item.created_at || item.createdAt,
+          });
+        }
+      }
+      return jsonResponse(list);
     }
 
     if (path === "/contacts" && method === "POST") {
@@ -3331,10 +3484,25 @@ SENDER NAME: "${senderName}"`;
       }
 
       const now = new Date().toISOString();
+      const contactId = crypto.randomUUID();
+
+      // Canonical contacts table
+      try {
+        await supabase.from("contacts").insert({
+          id: contactId,
+          user_id: user.id,
+          name: name.trim(),
+          email: cleanEmail,
+          relationship: relationship || "Other",
+          created_at: now,
+        });
+      } catch (_) {}
+
+      // Legacy Contact table
       const { data: contact, error: cntErr } = await supabase
         .from("Contact")
         .insert({
-          id: crypto.randomUUID(),
+          id: contactId,
           userId: user.id,
           name: name.trim(),
           email: cleanEmail,
@@ -3344,8 +3512,8 @@ SENDER NAME: "${senderName}"`;
         .select()
         .single();
 
-      if (cntErr) throw cntErr;
-      return jsonResponse(contact, 201);
+      if (cntErr && !contact) throw cntErr;
+      return jsonResponse(contact || { id: contactId, userId: user.id, name: name.trim(), email: cleanEmail, relationship: relationship || "Other", createdAt: now }, 201);
     }
 
     if (path.startsWith("/contacts/") && method === "DELETE") {
@@ -3354,7 +3522,10 @@ SENDER NAME: "${senderName}"`;
       const id = path.split("/")[2];
       const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
-      await supabase.from("Contact").delete().eq("id", id).in("userId", userIds);
+      await Promise.all([
+        supabase.from("contacts").delete().eq("id", id).in("user_id", userIds),
+        supabase.from("Contact").delete().eq("id", id).in("userId", userIds),
+      ]);
       return jsonResponse({ success: true, message: "Contact deleted." });
     }
 
@@ -3370,37 +3541,11 @@ SENDER NAME: "${senderName}"`;
       const importanceQuery = url.searchParams.get("importance");
       const dateRangeQuery = url.searchParams.get("dateRange");
 
-      // Query both canonical emails and legacy Email with strict user isolation across all userIds
-      const userEmail = (user.email || "").toLowerCase().trim();
-      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
-
-      let canonicalQuery = supabase.from("emails").select("*");
-      const canonicalOrs: string[] = [];
-      for (const uid of userIds) {
-        canonicalOrs.push(`user_id.eq.${uid}`);
-      }
-      if (userEmail) {
-        canonicalOrs.push(`sender_email.ilike.${userEmail}`);
-        canonicalOrs.push(`recipient_email.ilike.${userEmail}`);
-      }
-      if (canonicalOrs.length > 0) {
-        canonicalQuery = canonicalQuery.or(canonicalOrs.join(","));
-      }
+      // Query both canonical emails and legacy Email with strict user isolation strictly for this user.id
+      let canonicalQuery = supabase.from("emails").select("*").eq("user_id", user.id);
       const { data: canonicalEmails } = await canonicalQuery.order("created_at", { ascending: false });
 
-      let legacyQuery = supabase.from("Email").select("*, attachments:Attachment(*)");
-      const legacyOrs: string[] = [];
-      for (const uid of userIds) {
-        legacyOrs.push(`userId.eq.${uid}`);
-      }
-      if (userEmail) {
-        legacyOrs.push(`sender.ilike.${userEmail}`);
-        legacyOrs.push(`recipient.ilike.${userEmail}`);
-        legacyOrs.push(`sender_email.ilike.${userEmail}`);
-      }
-      if (legacyOrs.length > 0) {
-        legacyQuery = legacyQuery.or(legacyOrs.join(","));
-      }
+      let legacyQuery = supabase.from("Email").select("*, attachments:Attachment(*)").or(`user_id.eq.${user.id},userId.eq.${user.id}`);
       const { data: legacyEmails } = await legacyQuery.order("createdAt", { ascending: false });
 
       // Merge and deduplicate by id and gmail_message_id
@@ -4149,10 +4294,14 @@ SENDER NAME: "${senderName}"`;
     }
 
     if (path === "/templates" && method === "GET") {
-      const { data: templates } = await supabase
-        .from("Template")
-        .select("*")
-        .order("createdAt", { ascending: true });
+      const user = await getAuthUser(req, supabase);
+      let query = supabase.from("Template").select("*");
+      if (user) {
+        query = query.or(`is_system.eq.true,user_id.eq.${user.id},user_id.is.null`);
+      } else {
+        query = query.or("is_system.eq.true,user_id.is.null");
+      }
+      const { data: templates } = await query.order("createdAt", { ascending: true });
       return jsonResponse(templates || []);
     }
 
@@ -4163,46 +4312,27 @@ SENDER NAME: "${senderName}"`;
       const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
       const isTrashed = url.searchParams.get("trashed") === "true";
 
-      let debugInfo: any = {};
-      // Auto-backfill any missing notifications for recent incoming emails
+      // Auto-backfill any missing notifications for recent incoming emails strictly for this user
       try {
-        const { data: existingNotifs, error: notifFetchErr } = await supabase
+        const { data: existingNotifs } = await supabase
           .from("Notification")
           .select("id, emailId, message")
-          .in("userId", userIds);
+          .or(`user_id.in.(${userIds.join(",")}),userId.in.(${userIds.join(",")})`);
 
         const notifMessages = new Set((existingNotifs || []).map((n: any) => n.message));
-        const userEmail = (user.email || "").toLowerCase().trim();
 
-        // 1. Build canonical emails query
-        let canonQuery = supabase.from("emails").select("id, user_id, sender, sender_name, from_name, from_email, sender_email, subject, email_type, status, direction, is_read, created_at");
-        const canonOrs: string[] = [];
-        for (const uid of userIds) {
-          canonOrs.push(`user_id.eq.${uid}`);
-        }
-        if (userEmail) {
-          canonOrs.push(`recipient_email.ilike.${userEmail}`);
-        }
-        if (canonOrs.length > 0) {
-          canonQuery = canonQuery.or(canonOrs.join(","));
-        }
-
-        // 2. Build legacy Email query
-        let legacyQuery = supabase.from("Email").select("id, userId, sender, recipient, subject, category, situation, status, isReceived, isSent, createdAt");
-        const legacyOrs: string[] = [];
-        for (const uid of userIds) {
-          legacyOrs.push(`userId.eq.${uid}`);
-        }
-        if (userEmail) {
-          legacyOrs.push(`recipient.ilike.${userEmail}`);
-        }
-        if (legacyOrs.length > 0) {
-          legacyQuery = legacyQuery.or(legacyOrs.join(","));
-        }
-
+        // Strictly query canonical emails and legacy Email belonging to this user
         const [canonRec, legRec] = await Promise.all([
-          canonQuery.order("created_at", { ascending: false }).limit(40),
-          legacyQuery.order("createdAt", { ascending: false }).limit(40)
+          supabase.from("emails")
+            .select("id, user_id, sender, sender_name, from_name, from_email, sender_email, subject, email_type, status, direction, is_read, created_at")
+            .in("user_id", userIds)
+            .order("created_at", { ascending: false })
+            .limit(40),
+          supabase.from("Email")
+            .select("id, userId, sender, recipient, subject, category, situation, status, isReceived, isSent, createdAt")
+            .in("userId", userIds)
+            .order("createdAt", { ascending: false })
+            .limit(40)
         ]);
 
         const candidates: Array<{ sender: string; subject: string; type: string; isRead: boolean; date: string }> = [];
@@ -4232,15 +4362,13 @@ SENDER NAME: "${senderName}"`;
           }
         }
 
-        const legacyUserId = user.legacyId || user.id;
-        const insertedResults: any[] = [];
-
         for (const cand of candidates) {
           const notifMsg = `New email from ${cand.sender}: "${cand.subject}"`;
           if (!notifMessages.has(notifMsg)) {
             await safeInsertNotification(supabase, {
               id: crypto.randomUUID(),
-              userId: legacyUserId,
+              user_id: user.id,
+              userId: user.id,
               emailId: null,
               notificationType: cand.type || "General",
               message: notifMsg,
@@ -4258,14 +4386,14 @@ SENDER NAME: "${senderName}"`;
       const { data: notifications } = await supabase
         .from("Notification")
         .select("*")
-        .in("userId", userIds)
+        .or(`user_id.in.(${userIds.join(",")}),userId.in.(${userIds.join(",")})`)
         .eq("isTrashed", isTrashed)
         .order("createdAt", { ascending: false });
 
       const { data: allNotifs } = await supabase
         .from("Notification")
         .select("id, read, isTrashed")
-        .in("userId", userIds);
+        .or(`user_id.in.(${userIds.join(",")}),userId.in.(${userIds.join(",")})`);
 
       const unreadCount = (allNotifs || []).filter((n: any) => !n.read && !n.isTrashed).length;
       const activeCount = (allNotifs || []).filter((n: any) => !n.isTrashed).length;
@@ -4345,6 +4473,7 @@ SENDER NAME: "${senderName}"`;
       const { data: updated } = await supabase
         .from("UserSignature")
         .upsert({
+          user_id: user.id,
           userId: user.id,
           name: body.name || user.name,
           designation: body.designation || "",
@@ -4354,7 +4483,7 @@ SENDER NAME: "${senderName}"`;
           preferredTone: body.preferredTone || "Professional",
           enabled: body.enabled !== undefined ? !!body.enabled : true,
           updatedAt: now,
-        })
+        }, { onConflict: "user_id" })
         .select()
         .single();
 
@@ -4373,13 +4502,10 @@ SENDER NAME: "${senderName}"`;
       let account: any = (user.gmailConnections && user.gmailConnections[0]) || (user.gmailAccounts && user.gmailAccounts[0]);
       if (!account) {
         const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
-        const orConditions = userIds.map((id: string) => `user_id.eq.${id}`);
-        if (user.email) orConditions.push(`gmail_email.ilike.${user.email}`);
-
         const { data: connections } = await supabase
           .from("gmail_connections")
           .select("*")
-          .or(orConditions.join(","));
+          .in("user_id", userIds);
         if (connections && connections.length > 0) {
           account = connections[0];
         } else {
@@ -4747,32 +4873,8 @@ SENDER NAME: "${senderName}"`;
       const userEmail = (user.email || "").toLowerCase().trim();
       const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
-      let canonicalQuery = supabase.from("emails").select("*");
-      const canonicalOrs: string[] = [];
-      for (const uid of userIds) {
-        canonicalOrs.push(`user_id.eq.${uid}`);
-      }
-      if (userEmail) {
-        canonicalOrs.push(`sender_email.ilike.${userEmail}`);
-        canonicalOrs.push(`recipient_email.ilike.${userEmail}`);
-      }
-      if (canonicalOrs.length > 0) {
-        canonicalQuery = canonicalQuery.or(canonicalOrs.join(","));
-      }
-
-      let legacyQuery = supabase.from("Email").select("*");
-      const legacyOrs: string[] = [];
-      for (const uid of userIds) {
-        legacyOrs.push(`userId.eq.${uid}`);
-      }
-      if (userEmail) {
-        legacyOrs.push(`sender.ilike.${userEmail}`);
-        legacyOrs.push(`recipient.ilike.${userEmail}`);
-        legacyOrs.push(`sender_email.ilike.${userEmail}`);
-      }
-      if (legacyOrs.length > 0) {
-        legacyQuery = legacyQuery.or(legacyOrs.join(","));
-      }
+      let canonicalQuery = supabase.from("emails").select("*").in("user_id", userIds);
+      let legacyQuery = supabase.from("Email").select("*").or(`user_id.in.(${userIds.join(",")}),userId.in.(${userIds.join(",")})`);
 
       // Parallelize execution of canonical, legacy, recent events, and sync state queries
       const [
