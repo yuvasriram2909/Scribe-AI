@@ -126,6 +126,7 @@ DO $$ BEGIN
   DROP POLICY IF EXISTS "Service role full access contacts" ON public.contacts;
 
   -- Notification
+  DROP POLICY IF EXISTS "Users can only access their own notifications" ON public."Notification";
   DROP POLICY IF EXISTS "Users can view own notifications by uuid" ON public."Notification";
   DROP POLICY IF EXISTS "Users can view and manage their own notifications" ON public."Notification";
   DROP POLICY IF EXISTS "Service role full access Notification" ON public."Notification";
@@ -157,101 +158,124 @@ EXCEPTION WHEN OTHERS THEN NULL; END $$;
 -- 6. Apply Strict Zero-Trust RLS Policies
 
 -- PROFILES: Users can only read and modify their own profile
+DROP POLICY IF EXISTS "Service role full access profiles" ON public.profiles;
 CREATE POLICY "Service role full access profiles" ON public.profiles
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can only access their own profile" ON public.profiles;
 CREATE POLICY "Users can only access their own profile" ON public.profiles
   FOR ALL TO authenticated
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
 -- GMAIL CONNECTIONS: Users can only access their own connection
+DROP POLICY IF EXISTS "Service role full access gmail_connections" ON public.gmail_connections;
 CREATE POLICY "Service role full access gmail_connections" ON public.gmail_connections
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can only access their own gmail_connections" ON public.gmail_connections;
 CREATE POLICY "Users can only access their own gmail_connections" ON public.gmail_connections
   FOR ALL TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
 -- EMAILS: Users can only read/manage their own emails
+DROP POLICY IF EXISTS "Service role full access emails" ON public.emails;
 CREATE POLICY "Service role full access emails" ON public.emails
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can only access their own emails" ON public.emails;
 CREATE POLICY "Users can only access their own emails" ON public.emails
   FOR ALL TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
 -- EMAIL DRAFTS: Users can only access their own drafts
+DROP POLICY IF EXISTS "Service role full access email_drafts" ON public.email_drafts;
 CREATE POLICY "Service role full access email_drafts" ON public.email_drafts
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can only access their own email_drafts" ON public.email_drafts;
 CREATE POLICY "Users can only access their own email_drafts" ON public.email_drafts
   FOR ALL TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
 -- CONTACTS: Users can only access their own contacts
+DROP POLICY IF EXISTS "Service role full access contacts" ON public.contacts;
 CREATE POLICY "Service role full access contacts" ON public.contacts
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can only access their own contacts" ON public.contacts;
 CREATE POLICY "Users can only access their own contacts" ON public.contacts
   FOR ALL TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
 -- NOTIFICATIONS: Users can only access their own notifications
+DROP POLICY IF EXISTS "Service role full access Notification" ON public."Notification";
 CREATE POLICY "Service role full access Notification" ON public."Notification"
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can only access their own notifications" ON public."Notification";
 CREATE POLICY "Users can only access their own notifications" ON public."Notification"
   FOR ALL TO authenticated
   USING ((auth.uid() = user_id) OR (auth.uid()::text = "userId"))
   WITH CHECK ((auth.uid() = user_id) OR (auth.uid()::text = "userId"));
 
 -- TEMPLATES: Users can view defaults and access their own custom templates
+DROP POLICY IF EXISTS "Service role full access Template" ON public."Template";
 CREATE POLICY "Service role full access Template" ON public."Template"
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can read default and own templates" ON public."Template";
 CREATE POLICY "Users can read default and own templates" ON public."Template"
   FOR SELECT TO authenticated
   USING ("isDefault" = true OR auth.uid() = user_id OR auth.uid()::text = "userId");
 
+DROP POLICY IF EXISTS "Users can manage own templates" ON public."Template";
 CREATE POLICY "Users can manage own templates" ON public."Template"
   FOR ALL TO authenticated
   USING (auth.uid() = user_id OR auth.uid()::text = "userId")
   WITH CHECK (auth.uid() = user_id OR auth.uid()::text = "userId");
 
 -- USER SIGNATURE: Users can only view/manage their own signature
+DROP POLICY IF EXISTS "Service role full access UserSignature" ON public."UserSignature";
 CREATE POLICY "Service role full access UserSignature" ON public."UserSignature"
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can only access their own signature" ON public."UserSignature";
 CREATE POLICY "Users can only access their own signature" ON public."UserSignature"
   FOR ALL TO authenticated
   USING (auth.uid() = user_id OR auth.uid()::text = "userId")
   WITH CHECK (auth.uid() = user_id OR auth.uid()::text = "userId");
 
 -- LEGACY TABLES: Strict user ID match
+DROP POLICY IF EXISTS "Service role full access Email" ON public."Email";
 CREATE POLICY "Service role full access Email" ON public."Email"
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can only access their own legacy emails" ON public."Email";
 CREATE POLICY "Users can only access their own legacy emails" ON public."Email"
   FOR ALL TO authenticated
   USING (auth.uid()::text = "userId")
   WITH CHECK (auth.uid()::text = "userId");
 
+DROP POLICY IF EXISTS "Service role full access GmailAccount" ON public."GmailAccount";
 CREATE POLICY "Service role full access GmailAccount" ON public."GmailAccount"
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can only access their own legacy gmail accounts" ON public."GmailAccount";
 CREATE POLICY "Users can only access their own legacy gmail accounts" ON public."GmailAccount"
   FOR ALL TO authenticated
   USING (auth.uid()::text = "userId")
   WITH CHECK (auth.uid()::text = "userId");
 
+DROP POLICY IF EXISTS "Service role full access User" ON public."User";
 CREATE POLICY "Service role full access User" ON public."User"
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can only view their own legacy user profile" ON public."User";
 CREATE POLICY "Users can only view their own legacy user profile" ON public."User"
   FOR SELECT TO authenticated
   USING (auth.uid()::text = id);
@@ -445,7 +469,7 @@ BEGIN
     SELECT
       p_auth_user_id,
       e."gmailMessageId",
-      e."gmailThreadId",
+      NULL::text,
       COALESCE(e."sender_email", e."sender"),
       COALESCE(e."sender_email", e."sender"),
       e."sender_name",
