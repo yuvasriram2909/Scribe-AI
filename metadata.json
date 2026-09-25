@@ -1,0 +1,7 @@
+{
+  "name": "Scribe-AI",
+  "description": "AI-powered Gmail automation web application for intelligent situation classification, email composition, and contact management.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import { detectSituation, formatNaturalSubject, buildNaturalBody, SUPPORTED_SITUATIONS } from './emailPatterns.js';
 
@@ -8,9 +8,9 @@ const apiKey = process.env.GEMINI_API_KEY || process.env.AI_API_KEY;
 let aiGen = null;
 if (apiKey && apiKey.trim() !== '') {
   try {
-    aiGen = new GoogleGenerativeAI(apiKey);
+    aiGen = new GoogleGenAI({ apiKey });
   } catch (err) {
-    console.warn('GoogleGenerativeAI initialization warning:', err.message);
+    console.warn('GoogleGenAI initialization warning:', err.message);
   }
 }
 
@@ -105,22 +105,11 @@ export async function categorizeInstruction({ instruction, subject, recipient, r
   }
 
   try {
-    const model = aiGen.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const prompt = `Analyze this user input:
-User Input / Situation: "${query}"
-Recipient Context: ${recipient || 'Not specified'} (${relationship || 'General'})
-
-Determine the exact situation category, priority (High/Medium/Normal), and appropriate professional tone.
-Return valid JSON:
-{
-  "situation": "${sitObj.name}",
-  "category": "${sitObj.category}",
-  "priority": "${sitObj.priority}",
-  "tone": "${sitObj.tone}"
-}`;
-
-    const result = await model.generateContent([SYSTEM_INSTRUCTION, prompt]);
-    const responseText = result.response.text();
+    const result = await aiGen.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [SYSTEM_INSTRUCTION, prompt]
+    });
+    const responseText = result.text || '';
     const cleaned = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(cleaned);
 
@@ -166,39 +155,11 @@ export async function generateEmail({ instruction, subject, recipient, recipient
   }
 
   try {
-    const model = aiGen.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    const userPrompt = `
-User Input / Problem / Situation: "${instruction || subject || 'General update'}"
-User-Provided Subject (if any): "${subject || ''}"
-Recipient: "${recipient || ''}" (Name: "${recipientName || ''}", Relationship: "${relationship || 'Professional'}")
-Target Situation Category: ${situation || fallback.situation}
-Priority: ${priority || fallback.priority}
-Tone: ${tone || fallback.tone}
-
-INSTRUCTIONS FOR GENERATION:
-1. Write an email body specifically about the user's actual situation/problem described above.
-2. Incorporate all specific details provided (e.g. number of days, reasons, technical blockers, order details).
-3. Do NOT invent fake dates, names, or amounts. Use safe placeholders (e.g. [Start Date], [Order Number], [Manager Name]) if missing.
-4. Ensure the subject and body match directly.
-5. Format the email with a greeting, clearly structured paragraphs, and a polite closing.
-
-Return valid JSON:
-{
-  "situation": "${situation || fallback.situation}",
-  "category": "${fallback.category}",
-  "priority": "${priority || fallback.priority}",
-  "tone": "${tone || fallback.tone}",
-  "suggested_subject": "${fallback.suggested_subject}",
-  "email_body": "Full body text formatted with paragraphs and line breaks",
-  "greeting": "Dear ...",
-  "closing": "Best regards,",
-  "attachment_recommended": ${fallback.attachment_recommended},
-  "attachment_filename": ${fallback.attachment_filename ? `"${fallback.attachment_filename}"` : null}
-}`;
-
-    const result = await model.generateContent([SYSTEM_INSTRUCTION, userPrompt]);
-    const responseText = result.response.text();
+    const result = await aiGen.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [SYSTEM_INSTRUCTION, userPrompt]
+    });
+    const responseText = result.text || '';
     const cleaned = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(cleaned);
 

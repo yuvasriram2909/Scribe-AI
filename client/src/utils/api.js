@@ -6,14 +6,14 @@
 
 import { supabase } from './supabaseClient';
 
-// Default Supabase Edge Function backend endpoint
-export const DEFAULT_SUPABASE_EDGE_FUNCTION = 'https://bjxjorlxjijssrqjosed.supabase.co/functions/v1/api';
+// Default backend endpoint: local full-stack server API
+export const DEFAULT_SUPABASE_EDGE_FUNCTION = '/api';
 
 /**
  * Normalizes and sanitizes the API base URL to ensure no duplicate or nested sub-paths
  */
 export function sanitizeApiUrl(rawUrl) {
-  if (!rawUrl || typeof rawUrl !== 'string' || !rawUrl.trim()) {
+  if (!rawUrl || typeof rawUrl !== 'string' || !rawUrl.trim() || rawUrl.includes('bjxjorlxjijssrqjosed')) {
     return DEFAULT_SUPABASE_EDGE_FUNCTION;
   }
   let url = rawUrl.trim().replace(/\/+$/, '');
@@ -36,7 +36,7 @@ export function sanitizeApiUrl(rawUrl) {
 export function getApiBaseUrl() {
   // 1. User-configured custom backend URL in localStorage
   const customUrl = localStorage.getItem('customBackendUrl');
-  if (customUrl && customUrl.trim()) {
+  if (customUrl && customUrl.trim() && !customUrl.includes('bjxjorlxjijssrqjosed')) {
     const sanitized = sanitizeApiUrl(customUrl);
     // If localStorage had a corrupted sub-route, fix it in storage
     if (sanitized !== customUrl.trim()) {
@@ -47,11 +47,11 @@ export function getApiBaseUrl() {
 
   // 2. Vite environment variable (supports VITE_API_URL and VITE_API_BASE_URL)
   const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
-  if (envUrl && envUrl.trim()) {
+  if (envUrl && envUrl.trim() && !envUrl.includes('bjxjorlxjijssrqjosed')) {
     return sanitizeApiUrl(envUrl);
   }
 
-  // 3. Default production and development endpoint: Supabase Edge Function
+  // 3. Default production and development endpoint: local Express full-stack API
   return DEFAULT_SUPABASE_EDGE_FUNCTION;
 }
 
