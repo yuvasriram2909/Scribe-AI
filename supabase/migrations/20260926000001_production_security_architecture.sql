@@ -353,178 +353,197 @@ END $$;
 
 -- 7. High-Performance RLS Policies using (select auth.uid())
 -- profiles
+DROP POLICY IF EXISTS "profiles_user_isolation" ON public.profiles;
 CREATE POLICY "profiles_user_isolation"
   ON public.profiles FOR ALL TO authenticated
   USING ((select auth.uid()) = id)
   WITH CHECK ((select auth.uid()) = id);
 
+DROP POLICY IF EXISTS "profiles_service_role" ON public.profiles;
 CREATE POLICY "profiles_service_role"
   ON public.profiles FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- gmail_connections
+DROP POLICY IF EXISTS "gmail_connections_user_isolation" ON public.gmail_connections;
 CREATE POLICY "gmail_connections_user_isolation"
   ON public.gmail_connections FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id)
   WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "gmail_connections_service_role" ON public.gmail_connections;
 CREATE POLICY "gmail_connections_service_role"
   ON public.gmail_connections FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- emails
+DROP POLICY IF EXISTS "emails_user_isolation" ON public.emails;
 CREATE POLICY "emails_user_isolation"
   ON public.emails FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id)
   WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "emails_service_role" ON public.emails;
 CREATE POLICY "emails_service_role"
   ON public.emails FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- email_drafts
+DROP POLICY IF EXISTS "email_drafts_user_isolation" ON public.email_drafts;
 CREATE POLICY "email_drafts_user_isolation"
   ON public.email_drafts FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id)
   WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "email_drafts_service_role" ON public.email_drafts;
 CREATE POLICY "email_drafts_service_role"
   ON public.email_drafts FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- scheduled_emails
+DROP POLICY IF EXISTS "scheduled_emails_user_isolation" ON public.scheduled_emails;
 CREATE POLICY "scheduled_emails_user_isolation"
   ON public.scheduled_emails FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id)
   WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "scheduled_emails_service_role" ON public.scheduled_emails;
 CREATE POLICY "scheduled_emails_service_role"
   ON public.scheduled_emails FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- contacts
+DROP POLICY IF EXISTS "contacts_user_isolation" ON public.contacts;
 CREATE POLICY "contacts_user_isolation"
   ON public.contacts FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id)
   WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "contacts_service_role" ON public.contacts;
 CREATE POLICY "contacts_service_role"
   ON public.contacts FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- email_templates
+DROP POLICY IF EXISTS "email_templates_read" ON public.email_templates;
 CREATE POLICY "email_templates_read"
   ON public.email_templates FOR SELECT TO authenticated
   USING (is_default = true OR (select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "email_templates_write" ON public.email_templates;
 CREATE POLICY "email_templates_write"
   ON public.email_templates FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id)
   WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "email_templates_service_role" ON public.email_templates;
 CREATE POLICY "email_templates_service_role"
   ON public.email_templates FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- email_sync_state
+DROP POLICY IF EXISTS "email_sync_state_user_isolation" ON public.email_sync_state;
 CREATE POLICY "email_sync_state_user_isolation"
   ON public.email_sync_state FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id)
   WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "email_sync_state_service_role" ON public.email_sync_state;
 CREATE POLICY "email_sync_state_service_role"
   ON public.email_sync_state FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- email_threads
+DROP POLICY IF EXISTS "email_threads_user_isolation" ON public.email_threads;
 CREATE POLICY "email_threads_user_isolation"
   ON public.email_threads FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id)
   WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "email_threads_service_role" ON public.email_threads;
 CREATE POLICY "email_threads_service_role"
   ON public.email_threads FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- email_labels
+DROP POLICY IF EXISTS "email_labels_user_isolation" ON public.email_labels;
 CREATE POLICY "email_labels_user_isolation"
   ON public.email_labels FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id)
   WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "email_labels_service_role" ON public.email_labels;
 CREATE POLICY "email_labels_service_role"
   ON public.email_labels FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- email_events
+DROP POLICY IF EXISTS "email_events_user_isolation" ON public.email_events;
 CREATE POLICY "email_events_user_isolation"
   ON public.email_events FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id)
   WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "email_events_service_role" ON public.email_events;
 CREATE POLICY "email_events_service_role"
   ON public.email_events FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- Notification (consolidating into a single, unambiguous policy)
+DROP POLICY IF EXISTS "Notification_user_isolation" ON public."Notification";
 CREATE POLICY "Notification_user_isolation"
   ON public."Notification" FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"))
   WITH CHECK ((select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"));
 
+DROP POLICY IF EXISTS "Notification_service_role" ON public."Notification";
 CREATE POLICY "Notification_service_role"
   ON public."Notification" FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
--- Template (consolidating into unambiguous policies)
-CREATE POLICY "Template_user_read"
-  ON public."Template" FOR SELECT TO authenticated
-  USING ("isDefault" = true OR (select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"));
-
-CREATE POLICY "Template_user_write"
-  ON public."Template" FOR ALL TO authenticated
-  USING ((select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"))
-  WITH CHECK ((select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"));
-
-CREATE POLICY "Template_service_role"
-  ON public."Template" FOR ALL TO service_role
-  USING (true) WITH CHECK (true);
-
 -- UserSignature
+DROP POLICY IF EXISTS "UserSignature_user_isolation" ON public."UserSignature";
 CREATE POLICY "UserSignature_user_isolation"
   ON public."UserSignature" FOR ALL TO authenticated
   USING ((select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"))
   WITH CHECK ((select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"));
 
+DROP POLICY IF EXISTS "UserSignature_service_role" ON public."UserSignature";
 CREATE POLICY "UserSignature_service_role"
   ON public."UserSignature" FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- Email (legacy)
+DROP POLICY IF EXISTS "Email_legacy_user_isolation" ON public."Email";
 CREATE POLICY "Email_legacy_user_isolation"
   ON public."Email" FOR ALL TO authenticated
   USING (((select auth.uid())::text = "userId"))
   WITH CHECK (((select auth.uid())::text = "userId"));
 
+DROP POLICY IF EXISTS "Email_legacy_service_role" ON public."Email";
 CREATE POLICY "Email_legacy_service_role"
   ON public."Email" FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- GmailAccount (legacy)
+DROP POLICY IF EXISTS "GmailAccount_legacy_user_isolation" ON public."GmailAccount";
 CREATE POLICY "GmailAccount_legacy_user_isolation"
   ON public."GmailAccount" FOR ALL TO authenticated
   USING (((select auth.uid())::text = "userId"))
   WITH CHECK (((select auth.uid())::text = "userId"));
 
+DROP POLICY IF EXISTS "GmailAccount_legacy_service_role" ON public."GmailAccount";
 CREATE POLICY "GmailAccount_legacy_service_role"
   ON public."GmailAccount" FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- User (legacy)
+DROP POLICY IF EXISTS "User_legacy_read" ON public."User";
 CREATE POLICY "User_legacy_read"
   ON public."User" FOR SELECT TO authenticated
   USING (((select auth.uid())::text = id));
 
+DROP POLICY IF EXISTS "User_legacy_service_role" ON public."User";
 CREATE POLICY "User_legacy_service_role"
   ON public."User" FOR ALL TO service_role
   USING (true) WITH CHECK (true);
@@ -588,34 +607,41 @@ END;
 $$;
 
 -- Template (unambiguous, non-overlapping policies)
+DROP POLICY IF EXISTS "Template_user_read" ON public."Template";
 CREATE POLICY "Template_user_read"
   ON public."Template" FOR SELECT TO authenticated
   USING ("isDefault" = true OR (select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"));
 
+DROP POLICY IF EXISTS "Template_user_write" ON public."Template";
 CREATE POLICY "Template_user_write"
   ON public."Template" FOR INSERT TO authenticated
   WITH CHECK ((select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"));
 
+DROP POLICY IF EXISTS "Template_user_update" ON public."Template";
 CREATE POLICY "Template_user_update"
   ON public."Template" FOR UPDATE TO authenticated
   USING ((select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"))
   WITH CHECK ((select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"));
 
+DROP POLICY IF EXISTS "Template_user_delete" ON public."Template";
 CREATE POLICY "Template_user_delete"
   ON public."Template" FOR DELETE TO authenticated
   USING ((select auth.uid()) = user_id OR ((select auth.uid())::text = "userId"));
 
+DROP POLICY IF EXISTS "Template_service_role" ON public."Template";
 CREATE POLICY "Template_service_role"
   ON public."Template" FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
 -- Contact (legacy)
 DROP POLICY IF EXISTS "Users can view own contacts" ON public."Contact";
+DROP POLICY IF EXISTS "Contact_user_isolation" ON public."Contact";
 CREATE POLICY "Contact_user_isolation"
   ON public."Contact" FOR ALL TO authenticated
   USING (((select auth.uid())::text = "userId"))
   WITH CHECK (((select auth.uid())::text = "userId"));
 
+DROP POLICY IF EXISTS "Contact_service_role" ON public."Contact";
 CREATE POLICY "Contact_service_role"
   ON public."Contact" FOR ALL TO service_role
   USING (true) WITH CHECK (true);
