@@ -119,7 +119,6 @@ export async function apiFetch(url, options = {}) {
   const customHeaders = options.headers || {};
 
   const headers = {
-    ...(userEmail ? { 'x-user-email': userEmail } : {}),
     ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
     ...customHeaders
   };

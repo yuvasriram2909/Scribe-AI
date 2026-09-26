@@ -235,30 +235,6 @@ async function getAuthUser(req: Request, supabase: any) {
     }
   } catch (_) {}
 
-  // 2. Fallback: Parse decoded JWT payload if verified session exists in profiles
-  if (!supaUser || !supaUser.id) {
-    try {
-      const parts = token.split(".");
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-        const candidateId = payload.sub || payload.id;
-        const candidateEmail = payload.email ? payload.email.trim().toLowerCase() : "";
-        if (candidateId && candidateEmail) {
-          const { data: prof } = await supabase.from("profiles").select("*").eq("id", candidateId).maybeSingle();
-          if (prof) {
-            supaUser = {
-              id: prof.id,
-              email: prof.email,
-              user_metadata: { full_name: prof.full_name, name: prof.full_name },
-              app_metadata: { provider: prof.provider || "google" },
-              created_at: prof.created_at,
-            };
-          }
-        }
-      }
-    } catch (_) {}
-  }
-
   // Reject unverified or forged sessions immediately
   if (!supaUser || !supaUser.id) {
     return null;
@@ -372,12 +348,24 @@ async function getAuthUser(req: Request, supabase: any) {
 // Google Access Token Refresh Helper
 // ----------------------------------------------------
 
-async function getValidAccessToken(account: any, supabase: any) {
-  let accessToken = account.access_token_encrypted || account.encryptedAccessToken;
-  const rawRefresh = account.refresh_token_encrypted || account.encryptedRefreshToken;
+async function getValidAccessToken(account: any, supabase: any): Promise<string | null> {
+  if (!account) return null;
+  const rawAccess = account.access_token_encrypted || account.encryptedAccessToken || "";
+  const rawRefresh = account.refresh_token_encrypted || account.encryptedRefreshToken || "";
+
+  let accessToken = await decryptToken(rawAccess);
   const refreshToken = await decryptToken(rawRefresh);
 
-  if (refreshToken) {
+  // Proactive expiration check: refresh if expired or within 90 seconds of expiry
+  let needsRefresh = !accessToken;
+  if (account.token_expires_at) {
+    const expiresAt = new Date(account.token_expires_at).getTime();
+    if (Date.now() >= expiresAt - 90000) {
+      needsRefresh = true;
+    }
+  }
+
+  if (needsRefresh && refreshToken) {
     const { clientId, clientSecret } = await getGoogleCredentials(supabase);
     if (clientId && clientSecret) {
       try {
@@ -392,23 +380,43 @@ async function getValidAccessToken(account: any, supabase: any) {
           }),
         });
         const refreshData = await refreshRes.json();
-        if (refreshData.access_token) {
+        if (refreshRes.ok && refreshData.access_token) {
           accessToken = refreshData.access_token;
+          const encAccess = await encryptToken(accessToken);
+          const expiresInSec = refreshData.expires_in || 3600;
+          const newExpiresAt = new Date(Date.now() + expiresInSec * 1000).toISOString();
           const nowIso = new Date().toISOString();
+
           if (account.id) {
             try {
               await supabase
                 .from("gmail_connections")
-                .update({ access_token_encrypted: accessToken, updated_at: nowIso })
+                .update({
+                  access_token_encrypted: encAccess,
+                  token_expires_at: newExpiresAt,
+                  needs_reauth: false,
+                  updated_at: nowIso,
+                })
                 .eq("id", account.id);
             } catch (_) {}
             try {
               await supabase
                 .from("GmailAccount")
-                .update({ encryptedAccessToken: accessToken, updatedAt: nowIso })
+                .update({ encryptedAccessToken: encAccess, updatedAt: nowIso })
                 .eq("id", account.id);
             } catch (_) {}
           }
+        } else if (refreshRes.status === 400 || refreshData.error === "invalid_grant") {
+          console.warn("Google refresh token revoked or invalid_grant:", refreshData);
+          if (account.id) {
+            try {
+              await supabase
+                .from("gmail_connections")
+                .update({ needs_reauth: true, updated_at: new Date().toISOString() })
+                .eq("id", account.id);
+            } catch (_) {}
+          }
+          return null;
         }
       } catch (e) {
         console.warn("Token refresh attempt notice:", e);
@@ -416,7 +424,7 @@ async function getValidAccessToken(account: any, supabase: any) {
     }
   }
 
-  return accessToken;
+  return accessToken || null;
 }
 
 // ----------------------------------------------------
@@ -2253,43 +2261,7 @@ serve(async (req: Request) => {
     // ----------------------------------------------------
 
     if (path === "/auth/google/credentials" && method === "POST") {
-      const body = await req.json().catch(() => ({}));
-      const { clientId, clientSecret } = body;
-
-      if (!clientId || !clientSecret) {
-        return errorResponse("Both Google Client ID and Client Secret are required.");
-      }
-
-      const cleanClientId = clientId.trim();
-      const cleanClientSecret = clientSecret.trim();
-
-      // Persist in SystemConfig table
-      const now = new Date().toISOString();
-      await supabase.from("SystemConfig").upsert({ key: "GOOGLE_CLIENT_ID", value: cleanClientId, updatedAt: now });
-      await supabase.from("SystemConfig").upsert({ key: "GOOGLE_CLIENT_SECRET", value: cleanClientSecret, updatedAt: now });
-
-      const redirectUri = Deno.env.get("GOOGLE_REDIRECT_URI") || `${url.origin}/functions/v1/api/auth/google/callback`;
-      const scopes = [
-        "https://www.googleapis.com/auth/userinfo.email",
-        "https://www.googleapis.com/auth/userinfo.profile",
-        "https://www.googleapis.com/auth/gmail.send",
-      ].join(" ");
-
-      const userEmail = req.headers.get("x-user-email") || "";
-      const state = btoa(`${userEmail}:${Date.now()}`);
-
-      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
-        cleanClientId
-      )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(
-        scopes
-      )}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`;
-
-      return jsonResponse({
-        success: true,
-        message: "Google OAuth credentials configured successfully!",
-        configured: true,
-        url: googleAuthUrl,
-      });
+      return errorResponse("Manual credential mutation via public HTTP is disabled for security. Configure secrets in Supabase Edge Function Secrets.", 403);
     }
 
     // ----------------------------------------------------
@@ -2408,7 +2380,7 @@ serve(async (req: Request) => {
       ].join(" ");
 
       const user = await getAuthUser(req, supabase);
-      const userEmail = user?.email || req.headers.get("x-user-email") || "";
+      const userEmail = user?.email || "";
       const userId = user?.id || "";
 
       // Encode user identity in state so the callback links this connection to the right user
@@ -2599,14 +2571,24 @@ serve(async (req: Request) => {
       const grantedScope = tokenData.scope || "";
       const hasGmailSend = grantedScope.includes("gmail.send") || grantedScope.includes("mail.google.com");
 
+      const encAccessToken = tokenData.access_token ? await encryptToken(tokenData.access_token) : "";
+      const expiresInSec = tokenData.expires_in || 3600;
+      const tokenExpiresAt = new Date(Date.now() + expiresInSec * 1000).toISOString();
+
       // Save into canonical gmail_connections table
       try {
         await supabase.from("gmail_connections").upsert({
           user_id: effectiveUserId,
           gmail_email: authorizedEmail.toLowerCase(),
-          access_token_encrypted: tokenData.access_token || "",
+          gmail_address: authorizedEmail.toLowerCase(),
+          access_token_encrypted: encAccessToken,
           refresh_token_encrypted: encryptedRefreshToken,
+          token_expires_at: tokenExpiresAt,
           scopes: grantedScope.split(" "),
+          needs_reauth: false,
+          status: hasGmailSend ? "CONNECTED" : "NEEDS_ATTENTION",
+          sync_status: "idle",
+          connected_at: now,
           updated_at: now,
         }, { onConflict: "user_id,gmail_email" });
       } catch (e: any) {
@@ -2620,7 +2602,7 @@ serve(async (req: Request) => {
         id: crypto.randomUUID(),
         userId: user?.id || effectiveUserId,
         gmailEmail: authorizedEmail,
-        encryptedAccessToken: tokenData.access_token || "",
+        encryptedAccessToken: encAccessToken,
         encryptedRefreshToken,
         scope: grantedScope,
         status: hasGmailSend ? "CONNECTED" : "NEEDS_ATTENTION",
@@ -2639,10 +2621,11 @@ serve(async (req: Request) => {
           userId: effectiveUserId,
           gmailEmail: authorizedEmail,
           gmail_email: authorizedEmail,
-          access_token_encrypted: tokenData.access_token || "",
-          encryptedAccessToken: tokenData.access_token || "",
+          access_token_encrypted: encAccessToken,
+          encryptedAccessToken: encAccessToken,
           refresh_token_encrypted: encryptedRefreshToken,
           encryptedRefreshToken,
+          token_expires_at: tokenExpiresAt,
         };
         syncUserGmail({ id: effectiveUserId, email: authorizedEmail }, syncAccount, supabase)
           .catch((err: any) => console.warn("Post-OAuth initial sync notice:", err));
@@ -2710,11 +2693,15 @@ serve(async (req: Request) => {
       ];
 
       try {
+        const tokenExpiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
         const updatePayload: Record<string, any> = {
           user_id: user.id,
           gmail_email: userEmail,
           gmail_address: userEmail,
           scopes: defaultScopes,
+          token_expires_at: tokenExpiresAt,
+          needs_reauth: false,
+          status: "CONNECTED",
           sync_status: "idle",
           updated_at: now,
         };
@@ -2870,43 +2857,9 @@ serve(async (req: Request) => {
         return errorResponse("Gmail account is not connected. Please connect Google first.", 400);
       }
 
-      let accessToken = connection.access_token_encrypted || connection.encryptedAccessToken;
-      const rawRefresh = connection.refresh_token_encrypted || connection.encryptedRefreshToken;
-      const refreshToken = await decryptToken(rawRefresh);
-
-      // Refresh Google Access Token if refresh token is available
-      if (refreshToken) {
-        const { clientId, clientSecret } = await getGoogleCredentials(supabase);
-        if (clientId && clientSecret) {
-          const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              client_id: clientId,
-              client_secret: clientSecret,
-              refresh_token: refreshToken,
-              grant_type: "refresh_token",
-            }),
-          });
-          const refreshData = await refreshRes.json();
-          if (refreshData.access_token) {
-            accessToken = refreshData.access_token;
-            if (connection.id) {
-              try {
-                await supabase
-                  .from("gmail_connections")
-                  .update({ access_token_encrypted: accessToken, updated_at: new Date().toISOString() })
-                  .eq("id", connection.id);
-              } catch (_) {}
-              try {
-                await supabase
-                  .from("GmailAccount")
-                  .update({ encryptedAccessToken: accessToken, updatedAt: new Date().toISOString() })
-                  .eq("id", connection.id);
-              } catch (_) {}
-            }
-          }
-        }
+      const accessToken = await getValidAccessToken(connection, supabase);
+      if (!accessToken) {
+        return errorResponse("Gmail connection expired or invalid. Please reconnect Google.", 401);
       }
 
       const sendIndividually = body.sendIndividually === true ||
@@ -2955,11 +2908,19 @@ serve(async (req: Request) => {
         const sendData = await sendRes.json();
         if (!sendRes.ok || sendData.error) {
           const errorMsg = sendData.error?.message || "Failed to send email through Gmail API";
-          let userSafeError = "Email was generated, but Gmail could not send it.";
+          let isReauthError = false;
           if (sendRes.status === 403 && (errorMsg.includes("insufficient") || errorMsg.includes("scope") || errorMsg.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT"))) {
             userSafeError = "Gmail authorization is missing the required send permission.";
+            isReauthError = true;
           } else if (sendRes.status === 401 || errorMsg.includes("invalid_grant") || errorMsg.includes("Token has been expired")) {
             userSafeError = "Your Gmail connection has expired. Please reconnect Gmail.";
+            isReauthError = true;
+          }
+
+          if (isReauthError && connection?.id) {
+            try {
+              await supabase.from("gmail_connections").update({ needs_reauth: true, updated_at: new Date().toISOString() }).eq("id", connection.id);
+            } catch (_) {}
           }
 
           const now = new Date().toISOString();
@@ -4842,6 +4803,28 @@ SENDER NAME: "${senderName}"`;
         isRead: true,
         createdAt: now,
       };
+
+      const connection = (user.gmailConnections || [])[0] || null;
+      try {
+        await supabase.from("scheduled_emails").insert({
+          id: schedPayload.id,
+          user_id: user.id,
+          gmail_connection_id: connection?.id || null,
+          to_emails: schedToList,
+          cc_emails: body.cc ? (Array.isArray(body.cc) ? body.cc : [body.cc]) : [],
+          bcc_emails: body.bcc ? (Array.isArray(body.bcc) ? body.bcc : [body.bcc]) : [],
+          subject: schedPayload.subject,
+          body: schedPayload.body,
+          category: schedPayload.category,
+          situation: schedPayload.situation,
+          priority: schedPayload.priority,
+          tone: schedPayload.tone,
+          scheduled_for: body.scheduledAt || now,
+          status: "scheduled",
+          created_at: now,
+          updated_at: now,
+        });
+      } catch (_) {}
 
       const { data, error } = await safeInsertEmail(supabase, schedPayload);
       if (error) throw error;

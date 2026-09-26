@@ -368,20 +368,6 @@ export function LoginPage({ onLoginSuccess }) {
                 </>
               )}
             </button>
-
-            {!isSignUpMode && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('alex.morgan@example.com');
-                  setPassword('password123');
-                }}
-                className="w-full py-2.5 px-4 rounded-xl border border-[#D4A373]/30 bg-[#D4A373]/10 hover:bg-[#D4A373]/20 text-[#D4A373] font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-[#D4A373]" />
-                <span>Fill Demo Credentials (Alex Morgan)</span>
-              </button>
-            )}
           </form>
 
           <div className="pt-2 text-center border-t border-[#2E2D2B]">
