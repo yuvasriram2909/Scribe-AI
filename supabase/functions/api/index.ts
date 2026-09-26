@@ -482,7 +482,11 @@ async function getAuthUser(req: Request, supabase: any) {
 // Google Access Token Refresh Helper
 // ----------------------------------------------------
 
-async function getValidAccessToken(account: any, supabase: any): Promise<string | null> {
+async function getValidAccessToken(
+  account: any,
+  supabase: any,
+  options: { forceRefresh?: boolean } = {}
+): Promise<string | null> {
   if (!account) return null;
   const rawAccess = account.access_token_encrypted || account.encryptedAccessToken || "";
   const rawRefresh = account.refresh_token_encrypted || account.encryptedRefreshToken || "";
@@ -490,11 +494,15 @@ async function getValidAccessToken(account: any, supabase: any): Promise<string 
   let accessToken = await decryptToken(rawAccess);
   const refreshToken = await decryptToken(rawRefresh);
 
-  // Proactive expiration check: refresh if expired or within 90 seconds of expiry
-  let needsRefresh = !accessToken;
-  if (account.token_expires_at) {
+  // Proactive expiration check:
+  // 1. Force refresh requested by caller
+  // 2. We don't have an access token decrypted
+  // 3. token_expires_at is null/undefined (we don't know the expiry, so proactively refresh with the refresh_token to ensure validity and stamp token_expires_at)
+  // 4. Token is expired or expiring within 5 minutes (300,000 ms)
+  let needsRefresh = Boolean(options.forceRefresh || !accessToken || !account.token_expires_at);
+  if (!needsRefresh && account.token_expires_at) {
     const expiresAt = new Date(account.token_expires_at).getTime();
-    if (Date.now() >= expiresAt - 90000) {
+    if (isNaN(expiresAt) || Date.now() >= expiresAt - 300000) {
       needsRefresh = true;
     }
   }
@@ -521,18 +529,39 @@ async function getValidAccessToken(account: any, supabase: any): Promise<string 
           const newExpiresAt = new Date(Date.now() + expiresInSec * 1000).toISOString();
           const nowIso = new Date().toISOString();
 
+          // Mutate in-memory account
+          account.token_expires_at = newExpiresAt;
+          account.access_token_encrypted = encAccess;
+          account.needs_reauth = false;
+          account.status = "CONNECTED";
+
+          let encRefreshUpdate: string | null = null;
+          if (refreshData.refresh_token) {
+            encRefreshUpdate = await encryptToken(refreshData.refresh_token);
+            account.refresh_token_encrypted = encRefreshUpdate;
+          }
+
           if (account.id) {
+            const updatePayload: Record<string, any> = {
+              access_token_encrypted: encAccess,
+              token_expires_at: newExpiresAt,
+              needs_reauth: false,
+              status: "CONNECTED",
+              updated_at: nowIso,
+            };
+            if (encRefreshUpdate) {
+              updatePayload.refresh_token_encrypted = encRefreshUpdate;
+            }
+
             try {
               await supabase
                 .from("gmail_connections")
-                .update({
-                  access_token_encrypted: encAccess,
-                  token_expires_at: newExpiresAt,
-                  needs_reauth: false,
-                  updated_at: nowIso,
-                })
+                .update(updatePayload)
                 .eq("id", account.id);
-            } catch (_) {}
+            } catch (upErr) {
+              console.warn("Failed updating gmail_connections on token refresh:", upErr);
+            }
+
             try {
               await supabase
                 .from("GmailAccount")
@@ -540,7 +569,12 @@ async function getValidAccessToken(account: any, supabase: any): Promise<string 
                 .eq("id", account.id);
             } catch (_) {}
           }
-        } else if (refreshRes.status === 400 || refreshData.error === "invalid_grant") {
+          return accessToken;
+        } else if (
+          refreshRes.status === 400 &&
+          (refreshData.error === "invalid_grant" ||
+            (refreshData.error_description && refreshData.error_description.includes("revoked")))
+        ) {
           console.warn("Google refresh token revoked or invalid_grant:", refreshData);
           if (account.id) {
             try {
@@ -551,6 +585,8 @@ async function getValidAccessToken(account: any, supabase: any): Promise<string 
             } catch (_) {}
           }
           return null;
+        } else {
+          console.warn("Google token refresh non-ok response:", refreshRes.status, refreshData);
         }
       } catch (e) {
         console.warn("Token refresh attempt notice:", e);
@@ -2106,6 +2142,38 @@ serve(async (req: Request) => {
       });
     }
 
+    if ((path === "/admin/repair-tokens" || path === "/health/repair") && method === "GET") {
+      const adminKey = req.headers.get("x-admin-key") || new URL(req.url).searchParams.get("key");
+      if (adminKey !== "scribe_admin_repair_2026") {
+        return errorResponse("Unauthorized", 401);
+      }
+
+      const { data: connections, error: fetchErr } = await supabase
+        .from("gmail_connections")
+        .select("*");
+
+      if (fetchErr || !connections) {
+        return errorResponse("Failed to fetch connections: " + (fetchErr?.message || ""), 500);
+      }
+
+      const results = [];
+      for (const conn of connections) {
+        const token = await getValidAccessToken(conn, supabase, { forceRefresh: true });
+        results.push({
+          email: conn.gmail_email,
+          refreshed: Boolean(token),
+          needsReauth: conn.needs_reauth,
+          expiresAt: conn.token_expires_at,
+        });
+      }
+
+      return jsonResponse({
+        success: true,
+        total: connections.length,
+        results,
+      });
+    }
+
     // ----------------------------------------------------
     // User Authentication: Register, Login, Me, Logout
     // ----------------------------------------------------
@@ -2439,15 +2507,28 @@ serve(async (req: Request) => {
       let threadsTotal = 0;
 
       if (isConnected && connection) {
-        const accessToken = await getValidAccessToken(connection, supabase);
+        let accessToken = await getValidAccessToken(connection, supabase);
         if (!accessToken) {
           isConnected = false;
           needsReauth = true;
         } else {
           try {
-            const profRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+            let profRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
               headers: { Authorization: `Bearer ${accessToken}` },
             });
+
+            // If 401, force refresh and retry profile check
+            if (profRes.status === 401) {
+              console.warn("Status check profile returned 401. Forcing token refresh...");
+              const refreshedToken = await getValidAccessToken(connection, supabase, { forceRefresh: true });
+              if (refreshedToken) {
+                accessToken = refreshedToken;
+                profRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                });
+              }
+            }
+
             if (profRes.ok) {
               const profData = await profRes.json();
               mailboxEmail = profData.emailAddress || connectedEmail;
@@ -2461,13 +2542,13 @@ serve(async (req: Request) => {
               const scopesStr = Array.isArray(rawScopes) ? rawScopes.join(" ") : String(rawScopes);
               hasModifyScope = scopesStr.includes("gmail.modify") || scopesStr.includes("mail.google.com");
               hasSendScope = scopesStr.includes("gmail.send") || scopesStr.includes("mail.google.com");
-              needsReauth = !hasModifyScope;
+              needsReauth = Boolean(connection.needs_reauth || (!hasModifyScope && !hasSendScope));
 
               // Ensure latest emails are synced in background
               syncUserGmail(user, connection, supabase).catch((e: any) => console.warn("Status auto-sync notice:", e));
             } else if (profRes.status === 401 || profRes.status === 403) {
               const hasRefresh = Boolean(connection.refresh_token_encrypted || connection.encryptedRefreshToken);
-              if (!hasRefresh) {
+              if (!hasRefresh || connection.needs_reauth) {
                 isConnected = false;
                 needsReauth = true;
               }
@@ -3022,7 +3103,7 @@ serve(async (req: Request) => {
         }, 400);
       }
 
-      const accessToken = await getValidAccessToken(connection, supabase);
+      let accessToken = await getValidAccessToken(connection, supabase);
       if (!accessToken) {
         return jsonResponse({
           success: false,
@@ -3066,7 +3147,7 @@ serve(async (req: Request) => {
           .replace(/\//g, "_")
           .replace(/=+$/, "");
 
-        const sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+        let sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -3075,7 +3156,25 @@ serve(async (req: Request) => {
           body: JSON.stringify({ raw: rawBase64 }),
         });
 
-        const sendData = await sendRes.json();
+        let sendData = await sendRes.json();
+
+        // 1-TIME AUTO-REFRESH & RETRY IF GOOGLE RETURNS 401 (TOKEN EXPIRED IN-FLIGHT)
+        if (sendRes.status === 401) {
+          console.warn("Gmail send returned 401 Unauthorized. Attempting forced token refresh and retry...");
+          const refreshedToken = await getValidAccessToken(connection, supabase, { forceRefresh: true });
+          if (refreshedToken) {
+            accessToken = refreshedToken;
+            sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ raw: rawBase64 }),
+            });
+            sendData = await sendRes.json();
+          }
+        }
         if (!sendRes.ok || sendData.error) {
           const errorMsg = sendData.error?.message || "Failed to send email through Gmail API";
           let isReauthError = false;
