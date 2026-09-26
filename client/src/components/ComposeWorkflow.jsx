@@ -209,15 +209,14 @@ export function ComposeWorkflow({
     }
   }, [composeState.autoGenerate]);
 
-  // Core AI Intent Classification & Email Generation Function
+  // Core AI Intent Classification & Email Generation Function (Pure Real AI via Google Gemini)
   const executeAIGeneration = async (instrText, recipText) => {
     updateState({ errorMessage: '', step: 2 });
     setAiLoading(true);
 
     try {
-      // 1. High-precision local classification & factual generation
       const customToneParam = (composeState.tone && composeState.tone !== 'Auto') ? composeState.tone : null;
-      const localResult = generateIntelligentEmail({
+      const aiResult = await generateIntelligentEmail({
         instruction: instrText,
         userSubject: subject,
         recipient: recipText,
@@ -227,51 +226,23 @@ export function ComposeWorkflow({
       });
 
       updateState({
-        emailType: localResult.category,
-        detectedCategory: localResult.category,
-        situation: localResult.situation,
-        tone: localResult.tone,
-        priority: localResult.priority,
-        importance: localResult.priority,
-        urgency: localResult.urgency,
+        emailType: aiResult.category,
+        detectedCategory: aiResult.category,
+        situation: aiResult.situation,
+        tone: aiResult.tone,
+        priority: aiResult.priority,
+        importance: aiResult.priority,
+        urgency: aiResult.urgency,
         situationSource: 'auto',
-        subject: localResult.subject,
-        body: localResult.body,
-        step: 3, // Directly show Email Preview screen!
+        subject: aiResult.subject,
+        body: aiResult.body,
+        step: 3, // Real AI email generated! Proceed directly to Step 3 Preview.
         errorMessage: ''
       });
-      setAiLoading(false); // Make UI buttons immediately clickable!
-
-      // 2. Background pass-through to Gemini API if configured
-      try {
-        const genRes = await apiFetch('/api/ai/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            instruction: instrText,
-            subject: localResult.subject,
-            situation: localResult.situation,
-            category: localResult.category,
-            tone: localResult.tone,
-            priority: localResult.priority,
-            urgency: localResult.urgency,
-            recipient: recipText
-          })
-        });
-        const genData = await safeParseResponse(genRes);
-        if (genData && genData.body && !genData.error) {
-          updateState({
-            subject: genData.subject || localResult.subject,
-            body: genData.body || genData.email_body || localResult.body
-          });
-        }
-      } catch (apiErr) {
-        console.warn('Backend generation note (using local intelligence):', apiErr);
-      }
     } catch (err) {
       console.error('AI Generation Error:', err);
       updateState({
-        errorMessage: err.message || 'Unable to generate email. Please try again.',
+        errorMessage: err.message || 'AI generation failed. Please try again.',
         step: 1
       });
     } finally {
@@ -316,22 +287,12 @@ export function ComposeWorkflow({
     executeAIGeneration(cleanInstr || subject.trim(), normalizedRecipient);
   };
 
-  // User override for Category (regenerates email with new category while keeping recipient & facts)
-  const handleManualSituationChange = (newCatId) => {
+  // User override for Category (regenerates email with real AI for new category)
+  const handleManualSituationChange = async (newCatId) => {
     const catObj = EMAIL_CATEGORIES.find(c => c.id === newCatId || c.name === newCatId);
     if (!catObj) return;
 
-    const reGen = generateIntelligentEmail({
-      instruction: instruction || subject,
-      userSubject: subject,
-      recipient,
-      hasAttachment: !!selectedFile,
-      customCategory: catObj.id,
-      customTone: catObj.defaultTone,
-      customPriority: catObj.importance,
-      senderName: localStorage.getItem('userName') || ''
-    });
-
+    setAiLoading(true);
     updateState({
       situationSource: 'manual',
       emailType: catObj.name,
@@ -340,32 +301,67 @@ export function ComposeWorkflow({
       tone: catObj.defaultTone,
       priority: catObj.importance,
       importance: catObj.importance,
-      urgency: catObj.urgency,
-      subject: reGen.subject || subject,
-      body: reGen.body || body
+      urgency: catObj.urgency
     });
+
+    try {
+      const reGen = await generateIntelligentEmail({
+        instruction: instruction || subject,
+        userSubject: subject,
+        recipient,
+        hasAttachment: !!selectedFile,
+        customCategory: catObj.id,
+        customTone: catObj.defaultTone,
+        customPriority: catObj.importance,
+        senderName: localStorage.getItem('userName') || ''
+      });
+
+      updateState({
+        subject: reGen.subject || subject,
+        body: reGen.body || body,
+        errorMessage: ''
+      });
+    } catch (err) {
+      console.error('Category Re-generation Error:', err);
+      updateState({ errorMessage: err.message || 'Failed to regenerate email for this category.' });
+    } finally {
+      setAiLoading(false);
+    }
   };
 
-  // User override for Tone (regenerates email body with new tone while keeping recipient & facts)
-  const handleManualToneChange = (newToneIdOrName) => {
+  // User override for Tone (regenerates email body with real AI for new tone)
+  const handleManualToneChange = async (newToneIdOrName) => {
     const targetToneObj = ADVANCED_TONES.find(t => t.id === newToneIdOrName || t.name === newToneIdOrName) || ADVANCED_TONES[0];
-    const reGen = generateIntelligentEmail({
-      instruction: instruction || subject,
-      userSubject: subject,
-      recipient,
-      hasAttachment: !!selectedFile,
-      customCategory: detectedCategory,
-      customTone: targetToneObj.name,
-      customPriority: priority,
-      senderName: localStorage.getItem('userName') || ''
-    });
 
+    setAiLoading(true);
     updateState({
       situationSource: 'manual',
-      tone: targetToneObj.name,
-      subject: reGen.subject || subject,
-      body: reGen.body || body
+      tone: targetToneObj.name
     });
+
+    try {
+      const reGen = await generateIntelligentEmail({
+        instruction: instruction || subject,
+        userSubject: subject,
+        recipient,
+        hasAttachment: !!selectedFile,
+        customCategory: detectedCategory,
+        customTone: targetToneObj.name,
+        customPriority: priority,
+        senderName: localStorage.getItem('userName') || ''
+      });
+
+      updateState({
+        subject: reGen.subject || subject,
+        body: reGen.body || body,
+        errorMessage: ''
+      });
+    } catch (err) {
+      console.error('Tone Re-generation Error:', err);
+      updateState({ errorMessage: err.message || 'Failed to regenerate email with this tone.' });
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // User override for Priority
@@ -556,6 +552,16 @@ export function ComposeWorkflow({
             <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
             <span>{errorMessage}</span>
           </div>
+          {(errorMessage.toLowerCase().includes('ai') || errorMessage.toLowerCase().includes('generation') || errorMessage.toLowerCase().includes('generate') || errorMessage.toLowerCase().includes('demand')) && (
+            <button
+              type="button"
+              onClick={() => handleGenerateEmail()}
+              className="px-3.5 py-1.5 rounded-xl bg-[#D4A373] text-[#121211] font-bold text-xs hover:bg-[#c59362] transition-colors flex items-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Retry AI Generation
+            </button>
+          )}
           {(errorMessage.includes('Gmail') || errorMessage.includes('connect') || errorMessage.includes('OAuth') || errorMessage.includes('scopes') || errorMessage.includes('permission') || errorMessage.includes('revoked') || errorMessage.includes('expired') || errorMessage.includes('Authentication') || errorMessage.includes('sign in') || composeState.errorCode === 'AUTH_REQUIRED' || composeState.errorCode === 'GMAIL_NOT_CONNECTED' || composeState.errorCode === 'GMAIL_REAUTH_REQUIRED' || composeState.errorCode === 'GMAIL_SCOPE_MISSING') && (
             <button
               onClick={async () => {

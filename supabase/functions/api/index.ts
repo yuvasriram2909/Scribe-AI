@@ -1813,317 +1813,6 @@ function detectSituationEngine(text: string): SituationConfig {
   return defaultSit;
 }
 
-function generateNaturalEmailContent(params: {
-  instruction: string;
-  subject?: string;
-  recipient?: string;
-  recipientName?: string;
-  senderName?: string;
-  situationObj?: SituationConfig;
-  tone?: string;
-}) {
-  const { instruction, subject, recipient, recipientName, senderName, situationObj, tone } = params;
-  const sit = situationObj || detectSituationEngine(instruction || subject || "");
-  
-  // Clean trailing stray letters (e.g. "d" or ".") and conversational prefixes
-  let cleanInput = (instruction || subject || "").trim().replace(/\s+[a-zA-Z]$/, "").trim();
-  cleanInput = cleanInput.replace(/^(?:please\s+)?(?:send\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|saying\s+that\s+|saying\s+|about\s+)?|i\s+want\s+to\s+(?:send|write)\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|about\s+)?|write\s+(?:an?\s+)?(?:email|mail)\s+(?:to\s+[^:]+?\s+)?(?:that\s+|about\s+)?)/i, "").trim();
-  const lower = cleanInput.toLowerCase();
-
-  let greeting = "Hello,";
-  if (recipientName && recipientName.trim()) {
-    greeting = `Dear ${recipientName.trim()},`;
-  } else if (recipient) {
-    const firstItem = recipient.split(/[,;\n]+/)[0].trim();
-    if (firstItem.includes("<")) {
-      const namePart = firstItem.split("<")[0].trim().replace(/^["']|["']$/g, "");
-      if (namePart) {
-        const firstWord = namePart.split(/\s+/)[0];
-        greeting = `Dear ${firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase()},`;
-      }
-    } else if (firstItem.includes("@")) {
-      const local = firstItem.split("@")[0].replace(/[0-9._-]/g, " ").trim();
-      if (local.length >= 2 && !local.includes("info") && !local.includes("support") && !local.includes("contact") && !local.includes("admin") && !local.includes("noreply")) {
-        const rawLocal = firstItem.split("@")[0];
-        let nameWord = local.split(/\s+/)[0];
-        if (rawLocal.toLowerCase().startsWith("lbalaji")) {
-          nameWord = "Balaji";
-        } else {
-          const matchPunctInitial = rawLocal.match(/^[a-z][._-]([a-z]{2,})/i);
-          if (matchPunctInitial) {
-            nameWord = matchPunctInitial[1];
-          } else {
-            const matchCamelInitial = rawLocal.match(/^[a-z]([A-Z][a-z]{2,})/);
-            if (matchCamelInitial) {
-              nameWord = matchCamelInitial[1];
-            }
-          }
-        }
-        greeting = `Dear ${nameWord.charAt(0).toUpperCase() + nameWord.slice(1).toLowerCase()},`;
-      }
-    }
-  }
-
-  const myName = senderName && !senderName.includes("[Your Name]") ? senderName : "Sender";
-  let closing = `Best regards,\n${myName}`;
-  const t = (tone || sit.tone || "").toLowerCase();
-  if (t.includes("exec") || t.includes("c-suite")) closing = `Sincerely,\n${myName}`;
-  else if (t.includes("candidate") || t.includes("warm")) closing = `Warm regards,\n${myName}`;
-  else if (t.includes("action") || t.includes("concise")) closing = `Best,\n${myName}`;
-  else if (t.includes("diplomat") || t.includes("polite")) closing = `With sincere appreciation,\n${myName}`;
-  else if (t.includes("authoritative") || t.includes("formal")) closing = `Respectfully yours,\n${myName}`;
-  else if (t.includes("urgent")) closing = `Urgent regards,\n${myName}`;
-
-  let outSubject = subject ? subject.trim() : "";
-  let outBody = "";
-
-  // 1. Application Acknowledgment / Recruiter Response
-  if (sit.id === "application_acknowledgment" || sit.category === "Application Acknowledgment" || lower.includes("received your application") || lower.includes("reviewing applications") || lower.includes("next steps in the hiring") || lower.includes("credentials received") || (lower.includes("application") && (lower.includes("received") || lower.includes("reviewing")))) {
-    let role = "Senior Software Engineer";
-    const roleMatch = cleanInput.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
-    if (roleMatch) role = roleMatch[1].trim();
-
-    if (!outSubject) {
-      outSubject = `Application for ${role} Position – Acknowledgment`;
-    }
-
-    outBody = `${greeting}
-
-Thank you for reaching out and sharing your application for the ${role} position.
-
-We have received your email and credentials. Our team is currently reviewing applications and will be in touch regarding the next steps in the hiring process.
-
-${closing}`;
-  }
-  // 2. Candidate Reply / Recruiter Response Follow-up
-  else if (sit.id === "candidate_response" || sit.category === "Candidate Reply" || lower.includes("thank you for the update") || lower.includes("look forward to hearing") || (lower.includes("update") && (lower.includes("hearing from you") || lower.includes("application status")))) {
-    let role = "Senior Software Engineer";
-    const roleMatch = cleanInput.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
-    if (roleMatch) role = roleMatch[1].trim();
-
-    if (!outSubject) {
-      outSubject = `Re: Application for ${role} Position`;
-    }
-
-    outBody = `${greeting}
-
-Thank you for the update regarding my application for the ${role} position. I appreciate your team taking the time to review my credentials.
-
-I look forward to hearing from you regarding the next steps in the hiring process. Please let me know if any additional details or references are needed in the interim.
-
-${closing}`;
-  }
-  // 3. Leave / Sick Leave
-  else if (sit.category === "Leave/Holiday" || sit.id === "leave_request" || lower.includes("leave") || lower.includes("sick") || lower.includes("illness") || lower.includes("fever")) {
-    let days = "a few days";
-    const dayMatch = lower.match(/(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*days?/);
-    if (dayMatch) {
-      days = `${dayMatch[1]} days`;
-    }
-
-    let reasonDetail = "personal matters";
-    if (lower.includes("fever")) {
-      reasonDetail = "a high fever and acute weakness";
-    } else if (lower.includes("sick") || lower.includes("illness") || lower.includes("unwell")) {
-      reasonDetail = "an unexpected illness";
-    } else if (lower.includes("doctor") || lower.includes("hospital")) {
-      reasonDetail = "a medical appointment and prescribed recovery";
-    } else if (lower.includes("vacation") || lower.includes("trip")) {
-      reasonDetail = "personal travel";
-    }
-
-    if (!outSubject) {
-      outSubject = `Sick Leave Application – ${days.charAt(0).toUpperCase() + days.slice(1)}`;
-    }
-
-    outBody = `${greeting}
-
-I am writing to let you know that I am unwell with ${reasonDetail} and will need to take sick leave for ${days} to consult a doctor and rest.
-
-I have organized my active assignments so that pending responsibilities remain covered in my absence. If anything critical comes up that requires my direct attention, please feel free to reach me by email or phone.
-
-I expect to return to work once I am recovered and will keep you informed of my progress. Thank you very much for your understanding and support.
-
-${closing}`;
-  }
-  // 4. Meeting / Reschedule / Postpone
-  else if (sit.category === "Meeting" || sit.id === "meeting" || lower.includes("reschedule") || lower.includes("postpone") || lower.includes("demo") || lower.includes("meeting")) {
-    // Extract core reason if "because" or "due to" is present
-    let actionPart = cleanInput;
-    let reasonPart = "";
-    const becauseMatch = cleanInput.match(/^(.*?)\s+(?:because|due\s+to|as\s+a\s+result\s+of|since)\s+(.*)$/i);
-    if (becauseMatch) {
-      actionPart = becauseMatch[1].trim();
-      reasonPart = becauseMatch[2].trim();
-    }
-
-    let cleanedTopic = actionPart.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:postpone|reschedule|move|delay)\s+(?:the\s+|our\s+)?/i, "").trim();
-    if (!cleanedTopic) cleanedTopic = "Upcoming Discussion";
-    const topicTitle = cleanedTopic.charAt(0).toUpperCase() + cleanedTopic.slice(1);
-
-    if (!outSubject) {
-      outSubject = `Rescheduling Notice: ${topicTitle.slice(0, 45)}`;
-    }
-
-    let reasonParagraph = "";
-    if (reasonPart) {
-      reasonParagraph = `\n\nDue to recent developments (${reasonPart}), our team requires additional time to complete all prerequisites and ensure optimal outcomes before we proceed.`;
-    }
-
-    outBody = `${greeting}
-
-I hope you are having a productive week.
-
-I am writing to respectfully request that we reschedule our ${cleanedTopic}.${reasonParagraph}
-
-To ensure we have sufficient time for a thorough session, could we please move our meeting to a mutually convenient time later in the week? Kindly let me know your availability, or feel free to suggest an alternative time slot that fits your schedule.
-
-Thank you very much for your flexibility and understanding.
-
-${closing}`;
-  }
-  // 5. Emergency
-  else if (sit.category === "Emergency" || sit.id === "emergency" || lower.includes("emergency") || lower.includes("accident")) {
-    let emergDetail = cleanInput.replace(/^emergency\s*(?:leave)?\s*(?:today)?[:\s-]*/i, "").trim();
-    if (!emergDetail) emergDetail = "an urgent personal emergency that requires my immediate attention";
-
-    if (!outSubject) {
-      outSubject = `Urgent: Emergency Notice – Immediate Attention`;
-    }
-
-    outBody = `${greeting}
-
-I am writing to urgently inform you of an unforeseen emergency: ${emergDetail}.
-
-Because of these urgent circumstances, I must step away immediately to attend to the situation. I have coordinated with my team to ensure immediate deliverables and pending priorities are covered.
-
-Should any critical matter arise, please reach me directly on my mobile phone. I will provide an update as soon as the situation is resolved.
-
-Thank you very much for your prompt understanding and support.
-
-${closing}`;
-  }
-  // 6. Resume / Job Application
-  else if (sit.category === "Resume/Job Application" || sit.id === "job_application" || lower.includes("apply for") || lower.includes("applying for") || lower.includes("application for")) {
-    let role = "Software Engineer";
-    const roleMatch = cleanInput.match(/(?:for|as|regarding)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:position|role|job)/i);
-    if (roleMatch) role = roleMatch[1].trim();
-
-    if (!outSubject) {
-      outSubject = `Application for ${role} Position – ${myName}`;
-    }
-
-    outBody = `${greeting}
-
-I am writing to express my strong interest in the ${role} opportunity at your organization.
-
-With a solid background in engineering and a proven track record of solving complex technical challenges, I am confident in my ability to make an immediate, impactful contribution to your initiatives. I have attached my credentials and resume for your review.
-
-I would welcome the opportunity to speak with your team in an introductory interview. Thank you very much for your time and consideration.
-
-${closing}`;
-  }
-  // 7. Personal / Casual / Social Invitation
-  else if (sit.id === "personal_casual" || sit.category === "Personal / Casual" || lower.includes("date") || lower.includes("dinner") || lower.includes("lunch") || lower.includes("coffee") || lower.includes("catch up") || lower.includes("get together")) {
-    const isDate = lower.includes("date");
-    const isDinner = lower.includes("dinner");
-    const isLunch = lower.includes("lunch");
-    const isCoffee = lower.includes("coffee") || lower.includes("tea");
-
-    let activity = "get together and catch up";
-    if (isDate) activity = "go out for a date and spend some quality time together";
-    else if (isDinner) activity = "get together for dinner";
-    else if (isLunch) activity = "grab lunch together";
-    else if (isCoffee) activity = "meet up over coffee";
-
-    if (!outSubject) {
-      if (isDate) outSubject = "Dinner & Catching Up / Invitation";
-      else if (isDinner || isLunch || isCoffee) outSubject = `Let's catch up – ${isDinner ? 'Dinner' : isLunch ? 'Lunch' : 'Coffee'} invitation`;
-      else outSubject = "Catching up – Getting together";
-    }
-
-    outBody = `${greeting}
-
-I hope you are having a wonderful and productive week.
-
-I would love to invite you to ${activity} sometime soon. It would be a true pleasure to spend some quality time together and have a great conversation.
-
-Please let me know what your schedule looks like over the coming days or if there is an evening that works best for you.
-
-Looking forward to hearing from you.
-
-${closing}`;
-  }
-  // 8. General / Operational / Inquiries
-  else {
-    let stripped = cleanInput.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:tell|inform|notify|let\s+(?:the|you|everyone)\s+know)\s+(?:that|about)?\s*/i, "").trim();
-    stripped = stripped.replace(/^(?:regarding|about)[:\s-]*/i, "").trim();
-    if (!stripped) stripped = "Project and Operational Update";
-
-    const isQuestion = /^(?:can\s+we|could\s+we|is\s+it\s+possible|would\s+it\s+be\s+possible|shall\s+we|are\s+you\s+free|do\s+you\s+have\s+time)\b/i.test(stripped);
-    const isDateOrMeetup = /\b(?:date|dinner|lunch|coffee|meet|catch\s*up|outing)\b/i.test(stripped);
-
-    // Extract cause/context if "because" is used
-    let mainAction = stripped;
-    let mainCause = "";
-    const splitMatch = stripped.match(/^(.*?)\s+(?:because|due\s+to|since|as)\s+(.*)$/i);
-    if (splitMatch) {
-      mainAction = splitMatch[1].trim();
-      mainCause = splitMatch[2].trim();
-    }
-
-    if (!outSubject) {
-      if (isDateOrMeetup) {
-        outSubject = "Getting Together / Invitation";
-      } else if (isQuestion) {
-        const topic = mainAction.replace(/^(?:can\s+we|could\s+we|is\s+it\s+possible\s+to|shall\s+we)\s+/i, "");
-        outSubject = `Inquiry: ${topic.charAt(0).toUpperCase() + topic.slice(1, 45)}`;
-      } else {
-        const titleLead = mainAction.charAt(0).toUpperCase() + mainAction.slice(1);
-        outSubject = `${titleLead.slice(0, 48)}`;
-      }
-    }
-
-    let openingSentence = "";
-    if (isDateOrMeetup) {
-      openingSentence = "I would love to invite you to connect and spend some time together. I was wondering if you might be free sometime soon to catch up.";
-    } else if (isQuestion) {
-      const cleanAction = mainAction.replace(/^(?:can\s+we|could\s+we|is\s+it\s+possible\s+to|shall\s+we)\s+/i, "");
-      openingSentence = `I am writing to kindly inquire whether it might be possible to ${cleanAction}.`;
-    } else {
-      openingSentence = `I am reaching out to provide an update regarding ${mainAction}.`;
-    }
-
-    let causeSentence = "";
-    if (mainCause) {
-      causeSentence = `\n\nThis is primarily in context of ${mainCause}. We want to ensure everything is coordinated smoothly and all dependencies proceed with clarity.`;
-    }
-
-    outBody = `${greeting}
-
-I hope this message finds you well.
-
-${openingSentence}${causeSentence}
-
-Please let me know if you have any questions or if there is a convenient time for us to discuss this further. I appreciate your time and consideration.
-
-Thank you very much,
-
-${closing}`;
-  }
-
-  return {
-    subject: outSubject,
-    body: outBody,
-    greeting,
-    closing,
-    situation: sit.name,
-    category: sit.category,
-    priority: sit.priority,
-    tone: sit.tone,
-  };
-}
-
 // ----------------------------------------------------
 // Main Edge Function Server Handler
 // ----------------------------------------------------
@@ -3584,8 +3273,8 @@ serve(async (req: Request) => {
     if ((path === "/ai/generate" || path === "/generate" || path === "/ai/generate-email" || path === "/generate-email" || path === "/email/generate") && method === "POST") {
       const body = await req.json().catch(() => ({}));
       const { instruction, subject, situation, category, tone, priority, recipient, recipientName } = body;
-      const input = instruction || subject || "";
-      if (!input.trim()) return errorResponse("Please enter a subject or instruction.");
+      const input = (instruction || subject || "").trim();
+      if (!input) return errorResponse("Please enter a subject or instruction to generate an email.");
 
       const user = await getAuthUser(req, supabase);
       let senderName = user?.signature?.[0]?.name || user?.name || "";
@@ -3596,54 +3285,52 @@ serve(async (req: Request) => {
         }
       }
       if (!senderName || senderName.includes("[Your Name]")) {
-        senderName = user?.name || (user?.email ? user.email.split("@")[0] : "User");
+        senderName = user?.name || (user?.email ? user.email.split("@")[0] : "Sender");
       }
 
-      // 1. Generate via Situation Pattern Engine
+      // 1. Situation & Metadata Identification
       const sitObj = situation 
         ? (SUPPORTED_SITUATIONS.find(s => s.name === situation || s.id === situation) || detectSituationEngine(input))
         : detectSituationEngine(input);
 
-      const generated = generateNaturalEmailContent({
-        instruction: input,
-        subject,
-        recipient,
-        recipientName,
-        senderName,
-        situationObj: sitObj,
-        tone,
-      });
+      const targetTone = tone || sitObj.tone || "Corporate Professional";
+      const targetPriority = priority || sitObj.importance || "MEDIUM";
+      const cleanCategoryName = sitObj.name.replace(/^[\p{Emoji}\s]+/u, '').trim() || sitObj.category || "General";
 
-      let finalSubject = generated.subject;
-      let finalBody = generated.body;
-
-      // 2. Enhance with Google Gemini API if API key is provided
-      let geminiDebug: any = null;
+      // 2. Google Gemini API Key Validation
       const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("AI_API_KEY");
-      if (geminiApiKey) {
-        let aiData: any = null;
-        let rawText = "";
-        try {
-          const geminiPrompt = `You are an elite corporate communications strategist and executive writer.
-Your mission is to write an exceptionally professional, articulate, and authentic business email tailored precisely to the user's specific problem, reason, timeline, and request.
+      if (!geminiApiKey) {
+        return new Response(JSON.stringify({
+          error: "AI_GENERATION_FAILED",
+          message: "Google AI API key is not configured on the server. Please check GEMINI_API_KEY in Supabase secrets."
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
 
-CRITICAL EXECUTIVE WRITING STANDARDS:
-1. SPECIFICITY & FACTUAL FIDELITY:
-   - Carefully identify the user's exact problem, reason, numbers, dates, deadlines, and deliverables.
-   - Ground every statement in their actual facts (e.g. if postponing a demo due to database migration taking 4 hours, detail that exact context).
-   - NEVER misclassify general communications as job applications.
-2. CORPORATE STRUCTURE (2-3 natural paragraphs):
+      // 3. Construct Deeply Factual, Anti-Hallucination Prompt
+      const geminiPrompt = `You are Scribe AI, an elite corporate communications strategist and executive email author.
+Generate an exceptionally professional, articulate, and completely fact-grounded business email that directly reflects the user's specific problem, reason, timeline, numbers, and requested actions.
+
+CRITICAL INSTRUCTIONS:
+1. STRICT FACTUAL FIDELITY & NO HALLUCINATION:
+   - Ground the email strictly in the user's provided context, reasons, timelines, quantities, dates, and deliverables.
+   - Do NOT invent fake dates, company names, or commitments not requested by the user.
+   - Never output placeholder tokens such as "[Your Name]", "[Recipient Name]", "[Insert Date]", or "[Company Name]".
+2. STRUCTURE (2-3 natural, articulate paragraphs):
    - Professional Salutation matching recipient: "${recipientName || recipient || ''}"
-   - Paragraph 1: Courteous opening clearly articulating the primary purpose of the communication.
-   - Paragraph 2: Comprehensive context, cause, or technical rationale behind the situation.
-   - Paragraph 3: Actionable next steps, proposed alternative dates/times, or clear request.
-   - Elegant closing with sender's authentic name: "${senderName}"
-3. TONE ADAPTATION:
-   - Strictly reflect the target tone: "${tone || generated.tone}"
-   - Zero robotic cliches: NEVER write "I am reaching out to communicate regarding I need to...", "Regarding: ...", or generic templates.
-4. STRICT JSON OUTPUT FORMAT (no markdown code blocks, return pure JSON):
+   - Paragraph 1: Courteous, articulate opening clearly conveying the primary purpose of the communication.
+   - Paragraph 2: Comprehensive context, rationale, technical details, or specifics behind the situation.
+   - Paragraph 3: Actionable next steps, proposed alternatives, or timeline.
+   - Professional closing with sender's authentic name: "${senderName}"
+3. TONE & SITUATION:
+   - Target Situation: "${sitObj.name}"
+   - Target Tone: "${targetTone}"
+   - Express the message with natural human clarity, avoiding repetitive robotic cliches.
+4. STRICT JSON OUTPUT FORMAT (return pure JSON with no markdown formatting):
 {
-  "subject": "Crisp, executive corporate subject line without conversational filler",
+  "subject": "Concise, professional corporate subject line without conversational filler",
   "body": "Full body text including salutation and sign-off with proper double line breaks"
 }
 
@@ -3652,74 +3339,114 @@ USER SUBJECT (if provided): "${subject || ''}"
 RECIPIENT: "${recipientName || recipient || 'Recipient'}"
 SENDER NAME: "${senderName}"`;
 
-          const priorityModels = [
-            "models/gemini-2.0-flash",
-            "models/gemini-1.5-flash",
-            "models/gemini-2.5-flash"
-          ];
+      // 4. Model Selection with Priority Fallback
+      const priorityModels = [
+        "gemini-flash-lite-latest",
+        "gemini-2.5-flash-lite",
+        "gemini-3.5-flash-lite",
+        "gemini-flash-latest",
+        "gemini-3.7-flash",
+        "gemini-3.8-flash",
+        "gemini-pro-latest"
+      ];
 
-          for (const modelCandidate of priorityModels) {
-            try {
-              const modelEndpoint = modelCandidate.startsWith("models/") ? modelCandidate : `models/${modelCandidate}`;
-              const aiRes = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/${modelEndpoint}:generateContent?key=${geminiApiKey}`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    contents: [{ parts: [{ text: geminiPrompt }] }],
-                    generationConfig: { responseMimeType: "application/json" }
-                  }),
-                  signal: AbortSignal.timeout(3500)
-                }
-              );
-              aiData = await aiRes.json();
-              geminiDebug = { modelUsed: modelEndpoint, aiStatus: aiRes.status, aiDataError: aiData?.error || null };
-              
-              if (aiRes.status === 429) {
-                // Quota exceeded on this API key: break immediately to avoid delaying the user
-                break;
-              }
+      let rawText = "";
+      let chosenModel: string | null = null;
+      let lastError: any = null;
 
-              const genText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (genText) {
-                rawText = genText;
-                break;
-              }
-            } catch (tryErr) {
-              geminiDebug = { ...geminiDebug, tryErr: String(tryErr) };
+      for (const modelCandidate of priorityModels) {
+        try {
+          const modelEndpoint = modelCandidate.startsWith("models/") ? modelCandidate : `models/${modelCandidate}`;
+          const aiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/${modelEndpoint}:generateContent?key=${geminiApiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: geminiPrompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
+              }),
+              signal: AbortSignal.timeout(6000)
             }
+          );
+
+          if (aiRes.status === 429) {
+            // Quota exceeded: log and try next model or stop
+            lastError = { status: 429, message: "Rate limit reached" };
+            continue;
           }
 
-          if (rawText) {
-            // Strip any accidental markdown formatting
-            const cleanJson = rawText.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
-            const parsed = JSON.parse(cleanJson);
-            if (parsed.subject && typeof parsed.subject === "string") finalSubject = parsed.subject.trim();
-            if (parsed.body && typeof parsed.body === "string") finalBody = parsed.body.trim();
+          if (!aiRes.ok) {
+            const errData = await aiRes.json().catch(() => ({}));
+            lastError = { status: aiRes.status, error: errData?.error || null };
+            continue;
           }
-        } catch (e) {
-          geminiDebug = { ...geminiDebug, exception: String(e) };
-          console.warn("Gemini generation notice (using natural pattern generator):", e);
+
+          const aiData = await aiRes.json();
+          const genText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (genText && genText.trim()) {
+            rawText = genText.trim();
+            chosenModel = modelEndpoint;
+            break;
+          }
+        } catch (callErr: any) {
+          lastError = { message: callErr?.message || String(callErr) };
         }
       }
 
+      // 5. Parse Output - Absolutely ZERO Static Fallback Text
+      let parsedSubject = "";
+      let parsedBody = "";
+
+      if (rawText) {
+        try {
+          const cleanJson = rawText.replace(/^\`\`\`json\s*/i, "").replace(/^\`\`\`\s*/i, "").replace(/\s*\`\`\`$/i, "").trim();
+          const parsed = JSON.parse(cleanJson);
+          if (parsed.subject && typeof parsed.subject === "string") parsedSubject = parsed.subject.trim();
+          if (parsed.body && typeof parsed.body === "string") parsedBody = parsed.body.trim();
+        } catch (_) {
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              const parsed = JSON.parse(jsonMatch[0]);
+              if (parsed.subject && typeof parsed.subject === "string") parsedSubject = parsed.subject.trim();
+              if (parsed.body && typeof parsed.body === "string") parsedBody = parsed.body.trim();
+            } catch (_) {}
+          }
+        }
+      }
+
+      if (!parsedBody) {
+        return new Response(JSON.stringify({
+          error: "AI_GENERATION_FAILED",
+          message: "AI email generation was unable to complete due to high service demand. Please click Retry to generate.",
+          details: lastError
+        }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      const greetingLine = (parsedBody.split('\n\n')[0] || '').trim();
+
       return jsonResponse({
         success: true,
-        has_gemini_key: Boolean(geminiApiKey),
-        gemini_debug: geminiDebug,
-        situation: generated.situation,
-        category: generated.category,
-        tone: tone || generated.tone,
-        priority: priority || generated.priority,
-        subject: finalSubject,
-        suggested_subject: finalSubject,
-        body: finalBody,
-        email_body: finalBody,
-        greeting: generated.greeting,
-        closing: generated.closing,
-        attachment_recommended: generated.situation.includes("Resume"),
-        attachment_filename: generated.situation.includes("Resume") ? "resume.pdf" : null,
+        emailType: cleanCategoryName,
+        situation: sitObj.name,
+        category: cleanCategoryName,
+        tone: targetTone,
+        priority: targetPriority,
+        importance: targetPriority,
+        urgency: sitObj.urgency,
+        subject: parsedSubject || subject || cleanCategoryName,
+        suggested_subject: parsedSubject || subject || cleanCategoryName,
+        body: parsedBody,
+        email_body: parsedBody,
+        greeting: greetingLine,
+        closing: `Best regards,\n${senderName}`,
+        attachment_recommended: Boolean(sitObj.name.includes("Resume")),
+        attachment_filename: sitObj.name.includes("Resume") ? "resume.pdf" : null,
+        model_used: chosenModel
       });
     }
 

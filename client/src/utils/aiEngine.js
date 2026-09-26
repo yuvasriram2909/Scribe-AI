@@ -1,3 +1,4 @@
+import { apiFetch, safeParseResponse } from './api';
 /**
  * ============================================================================
  * Scribe AI — Intelligent Professional Email Generation & Classification Engine
@@ -691,10 +692,11 @@ export function determineClosing(toneId = 'corporate_professional', myName = 'Se
 }
 
 /**
- * Intelligent Professional Email Generator
- * Assembles human-crafted, grammatically polished, fact-grounded emails tailored strictly to user intent and tone
+ * Real AI-Powered Email Generation via Google Gemini Backend
+ * NEVER returns hardcoded, canned, or mock emails.
+ * If AI fails, throws structured AI_GENERATION_FAILED error.
  */
-export function generateIntelligentEmail({
+export async function generateAIEmail({
   instruction = '',
   userSubject = '',
   recipient = '',
@@ -704,687 +706,66 @@ export function generateIntelligentEmail({
   customPriority = null,
   senderName = ''
 }) {
-  const rawInput = instruction.trim() || userSubject.trim();
-  const input = cleanUserInput(rawInput);
-  const lower = input.toLowerCase();
-  const facts = extractFactualDetails(input);
-  
-  // 1. Intent Classification
+  const rawInput = (instruction || userSubject || '').trim();
+  if (!rawInput) {
+    throw new Error('Please enter a subject or problem description to generate an email.');
+  }
+
+  // 1. Identify category & tone metadata
   const category = customCategory 
-    ? (EMAIL_CATEGORIES.find(c => c.id === customCategory || c.name === customCategory) || classifyEmailIntent(input, userSubject))
-    : classifyEmailIntent(input, userSubject);
+    ? (EMAIL_CATEGORIES.find(c => c.id === customCategory || c.name === customCategory) || classifyEmailIntent(rawInput, userSubject))
+    : classifyEmailIntent(rawInput, userSubject);
 
   const rawTone = customTone || category.defaultTone;
   const toneId = normalizeToneId(rawTone);
   const activeToneObj = ADVANCED_TONES.find(t => t.id === toneId) || ADVANCED_TONES[0];
   const priority = customPriority || category.importance;
-  const urgency = category.urgency;
-
-  // 2. Greeting & Sign-off
-  const greeting = determineGreeting(recipient, facts.recipientType, toneId);
-  const myName = getSenderDisplayName(senderName);
-  const closing = determineClosing(toneId, myName);
-
-  let finalSubject = userSubject.trim();
-  let bodyContent = '';
-
-  const role = facts.jobRole || 'Senior Software Engineer';
-  const attachmentLine = hasAttachment 
-    ? 'I have attached my comprehensive resume and credentials for your review.' 
-    : 'I would be delighted to share my detailed resume and credentials upon your request.';
-
-  // 3. Category & Tone Specific Structural Content
-  switch (category.id) {
-    case 'application_acknowledgment': {
-      // Exactly matches real-world recruiter communication shown in user's Gmail screenshot
-      if (!finalSubject) {
-        finalSubject = `Application for ${role} Position – Acknowledgment`;
-      }
-
-      if (toneId === 'action_concise') {
-        bodyContent = `${greeting}
-
-Thank you for your application for the ${role} position.
-
-Status Update:
-- Credentials & Portfolio: Received and logged
-- Review Pipeline: Candidate profiles are actively being assessed by our hiring committee
-- Next Steps: Shortlisted candidates will be contacted within 3–5 business days for initial conversations
-
-${closing}`;
-      } else if (toneId === 'executive') {
-        bodyContent = `${greeting}
-
-Thank you for your interest in joining our engineering organization for the ${role} position.
-
-We have received your email and credentials. Our leadership team is evaluating submissions to align with our technical strategy and architectural roadmap. Should your background match our strategic priorities, we will be in touch directly.
-
-${closing}`;
-      } else if (toneId === 'warm_collaborative') {
-        bodyContent = `${greeting}
-
-Thank you so much for reaching out and sharing your application for the ${role} position!
-
-We have safely received your email and credentials. We know how much dedication goes into putting together your application, and our team is excited to review your background. We will be in touch shortly regarding the next steps in our hiring process.
-
-${closing}`;
-      } else {
-        // Standard Recruiter / HR Response (Matching the screenshot perfectly)
-        bodyContent = `${greeting}
-
-Thank you for reaching out and sharing your application for the ${role} position.
-
-We have received your email and credentials. Our team is currently reviewing applications and will be in touch regarding the next steps in the hiring process.
-
-${closing}`;
-      }
-      break;
-    }
-
-    case 'candidate_response': {
-      // Direct response to recruiter updates or application status notifications
-      if (!finalSubject) {
-        finalSubject = `Re: Application for ${role} Position`;
-      }
-
-      if (toneId === 'action_concise') {
-        // Direct match with Gmail suggested quick reply in screenshot
-        bodyContent = `${greeting}
-
-Thank you for the update. I look forward to hearing from you.
-
-${closing}`;
-      } else if (toneId === 'executive') {
-        bodyContent = `${greeting}
-
-Thank you for the update regarding the review timeline for the ${role} position.
-
-I appreciate your team's evaluation and remain eager to discuss how my technical leadership and architectural experience align with your strategic milestones.
-
-${closing}`;
-      } else if (toneId === 'candidate_application' || toneId === 'warm_collaborative') {
-        bodyContent = `${greeting}
-
-Thank you very much for confirming receipt of my application for the ${role} position and for the update on the hiring timeline.
-
-I am enthusiastic about the opportunity to contribute to your engineering team. I look forward to hearing from you regarding the next steps, and please feel free to reach out if you need any additional materials in the meantime.
-
-${closing}`;
-      } else {
-        // Polite & Diplomatic / Corporate Professional standard
-        bodyContent = `${greeting}
-
-Thank you for the update regarding my application for the ${role} position. I appreciate your team taking the time to review my credentials.
-
-I look forward to hearing from you regarding the next steps in the hiring process. Please let me know if any additional details or references are needed in the interim.
-
-${closing}`;
-      }
-      break;
-    }
-
-    case 'job_application': {
-      if (!finalSubject) {
-        finalSubject = `Application for ${role} Position – ${myName}`;
-      }
-
-      if (toneId === 'executive') {
-        bodyContent = `${greeting}
-
-I am writing to submit my formal candidacy for the ${role} position at your organization.
-
-Throughout my career, I have focused on engineering scalable architectures, driving technical excellence, and aligning complex development with core business milestones. I would welcome an introductory discussion regarding how my background and leadership can advance your strategic technical objectives.
-
-${attachmentLine}
-
-Thank you for your time, and I look forward to our conversation.
-
-${closing}`;
-      } else if (toneId === 'action_concise') {
-        bodyContent = `${greeting}
-
-Please accept my application for the ${role} position.
-
-Key Highlights:
-- Extensive experience architecting and delivering high-impact, scalable software solutions
-- Strong track record of practical problem solving, performance tuning, and cross-functional delivery
-- Deep technical mastery aligned with your team's stack and production requirements
-
-${attachmentLine} I look forward to speaking with your team.
-
-${closing}`;
-      } else if (toneId === 'candidate_application') {
-        bodyContent = `${greeting}
-
-I am excited to submit my application for the ${role} position at your organization.
-
-Having developed and deployed production-grade applications with a strong emphasis on clean code, system performance, and reliability, I am eager to bring my technical skills and collaborative mindset to your team. ${attachmentLine}
-
-I look forward to discussing how my background aligns with your team's upcoming milestones. Thank you for your time and consideration.
-
-${closing}`;
-      } else if (toneId === 'formal_authoritative' || toneId === 'polite_diplomatic') {
-        bodyContent = `${greeting}
-
-I am writing to formally present my application for the ${role} position with your organization.
-
-I possess a solid technical background, a deep dedication to engineering excellence, and extensive experience delivering dependable software architectures. It would be a privilege to contribute to your organization's continued success. ${attachmentLine}
-
-I respectfully request the opportunity to discuss my qualifications with your team at your earliest convenience. Thank you for your courteous consideration.
-
-${closing}`;
-      } else {
-        // Corporate Professional (Clean, authentic, articulate)
-        bodyContent = `${greeting}
-
-I am writing to express my strong interest in the ${role} opportunity at your organization.
-
-With a dedicated background in this domain, practical problem-solving experience, and a proven track record of delivering quality results, I am confident in my ability to make a meaningful and immediate contribution to your team's goals. ${attachmentLine}
-
-I would welcome the opportunity to discuss how my qualifications align with your requirements in an interview. Thank you very much for your time and consideration.
-
-${closing}`;
-      }
-      break;
-    }
-
-    case 'leave_request': {
-      const durText = facts.duration || 'a few days';
-      let reasonDetail = 'personal health matters';
-      if (lower.includes('fever')) {
-        reasonDetail = 'a high fever and acute weakness';
-      } else if (lower.includes('sick') || lower.includes('illness') || lower.includes('unwell')) {
-        reasonDetail = 'an unexpected illness';
-      } else if (lower.includes('doctor') || lower.includes('hospital')) {
-        reasonDetail = 'a medical consultation and prescribed recovery';
-      } else if (lower.includes('vacation') || lower.includes('trip') || lower.includes('holiday')) {
-        reasonDetail = 'planned personal travel';
-      }
-
-      if (!finalSubject) {
-        finalSubject = `Leave Request – ${durText.charAt(0).toUpperCase() + durText.slice(1)}`;
-      }
-
-      if (toneId === 'action_concise') {
-        bodyContent = `${greeting}
-
-Notice of Absence: ${durText} due to ${reasonDetail}.
-
-Coverage Plan:
-- Current deliverables: Documented and assigned to team coverage
-- Escalation contact: Available on phone for critical emergencies only
-- Expected return: Immediately following recovery
-
-Thank you for your support.
-
-${closing}`;
-      } else if (toneId === 'executive') {
-        bodyContent = `${greeting}
-
-Please be advised that I will be taking leave for ${durText} starting today due to ${reasonDetail}.
-
-I have ensured all active workstreams are organized and that critical priorities remain under active coverage. Should an urgent matter require my direct attention, I will be accessible via mobile phone.
-
-Thank you for your understanding.
-
-${closing}`;
-      } else {
-        bodyContent = `${greeting}
-
-I am writing to inform you that I am currently unwell with ${reasonDetail} and will need to take leave for ${durText} to consult a physician and rest.
-
-I have organized my active tasks and coordinated with the team to ensure that ongoing responsibilities remain covered during my absence. If any critical situation arises, please feel free to reach me via email or phone.
-
-I expect to resume work promptly following my recovery. Thank you very much for your understanding and cooperation.
-
-${closing}`;
-      }
-      break;
-    }
-
-    case 'emergency': {
-      let emergDetail = input.replace(/^emergency\s*(?:leave)?\s*(?:today)?[:\s-]*/i, '').trim();
-      if (!emergDetail) emergDetail = 'an urgent family emergency requiring my immediate attention';
-
-      if (!finalSubject) {
-        finalSubject = `Urgent: Emergency Leave Notice – Today`;
-      }
-
-      bodyContent = `${greeting}
-
-I am writing to urgently let you know that an unforeseen emergency has occurred today: ${emergDetail}.
-
-Due to these critical circumstances, I need to step away immediately to attend to this matter. I have briefed team colleagues on immediate priorities to ensure coverage during my absence.
-
-Should any critical matter require my urgent attention, please reach me directly on my mobile phone. I will provide an update as soon as the situation is stabilized.
-
-Thank you very much for your prompt understanding and support.
-
-${closing}`;
-      break;
-    }
-
-    case 'meeting': {
-      // Deconstruct action vs cause/reason (e.g. "postpone tomorrow sprint demo ... because ...")
-      let actionPart = input;
-      let reasonPart = '';
-      const becauseMatch = input.match(/^(.*?)\s+(?:because|due\s+to|as\s+a\s+result\s+of|since)\s+(.*)$/i);
-      if (becauseMatch) {
-        actionPart = becauseMatch[1].trim();
-        reasonPart = becauseMatch[2].trim();
-      }
-
-      let cleanedTopic = actionPart.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:postpone|reschedule|move|delay)\s+(?:the\s+|our\s+)?/i, '').trim();
-      if (!cleanedTopic) cleanedTopic = 'Upcoming Discussion';
-      const topicTitle = cleanedTopic.charAt(0).toUpperCase() + cleanedTopic.slice(1);
-
-      if (!finalSubject) {
-        finalSubject = `Rescheduling Notice: ${topicTitle.slice(0, 45)}`;
-      }
-
-      let reasonContext = reasonPart 
-        ? `Due to unexpected staging developments (${reasonPart}), our team requires additional time to ensure complete stability and verification prior to the session.`
-        : 'Due to unforeseen operational priorities, our team requires a short window to finalize all deliverables prior to the session.';
-
-      if (toneId === 'action_concise') {
-        bodyContent = `${greeting}
-
-Schedule Adjustment Request: ${cleanedTopic}
-
-- Reason: ${reasonPart || 'Finalizing prerequisites and ensuring quality verification'}
-- Proposed Action: Move scheduled demo/discussion to an updated time slot later this week
-- Requested Confirmation: Please reply with your availability or preferred 30-minute window
-
-Thank you for your flexibility,
-
-${closing}`;
-      } else if (toneId === 'executive') {
-        bodyContent = `${greeting}
-
-I am writing to request that we reschedule our ${cleanedTopic}.
-
-${reasonContext}
-
-To ensure we deliver a focused and high-value demonstration, we would like to propose holding this session later in the week. Please let me know your availability for an alternative time slot.
-
-Sincerely,
-
-${closing}`;
-      } else if (toneId === 'polite_diplomatic') {
-        bodyContent = `${greeting}
-
-I hope you are having a productive week.
-
-I am writing to respectfully ask if it might be possible to reschedule our ${cleanedTopic}.
-
-${reasonContext} We truly appreciate your team's partnership, and we want to ensure everything is thoroughly prepared for a productive conversation.
-
-Could you kindly share a few time slots later this week or next that fit your schedule? Thank you very much for your courteous understanding and flexibility.
-
-${closing}`;
-      } else {
-        // Corporate Professional standard
-        bodyContent = `${greeting}
-
-I hope you are having a productive week.
-
-I am writing to respectfully request that we reschedule our ${cleanedTopic}.
-
-${reasonContext}
-
-To ensure we provide a comprehensive walkthrough and address all technical aspects thoroughly, could we please move our meeting to a mutually convenient time later in the week? Kindly let me know your availability so we can confirm an updated calendar invite.
-
-Thank you very much for your flexibility and understanding.
-
-${closing}`;
-      }
-      break;
-    }
-
-    case 'follow_up': {
-      let followTopic = input.replace(/^follow\s*up\s*(?:on)?[:\s-]*/i, '').trim();
-      if (!followTopic) followTopic = 'our earlier correspondence';
-
-      if (!finalSubject) {
-        finalSubject = `Following Up: ${followTopic.slice(0, 40)}`;
-      }
-
-      if (toneId === 'action_concise') {
-        bodyContent = `${greeting}
-
-Quick check-in regarding ${followTopic}:
-
-- Current status: Pending review and next steps
-- Action needed: Please confirm if additional details or approvals are required from our end
-- Next milestone: Awaiting your feedback to proceed with scheduling
-
-Thank you,
-
-${closing}`;
-      } else if (toneId === 'executive') {
-        bodyContent = `${greeting}
-
-Following up on our previous discussion regarding ${followTopic}.
-
-To maintain momentum on our strategic timeline, could you please provide a brief status update or advise if any blockers need to be resolved? I would appreciate your guidance so we can finalize our schedule.
-
-${closing}`;
-      } else {
-        bodyContent = `${greeting}
-
-I hope this email finds you well.
-
-I am writing to briefly check in regarding ${followTopic}.
-
-Could you please let me know if you have had an opportunity to review this, or if any additional details are needed from my end to help move things forward? I am happy to hop on a brief call whenever convenient.
-
-Thank you for your time and assistance.
-
-${closing}`;
-      }
-      break;
-    }
-
-    case 'business_proposal': {
-      let propDetail = input.replace(/^proposal[:\s-]*/i, '').trim();
-      if (!propDetail) propDetail = 'collaborative strategic partnership';
-
-      if (!finalSubject) {
-        finalSubject = `Proposal: ${propDetail.slice(0, 40)}`;
-      }
-
-      bodyContent = `${greeting}
-
-I am pleased to present our proposal regarding ${propDetail}.
-
-Based on your organization's key priorities, we have outlined a targeted solution designed to optimize efficiency, accelerate delivery timelines, and drive measurable return on investment.
-
-We would welcome the opportunity to walk you through the key milestones and answer any questions your team may have. Please let us know if you are available for a brief introductory call this week.
-
-Thank you for your consideration, and we look forward to the prospect of working together.
-
-${closing}`;
-      break;
-    }
-
-    case 'payment_invoice': {
-      if (lower.includes('extension') || lower.includes('rent') || lower.includes('extend')) {
-        let actionPart = input;
-        let reasonPart = '';
-        const becauseMatch = input.match(/^(.*?)\s+(?:because|due\s+to|since|as)\s+(.*)$/i);
-        if (becauseMatch) {
-          actionPart = becauseMatch[1].trim();
-          reasonPart = becauseMatch[2].trim();
-        }
-
-        let cleanExt = actionPart.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:request|ask\s+for)?\s*(?:an?\s+)?/i, '').trim();
-        const extTitle = cleanExt.charAt(0).toUpperCase() + cleanExt.slice(1);
-        if (!finalSubject) {
-          finalSubject = `Payment Extension Request – ${extTitle.slice(0, 42)}`;
-        }
-
-        let reasonText = reasonPart
-          ? `Due to unforeseen timing (${reasonPart}), there has been a temporary delay in available funds.`
-          : 'Due to unexpected banking processing times, there has been a temporary hold on funds.';
-
-        bodyContent = `${greeting}
-
-I hope this message finds you well.
-
-I am writing to respectfully request a short extension regarding ${cleanExt}.
-
-${reasonText} I am actively coordinating to ensure this is cleared promptly and anticipate fulfilling the payment in full immediately upon resolution.
-
-I deeply appreciate your understanding and flexibility regarding this matter. Please let me know if this proposed arrangement is acceptable.
-
-Thank you very much for your patience.
-
-${closing}`;
-        break;
-      }
-
-      let payDetail = input.replace(/^invoice\s*(?:and)?\s*payment[:\s-]*/i, '').trim();
-      if (!payDetail) payDetail = 'outstanding services';
-
-      if (!finalSubject) {
-        finalSubject = `Invoice & Payment Request: ${payDetail.slice(0, 40)}`;
-      }
-
-      bodyContent = `${greeting}
-
-I hope this email finds you well.
-
-I am writing to share the invoice details regarding ${payDetail}.
-
-Please review the attached statement and arrange for processing in accordance with our agreed terms. Kindly confirm receipt and let me know if your finance team requires any additional documentation or purchase order references.
-
-Thank you very much for your prompt cooperation and continued partnership.
-
-${closing}`;
-      break;
-    }
-
-    case 'complaint': {
-      let compDetail = input.replace(/^complaint[:\s-]*/i, '').trim();
-      if (!compDetail) compDetail = 'recent service delivery issues';
-
-      if (!finalSubject) {
-        finalSubject = `Formal Concern: ${compDetail.slice(0, 40)}`;
-      }
-
-      bodyContent = `${greeting}
-
-I am writing to formally bring an important matter to your attention regarding ${compDetail}.
-
-Unfortunately, this issue has caused significant inconvenience and falls below the standard of quality we expected. I kindly request your immediate review into this situation and an update on corrective measures or resolution at your earliest convenience.
-
-I appreciate your prompt attention to this matter and look forward to your response.
-
-${closing}`;
-      break;
-    }
-
-    case 'apology': {
-      let apolDetail = input.replace(/^apolog(?:y|ize)[:\s-]*/i, '').trim();
-      if (!apolDetail) apolDetail = 'the recent delay and oversight';
-
-      if (!finalSubject) {
-        finalSubject = `Apology Regarding: ${apolDetail.slice(0, 35)}`;
-      }
-
-      bodyContent = `${greeting}
-
-Please accept my sincere apologies regarding ${apolDetail}.
-
-I take full responsibility for this occurrence and understand the inconvenience it may have caused. We have already instituted corrective actions to ensure that this does not recur and that our future deliverables meet the highest standard of dependability.
-
-Thank you for your patience and understanding as we resolve this matter.
-
-${closing}`;
-      break;
-    }
-
-    case 'thank_you': {
-      let thankDetail = input.replace(/^thank\s*you\s*(?:for)?[:\s-]*/i, '').trim();
-      if (!thankDetail) thankDetail = 'your outstanding collaboration and guidance';
-
-      if (!finalSubject) {
-        finalSubject = `Sincere Thanks & Appreciation`;
-      }
-
-      bodyContent = `${greeting}
-
-I wanted to take a moment to express my sincere appreciation for ${thankDetail}.
-
-Your support made a significant difference, and I truly value the time, dedication, and insight you contributed. It is an absolute pleasure collaborating with you.
-
-Thank you once again!
-
-${closing}`;
-      break;
-    }
-
-    case 'personal_casual': {
-      const isDate = lower.includes('date');
-      const isDinner = lower.includes('dinner');
-      const isLunch = lower.includes('lunch');
-      const isCoffee = lower.includes('coffee') || lower.includes('tea');
-
-      let activity = 'get together and catch up';
-      if (isDate) activity = 'go out for a date and spend some quality time together';
-      else if (isDinner) activity = 'get together for dinner';
-      else if (isLunch) activity = 'grab lunch together';
-      else if (isCoffee) activity = 'meet up over coffee';
-
-      if (!finalSubject) {
-        if (isDate) finalSubject = 'Dinner & Catching Up / Invitation';
-        else if (isDinner || isLunch || isCoffee) finalSubject = `Let's catch up – ${isDinner ? 'Dinner' : isLunch ? 'Lunch' : 'Coffee'} invitation`;
-        else finalSubject = 'Catching up – Getting together';
-      }
-
-      if (toneId === 'polite_diplomatic' || toneId === 'corporate_professional') {
-        bodyContent = `${greeting}
-
-I hope you are having a wonderful and productive week.
-
-I would love to invite you to ${activity} sometime soon. It would be a true pleasure to spend some quality time together and have a great conversation.
-
-Please let me know what your schedule looks like over the coming days or if there is an evening that works best for you.
-
-Looking forward to hearing from you.
-
-${closing}`;
-      } else if (toneId === 'action_concise') {
-        bodyContent = `${greeting}
-
-I hope you're having a great week!
-
-Would love to ${activity} sometime soon. Let me know if you are free in the coming days or what day and time works best for you.
-
-Looking forward to it!
-
-${closing}`;
-      } else {
-        // Warm & Collaborative / Friendly
-        bodyContent = `${greeting}
-
-I hope you're having a wonderful week!
-
-I was wondering if you might be free sometime soon to ${activity}. It would be really wonderful to see you and catch up properly.
-
-Let me know what your week looks like or if there's a day that suits you best. No pressure at all—looking forward to hearing from you!
-
-${closing}`;
-      }
-      break;
-    }
-
-    default: {
-      let stripped = input.replace(/^(?:i\s+(?:need|want|would\s+like)\s+to\s+)?(?:tell|inform|notify|let\s+(?:the|you|everyone)\s+know)\s+(?:that|about)?\s*/i, '').trim();
-      stripped = stripped.replace(/^(?:regarding|about)[:\s-]*/i, '').trim();
-      if (!stripped) stripped = 'Project and Operational Update';
-
-      // Clean conversational question starters
-      const isQuestion = /^(?:can\s+we|could\s+we|is\s+it\s+possible|would\s+it\s+be\s+possible|shall\s+we|are\s+you\s+free|do\s+you\s+have\s+time)\b/i.test(stripped);
-      const isDateOrMeetup = /\b(?:date|dinner|lunch|coffee|meet|catch\s*up|outing)\b/i.test(stripped);
-
-      // Extract cause / background if "because" or "due to" is present
-      let mainAction = stripped;
-      let mainCause = '';
-      const splitMatch = stripped.match(/^(.*?)\s+(?:because|due\s+to|since|as)\s+(.*)$/i);
-      if (splitMatch) {
-        mainAction = splitMatch[1].trim();
-        mainCause = splitMatch[2].trim();
-      }
-
-      if (!finalSubject) {
-        if (isDateOrMeetup) {
-          finalSubject = 'Getting Together / Invitation';
-        } else if (isQuestion) {
-          const topic = mainAction.replace(/^(?:can\s+we|could\s+we|is\s+it\s+possible\s+to|shall\s+we)\s+/i, '');
-          finalSubject = `Inquiry: ${topic.charAt(0).toUpperCase() + topic.slice(1, 45)}`;
-        } else {
-          const titleLead = mainAction.charAt(0).toUpperCase() + mainAction.slice(1);
-          finalSubject = `${titleLead.slice(0, 48)}`;
-        }
-      }
-
-      let openingSentence = '';
-      if (isDateOrMeetup) {
-        openingSentence = `I would love to invite you to connect and spend some time together. I was wondering if you might be free sometime soon to catch up.`;
-      } else if (isQuestion) {
-        const cleanAction = mainAction.replace(/^(?:can\s+we|could\s+we|is\s+it\s+possible\s+to|shall\s+we)\s+/i, '');
-        openingSentence = `I am writing to kindly inquire whether it might be possible to ${cleanAction}.`;
-      } else {
-        openingSentence = `I am reaching out to provide an update regarding ${mainAction}.`;
-      }
-
-      let causeParagraph = '';
-      if (mainCause) {
-        causeParagraph = `\n\nThis is primarily in context of ${mainCause}. We want to ensure everything is coordinated smoothly and all milestones proceed with clarity.`;
-      }
-
-      if (toneId === 'action_concise') {
-        bodyContent = `${greeting}
-
-${openingSentence}${causeParagraph}
-
-Next Steps:
-- Please review and let me know your thoughts or availability
-- Happy to answer any questions or align on details
-
-Best,
-
-${closing}`;
-      } else if (toneId === 'executive') {
-        bodyContent = `${greeting}
-
-${openingSentence}${causeParagraph}
-
-Please let me know if this aligns with your schedule and current priorities. I welcome the opportunity to discuss further at your earliest convenience.
-
-Sincerely,
-
-${closing}`;
-      } else if (toneId === 'polite_diplomatic') {
-        bodyContent = `${greeting}
-
-I hope you are having a productive and pleasant week.
-
-${openingSentence}${causeParagraph}
-
-Please feel free to share your thoughts at your convenience. I truly appreciate your time, consideration, and continued collaboration.
-
-${closing}`;
-      } else {
-        // Corporate Professional standard - elegant, articulate, authentic
-        bodyContent = `${greeting}
-
-I hope this message finds you well.
-
-${openingSentence}${causeParagraph}
-
-Please let me know if you have any questions or if there is a convenient time for us to discuss this further. I appreciate your time and consideration.
-
-Thank you very much,
-
-${closing}`;
-      }
-      break;
-    }
+  const activeSenderName = getSenderDisplayName(senderName);
+
+  // 2. Call Supabase Edge Function with Google AI / Gemini
+  const response = await apiFetch('/api/ai/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      instruction: rawInput,
+      subject: userSubject ? userSubject.trim() : '',
+      situation: `${category.icon || ''} ${category.name}`.trim(),
+      category: category.name,
+      tone: activeToneObj.name,
+      priority,
+      recipient: recipient ? recipient.trim() : '',
+      senderName: activeSenderName
+    })
+  });
+
+  const data = await safeParseResponse(response);
+
+  if (!data || data.error || !data.body) {
+    const errorMsg = data?.message || data?.error || 'AI generation failed. Please try again.';
+    const err = new Error(errorMsg);
+    err.code = data?.error || 'AI_GENERATION_FAILED';
+    err.details = data?.details;
+    throw err;
   }
 
   return {
-    subject: finalSubject,
-    body: bodyContent,
-    category: category.name,
+    subject: data.subject || userSubject || `${category.name} Communication`,
+    body: data.body,
+    category: data.category || category.name,
     categoryId: category.id,
-    situation: `${category.icon} ${category.name}`,
-    priority,
-    tone: activeToneObj.name,
+    situation: data.situation || `${category.icon || ''} ${category.name}`.trim(),
+    priority: data.priority || priority,
+    importance: data.priority || priority,
+    tone: data.tone || activeToneObj.name,
     toneId: activeToneObj.id,
-    urgency,
-    greeting,
-    closing
+    urgency: data.urgency || category.urgency,
+    greeting: data.greeting || '',
+    closing: data.closing || '',
+    attachment_recommended: data.attachment_recommended || Boolean(category.id === 'job_application' || category.id === 'resume_submission'),
+    attachment_filename: data.attachment_filename || (category.id === 'job_application' || category.id === 'resume_submission' ? 'resume.pdf' : null),
+    modelUsed: data.model_used || null
   };
 }
+
+// Backward compatibility alias:
+export const generateIntelligentEmail = generateAIEmail;
