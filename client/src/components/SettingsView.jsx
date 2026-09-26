@@ -19,6 +19,7 @@ import {
 import { apiFetch, safeParseResponse, getApiBaseUrl, setCustomBackendUrl, DEFAULT_SUPABASE_EDGE_FUNCTION } from '../utils/api';
 import { signInWithGoogle } from '../utils/supabaseClient';
 import { formatNormalDateTime } from '../utils/dateUtils';
+import { connectionManager, ConnectionStates } from '../utils/connectionManager';
 
 export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
   // Current logged in user profile
@@ -32,21 +33,41 @@ export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
     isConnected: false
   });
 
-  // Gmail OAuth status
+  // Gmail OAuth status initialized directly from connectionManager
+  const initialConn = connectionManager.getState();
   const [authStatus, setAuthStatus] = useState({
-    isConnected: false,
-    status: 'DISCONNECTED',
-    connectedEmail: null,
-    mailboxEmail: null,
-    hasModifyScope: false,
-    hasSendScope: false,
-    needsReauth: false,
-    scope: '',
+    isConnected: initialConn.isConnected,
+    status: initialConn.status || (initialConn.isConnected ? 'CONNECTED' : 'DISCONNECTED'),
+    connectedEmail: initialConn.connectedEmail || null,
+    mailboxEmail: initialConn.mailboxEmail || initialConn.connectedEmail || null,
+    hasModifyScope: initialConn.hasModifyScope,
+    hasSendScope: initialConn.hasSendScope,
+    needsReauth: initialConn.needsReauth,
+    scope: initialConn.scope || '',
     lastSyncedAt: null,
     syncStatus: 'IDLE',
     isGoogleConfigured: true,
-    mode: 'Checking connection...'
+    mode: initialConn.isConnected ? 'Gmail OAuth Active' : 'Not Connected'
   });
+
+  useEffect(() => {
+    const unsub = connectionManager.subscribe((st) => {
+      setAuthStatus(prev => ({
+        ...prev,
+        isConnected: st.isConnected,
+        status: st.status || (st.isConnected ? 'CONNECTED' : 'DISCONNECTED'),
+        connectedEmail: st.connectedEmail || null,
+        mailboxEmail: st.mailboxEmail || st.connectedEmail || null,
+        hasModifyScope: st.hasModifyScope,
+        hasSendScope: st.hasSendScope,
+        needsReauth: st.needsReauth,
+        scope: st.scope || '',
+        mode: st.isConnected ? 'Gmail OAuth Active' : 'Not Connected'
+      }));
+    });
+    return unsub;
+  }, []);
+
   const [connectingGoogle, setConnectingGoogle] = useState(false);
   const [syncingGmail, setSyncingGmail] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
@@ -150,27 +171,8 @@ export function SettingsView({ currentUserName, currentUserEmail, onLogout }) {
   const handleDisconnect = async () => {
     if (!window.confirm('Are you sure you want to disconnect your Google account?')) return;
     try {
-      const res = await apiFetch('/api/auth/google/disconnect', { method: 'POST' });
-      const data = await safeParseResponse(res);
-      if (data.success) {
-        setAuthStatus({
-          isConnected: false,
-          status: 'DISCONNECTED',
-          connectedEmail: null,
-          mailboxEmail: null,
-          hasModifyScope: false,
-          hasSendScope: false,
-          needsReauth: false,
-          scope: '',
-          lastSyncedAt: null,
-          syncStatus: 'IDLE',
-          isGoogleConfigured: true,
-          mode: 'Not Connected'
-        });
-        fetchSettings();
-      } else {
-        alert(data.error || 'Failed to disconnect account.');
-      }
+      await connectionManager.disconnect();
+      fetchSettings();
     } catch (err) {
       alert('Error disconnecting: ' + err.message);
     }

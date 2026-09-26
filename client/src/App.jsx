@@ -32,6 +32,7 @@ import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { TermsOfService } from './components/TermsOfService';
 import { apiFetch } from './utils/api';
 import { supabase, subscribeToNotificationChanges, signOutUser } from './utils/supabaseClient';
+import { connectionManager, ConnectionStates } from './utils/connectionManager';
 
 export default function App() {
   // Lock theme permanently to dark mode
@@ -55,12 +56,21 @@ export default function App() {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [composeInitialData, setComposeInitialData] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isGmailConnected, setIsGmailConnected] = useState(false);
-  const [needsReauth, setNeedsReauth] = useState(false);
+  const [isGmailConnected, setIsGmailConnected] = useState(() => connectionManager.getState().isConnected);
+  const [needsReauth, setNeedsReauth] = useState(() => connectionManager.getState().needsReauth);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const userDropdownTimeoutRef = useRef(null);
   const lastKnownNotifsRef = useRef(new Set());
   const isInitialNotifLoadRef = useRef(true);
+
+  // Subscribe to authoritative connection manager
+  useEffect(() => {
+    const unsub = connectionManager.subscribe((connState) => {
+      setIsGmailConnected(connState.isConnected);
+      setNeedsReauth(connState.needsReauth);
+    });
+    return unsub;
+  }, []);
 
   // Deep Email History Filter State for Card Clicks & Navigation
   const [historyFilters, setHistoryFilters] = useState({
@@ -204,6 +214,9 @@ export default function App() {
           }
           if (typeof u.isConnected === 'boolean') {
             setIsGmailConnected(u.isConnected);
+            if (u.isConnected) {
+              connectionManager.setConnected({ email: u.connectedEmail || u.email });
+            }
           }
         }
       })
@@ -234,7 +247,7 @@ export default function App() {
         }
 
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-          checkGmailConnection();
+          checkGmailConnection(true);
           apiFetch('/api/gmail/sync', { method: 'POST' }).catch(() => {});
         }
       } else if (event === 'SIGNED_OUT') {
@@ -244,6 +257,7 @@ export default function App() {
         localStorage.removeItem('userName');
         localStorage.removeItem('userId');
         localStorage.removeItem('authToken');
+        connectionManager.resetOnLogout();
         setIsGmailConnected(false);
         setUnreadNotifCount(0);
       }
@@ -363,7 +377,8 @@ export default function App() {
       setToastMessage(`✓ Logged in as ${nameParam || emailParam || 'User'}! Gmail connected.`);
       window.history.replaceState({}, '', '/app');
       setTimeout(() => setToastMessage(''), 5000);
-      checkGmailConnection();
+      connectionManager.setConnected({ email: emailParam || null });
+      checkGmailConnection(true);
       // Auto-trigger sync immediately upon connecting Gmail
       apiFetch('/api/gmail/sync', { method: 'POST' }).catch(() => {});
     } else if (params.get('gmail') === 'missing_scopes') {
@@ -443,24 +458,12 @@ export default function App() {
     }
   };
 
-  const checkGmailConnection = async () => {
+  const checkGmailConnection = async (force = false) => {
     try {
-      const res = await apiFetch('/api/auth/status');
-      if (res.ok) {
-        const data = await res.json();
-        setIsGmailConnected(!!data.isConnected);
-        setNeedsReauth(!!data.needsReauth);
-        if (data.connectedEmail) {
-          localStorage.setItem('connectedEmail', data.connectedEmail);
-        }
-      } else {
-        setIsGmailConnected(false);
-        setNeedsReauth(false);
-      }
+      const state = await connectionManager.checkConnection(force);
+      return state;
     } catch (err) {
       console.error('Failed to check auth status:', err);
-      setIsGmailConnected(false);
-      setNeedsReauth(false);
     }
   };
 
@@ -479,6 +482,7 @@ export default function App() {
       await apiFetch('/api/auth/logout', { method: 'POST' });
     } catch (e) {}
     localStorage.clear();
+    connectionManager.resetOnLogout();
     setCurrentUserEmail('');
     setCurrentUserName('');
     setUnreadNotifCount(0);

@@ -18,6 +18,7 @@ import {
   parseEmailList, 
   formatEmailList 
 } from '../utils/emailValidation';
+import { connectionManager, ConnectionStates } from '../utils/connectionManager';
 
 export function ComposeWorkflow({ 
   composeState = {}, 
@@ -33,6 +34,18 @@ export function ComposeWorkflow({
   needsReauth = false,
   onCheckGmailConnection
 }) {
+  // Authoritative connection manager subscription
+  const [internalConn, setInternalConn] = useState(() => connectionManager.getState());
+  const [isSendingInProgress, setIsSendingInProgress] = useState(false);
+
+  useEffect(() => {
+    const unsub = connectionManager.subscribe(st => setInternalConn(st));
+    return unsub;
+  }, []);
+
+  const effectiveIsConnected = Boolean(isGmailConnected || internalConn.isConnected);
+  const effectiveNeedsReauth = Boolean(needsReauth || internalConn.needsReauth);
+
   // Helper to sync state directly with the authoritative composeState
   const updateState = (updates) => {
     if (onUpdateComposeState) {
@@ -403,12 +416,16 @@ export function ComposeWorkflow({
 
   // STEP 4 -> STEP 5 & 6: Final Confirmed Dispatch via Gmail API
   const handleFinalConfirmedSend = async (validRecip) => {
+    if (isSendingInProgress) return;
+    setIsSendingInProgress(true);
     const sendRecipient = validRecip || recipient;
     setShowConfirmModal(false);
     updateState({ step: 5, errorMessage: '' }); // Sending progress animation
 
     try {
       const formData = new FormData();
+      const idempotencyKey = crypto.randomUUID();
+      formData.append('idempotencyKey', idempotencyKey);
       formData.append('recipient', sendRecipient);
       formData.append('cc', cc || '');
       formData.append('bcc', bcc || '');
@@ -436,6 +453,9 @@ export function ComposeWorkflow({
 
       const res = await apiFetch('/api/emails/send', {
         method: 'POST',
+        headers: {
+          'X-Idempotency-Key': idempotencyKey
+        },
         body: formData
       });
 
@@ -498,6 +518,8 @@ export function ComposeWorkflow({
       if (onCheckGmailConnection) {
         onCheckGmailConnection();
       }
+    } finally {
+      setIsSendingInProgress(false);
     }
   };
 
@@ -1364,11 +1386,11 @@ export function ComposeWorkflow({
               )}
             </div>
 
-            {(!isGmailConnected || needsReauth) ? (
+            {(!effectiveIsConnected || effectiveNeedsReauth) ? (
               <div className="p-3.5 rounded-xl bg-amber-950/50 border border-amber-500/40 text-amber-200 text-xs flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>{needsReauth ? 'Gmail authorization needs to be refreshed before sending.' : 'Gmail is not connected yet.'}</span>
+                  <span>{effectiveNeedsReauth ? 'Gmail authorization needs to be refreshed before sending.' : 'Gmail is not connected yet.'}</span>
                 </div>
                 <button
                   type="button"
@@ -1388,7 +1410,7 @@ export function ComposeWorkflow({
                   className="px-3 py-1.5 rounded-lg gradient-btn text-white font-bold text-xs flex items-center gap-1 cursor-pointer shadow-sm shrink-0"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
-                  ⚡ {needsReauth ? 'Reconnect Gmail' : 'Connect Gmail'}
+                  ⚡ {effectiveNeedsReauth ? 'Reconnect Gmail' : 'Connect Gmail'}
                 </button>
               </div>
             ) : (
@@ -1404,13 +1426,15 @@ export function ComposeWorkflow({
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
+                disabled={isSendingInProgress}
                 onClick={() => setShowConfirmModal(false)}
-                className="px-4 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#99958F] text-xs font-bold border border-[#2E2D2B] cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#99958F] text-xs font-bold border border-[#2E2D2B] cursor-pointer disabled:opacity-50"
               >
                 Cancel / Edit
               </button>
               <button
-                onClick={(!isGmailConnected || needsReauth) ? async () => {
+                disabled={isSendingInProgress}
+                onClick={(!effectiveIsConnected || effectiveNeedsReauth) ? async () => {
                   try {
                     const res = await apiFetch('/api/auth/google/start');
                     const data = await safeParseResponse(res);
@@ -1423,19 +1447,23 @@ export function ComposeWorkflow({
                     if (onNavigateToSettings) onNavigateToSettings();
                   }
                 } : handleFinalConfirmedSend}
-                className="px-6 py-2.5 rounded-xl gold-btn text-[#121211] font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] transition-transform cursor-pointer"
+                className={`px-6 py-2.5 rounded-xl gold-btn text-[#121211] font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] transition-transform cursor-pointer ${
+                  isSendingInProgress ? 'opacity-70 cursor-not-allowed' : ''
+                }`}
               >
-                {(!isGmailConnected || needsReauth) ? (
+                {(!effectiveIsConnected || effectiveNeedsReauth) ? (
                   <>
                     <ExternalLink className="w-4 h-4" />
-                    ⚡ {needsReauth ? 'Reconnect Gmail to Send' : 'Connect Gmail to Send'}
+                    ⚡ {effectiveNeedsReauth ? 'Reconnect Gmail to Send' : 'Connect Gmail to Send'}
                   </>
                 ) : (
                   <>
-                    <Send className="w-4 h-4" />
-                    {parsedRecipients.length > 1 && sendIndividually
-                      ? `Authorize & Send ${parsedRecipients.length} Private Emails`
-                      : 'Authorize & Send Now'}
+                    <Send className={`w-4 h-4 ${isSendingInProgress ? 'animate-spin' : ''}`} />
+                    {isSendingInProgress
+                      ? 'Sending Email...'
+                      : (parsedRecipients.length > 1 && sendIndividually
+                        ? `Authorize & Send ${parsedRecipients.length} Private Emails`
+                        : 'Authorize & Send Now')}
                   </>
                 )}
               </button>

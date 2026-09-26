@@ -10,6 +10,7 @@ import { validateEmailList, parseEmailList } from '../utils/emailValidation';
 import { registerServiceWorker, subscribeUserToPush } from '../utils/push';
 import { supabase, subscribeToEmailChanges, subscribeToEmailEvents, signInWithGoogle, subscribeToSyncState } from '../utils/supabaseClient';
 import { formatNormalDateTime, formatNormalTime, parseToValidDate } from '../utils/dateUtils';
+import { connectionManager, ConnectionStates } from '../utils/connectionManager';
 
 function GoldMiniBarChart() {
   return (
@@ -205,6 +206,11 @@ export function Dashboard({
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && typeof parsed === 'object') {
+          // If cached sent count is the legacy stale 835, purge it immediately
+          if (parsed.sent === 835) {
+            localStorage.removeItem('scribe_stats_cache');
+            return DEFAULT_STATS;
+          }
           return {
             ...DEFAULT_STATS,
             ...parsed,
@@ -263,11 +269,14 @@ export function Dashboard({
   const [syncToast, setSyncToast] = useState('');
   const [syncState, setSyncState] = useState(null);
 
-  const [connectionStatus, setConnectionStatus] = useState({
-    isConnected: false,
-    status: 'DISCONNECTED',
-    connectedEmail: null
-  });
+  const [connectionStatus, setConnectionStatus] = useState(() => connectionManager.getState());
+
+  useEffect(() => {
+    const unsub = connectionManager.subscribe((st) => {
+      setConnectionStatus(st);
+    });
+    return unsub;
+  }, []);
 
   const [showPushBanner, setShowPushBanner] = useState(false);
   const [recentEmails, setRecentEmails] = useState([]);
@@ -423,29 +432,15 @@ export function Dashboard({
   const handleDisconnectGmail = async () => {
     if (!window.confirm('Are you sure you want to disconnect your Gmail account?')) return;
     try {
-      const res = await apiFetch('/api/auth/google/disconnect', { method: 'POST' });
-      if (res.ok) {
-        setConnectionStatus({ isConnected: false, status: 'DISCONNECTED', connectedEmail: null });
-      }
+      await connectionManager.disconnect();
     } catch (err) {
       console.error('Failed to disconnect Gmail:', err);
     }
   };
 
-  const checkConnectionStatus = async () => {
+  const checkConnectionStatus = async (force = false) => {
     try {
-      const res = await apiFetch('/api/auth/status');
-      if (res.ok) {
-        const data = await res.json();
-        setConnectionStatus({
-          ...data,
-          isConnected: !!data.isConnected,
-          mailboxEmail: data.mailboxEmail || data.connectedEmail || (data.isConnected ? (currentUserEmail || 'Active') : null),
-        });
-        if (data.connectedEmail && !localStorage.getItem('userEmail')) {
-          localStorage.setItem('userEmail', data.connectedEmail);
-        }
-      }
+      await connectionManager.checkConnection(force);
     } catch (err) {
       console.error('Failed to check connection status:', err);
     }
@@ -650,30 +645,22 @@ export function Dashboard({
       }
 
       const resolvedStats = {
-        sent: Math.max(sData?.sent ?? sData?.totalEmails ?? 0, listSent),
-        received: Math.max(sData?.received ?? 0, listReceived),
-        drafts: Math.max(sData?.drafts ?? 0, listDrafts),
-        scheduled: Math.max(sData?.scheduled ?? 0, listScheduled),
-        emergency: Math.max(sData?.emergency ?? 0, listEmergency),
-        spam: Math.max(sData?.spam ?? 0, listSpam),
-        pendingReview: Math.max(sData?.pendingReview ?? sData?.pending ?? 0, listPending),
-        sentToday: sData?.sentToday ?? 0,
-        total: Math.max(sData?.total ?? 0, emailList.length),
+        sent: sData?.sent !== undefined ? Number(sData.sent) : listSent,
+        received: sData?.received !== undefined ? Number(sData.received) : listReceived,
+        drafts: sData?.drafts !== undefined ? Number(sData.drafts) : listDrafts,
+        scheduled: sData?.scheduled !== undefined ? Number(sData.scheduled) : listScheduled,
+        emergency: sData?.emergency !== undefined ? Number(sData.emergency) : listEmergency,
+        spam: sData?.spam !== undefined ? Number(sData.spam) : listSpam,
+        pendingReview: (sData?.pendingReview ?? sData?.pending) !== undefined ? Number(sData.pendingReview ?? sData.pending) : listPending,
+        sentToday: Number(sData?.sentToday ?? 0),
+        total: sData?.total !== undefined ? Number(sData.total) : emailList.length,
         categories: resolvedCategories
       };
 
-      setStats(prev => {
-        const merged = {
-          ...resolvedStats,
-          sent: Math.max(prev.sent, resolvedStats.sent),
-          sentToday: Math.max(prev.sentToday, resolvedStats.sentToday),
-          total: Math.max(prev.total, resolvedStats.total)
-        };
-        try {
-          localStorage.setItem('scribe_stats_cache', JSON.stringify(merged));
-        } catch (_) {}
-        return merged;
-      });
+      setStats(resolvedStats);
+      try {
+        localStorage.setItem('scribe_stats_cache', JSON.stringify(resolvedStats));
+      } catch (_) {}
       setHasCachedStats(true);
     } catch (err) {
       console.error('Dashboard data fetch error:', err);

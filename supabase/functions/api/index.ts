@@ -479,8 +479,11 @@ async function getAuthUser(req: Request, supabase: any) {
 
 
 // ----------------------------------------------------
-// Google Access Token Refresh Helper
+// Google Access Token Refresh Helper with In-Flight Mutex
 // ----------------------------------------------------
+
+const activeTokenRefreshes = new Map<string, Promise<string | null>>();
+const recentSentIdempotencyKeys = new Map<string, number>();
 
 async function getValidAccessToken(
   account: any,
@@ -508,90 +511,103 @@ async function getValidAccessToken(
   }
 
   if (needsRefresh && refreshToken) {
-    const { clientId, clientSecret } = await getGoogleCredentials(supabase);
-    if (clientId && clientSecret) {
+    const lockKey = account.id || rawRefresh.slice(0, 32);
+    if (activeTokenRefreshes.has(lockKey)) {
+      return await activeTokenRefreshes.get(lockKey)!;
+    }
+
+    const refreshPromise = (async (): Promise<string | null> => {
       try {
-        const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
-            refresh_token: refreshToken,
-            grant_type: "refresh_token",
-          }),
-        });
-        const refreshData = await refreshRes.json();
-        if (refreshRes.ok && refreshData.access_token) {
-          accessToken = refreshData.access_token;
-          const encAccess = await encryptToken(accessToken);
-          const expiresInSec = refreshData.expires_in || 3600;
-          const newExpiresAt = new Date(Date.now() + expiresInSec * 1000).toISOString();
-          const nowIso = new Date().toISOString();
+        const { clientId, clientSecret } = await getGoogleCredentials(supabase);
+        if (clientId && clientSecret) {
+          const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: clientId,
+              client_secret: clientSecret,
+              refresh_token: refreshToken,
+              grant_type: "refresh_token",
+            }),
+          });
+          const refreshData = await refreshRes.json();
+          if (refreshRes.ok && refreshData.access_token) {
+            accessToken = refreshData.access_token;
+            const encAccess = await encryptToken(accessToken);
+            const expiresInSec = refreshData.expires_in || 3600;
+            const newExpiresAt = new Date(Date.now() + expiresInSec * 1000).toISOString();
+            const nowIso = new Date().toISOString();
 
-          // Mutate in-memory account
-          account.token_expires_at = newExpiresAt;
-          account.access_token_encrypted = encAccess;
-          account.needs_reauth = false;
-          account.status = "CONNECTED";
+            // Mutate in-memory account
+            account.token_expires_at = newExpiresAt;
+            account.access_token_encrypted = encAccess;
+            account.needs_reauth = false;
+            account.status = "CONNECTED";
 
-          let encRefreshUpdate: string | null = null;
-          if (refreshData.refresh_token) {
-            encRefreshUpdate = await encryptToken(refreshData.refresh_token);
-            account.refresh_token_encrypted = encRefreshUpdate;
-          }
-
-          if (account.id) {
-            const updatePayload: Record<string, any> = {
-              access_token_encrypted: encAccess,
-              token_expires_at: newExpiresAt,
-              needs_reauth: false,
-              status: "CONNECTED",
-              updated_at: nowIso,
-            };
-            if (encRefreshUpdate) {
-              updatePayload.refresh_token_encrypted = encRefreshUpdate;
+            let encRefreshUpdate: string | null = null;
+            if (refreshData.refresh_token) {
+              encRefreshUpdate = await encryptToken(refreshData.refresh_token);
+              account.refresh_token_encrypted = encRefreshUpdate;
             }
 
-            try {
-              await supabase
-                .from("gmail_connections")
-                .update(updatePayload)
-                .eq("id", account.id);
-            } catch (upErr) {
-              console.warn("Failed updating gmail_connections on token refresh:", upErr);
-            }
+            if (account.id) {
+              const updatePayload: Record<string, any> = {
+                access_token_encrypted: encAccess,
+                token_expires_at: newExpiresAt,
+                needs_reauth: false,
+                status: "CONNECTED",
+                updated_at: nowIso,
+              };
+              if (encRefreshUpdate) {
+                updatePayload.refresh_token_encrypted = encRefreshUpdate;
+              }
 
-            try {
-              await supabase
-                .from("GmailAccount")
-                .update({ encryptedAccessToken: encAccess, updatedAt: nowIso })
-                .eq("id", account.id);
-            } catch (_) {}
+              try {
+                await supabase
+                  .from("gmail_connections")
+                  .update(updatePayload)
+                  .eq("id", account.id);
+              } catch (upErr) {
+                console.warn("Failed updating gmail_connections on token refresh:", upErr);
+              }
+
+              try {
+                await supabase
+                  .from("GmailAccount")
+                  .update({ encryptedAccessToken: encAccess, updatedAt: nowIso })
+                  .eq("id", account.id);
+              } catch (_) {}
+            }
+            return accessToken;
+          } else if (
+            refreshRes.status === 400 &&
+            (refreshData.error === "invalid_grant" ||
+              (refreshData.error_description && refreshData.error_description.includes("revoked")))
+          ) {
+            console.warn("Google refresh token revoked or invalid_grant:", refreshData);
+            if (account.id) {
+              try {
+                await supabase
+                  .from("gmail_connections")
+                  .update({ needs_reauth: true, updated_at: new Date().toISOString() })
+                  .eq("id", account.id);
+              } catch (_) {}
+            }
+            return null;
+          } else {
+            console.warn("Google token refresh non-ok response:", refreshRes.status, refreshData);
           }
-          return accessToken;
-        } else if (
-          refreshRes.status === 400 &&
-          (refreshData.error === "invalid_grant" ||
-            (refreshData.error_description && refreshData.error_description.includes("revoked")))
-        ) {
-          console.warn("Google refresh token revoked or invalid_grant:", refreshData);
-          if (account.id) {
-            try {
-              await supabase
-                .from("gmail_connections")
-                .update({ needs_reauth: true, updated_at: new Date().toISOString() })
-                .eq("id", account.id);
-            } catch (_) {}
-          }
-          return null;
-        } else {
-          console.warn("Google token refresh non-ok response:", refreshRes.status, refreshData);
         }
       } catch (e) {
         console.warn("Token refresh attempt notice:", e);
+      } finally {
+        activeTokenRefreshes.delete(lockKey);
       }
-    }
+      return accessToken || null;
+    })();
+
+    activeTokenRefreshes.set(lockKey, refreshPromise);
+    return await refreshPromise;
   }
 
   return accessToken || null;
@@ -3049,6 +3065,25 @@ serve(async (req: Request) => {
         body = await req.json().catch(() => ({}));
       }
 
+      const idempotencyKey = body.idempotencyKey || req.headers.get("x-idempotency-key") || null;
+      if (idempotencyKey) {
+        if (recentSentIdempotencyKeys.has(idempotencyKey)) {
+          console.warn("Deduplicated email send request with idempotency key:", idempotencyKey);
+          return jsonResponse({
+            success: true,
+            message: "Email already processed (deduplicated).",
+            deduplicated: true
+          });
+        }
+        recentSentIdempotencyKeys.set(idempotencyKey, Date.now());
+        if (recentSentIdempotencyKeys.size > 500) {
+          const cut = Date.now() - 120000;
+          for (const [k, v] of recentSentIdempotencyKeys.entries()) {
+            if (v < cut) recentSentIdempotencyKeys.delete(k);
+          }
+        }
+      }
+
       const rawRecipient = body.recipient || body.to || "";
       const toList = (Array.isArray(rawRecipient) ? rawRecipient : String(rawRecipient).split(/[,;\n\r]+/))
         .map((e: string) => e.trim())
@@ -3785,6 +3820,50 @@ SENDER NAME: "${senderName}"`;
       return jsonResponse({ success: true, message: "Contact deleted." });
     }
 
+    if (path.startsWith("/contacts/") && (method === "PUT" || method === "PATCH")) {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const id = path.split("/")[2];
+      const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
+
+      const body = await req.json().catch(() => ({}));
+      const { name, email, relationship } = body;
+
+      const updateData: Record<string, any> = {};
+      if (name && name.trim()) updateData.name = name.trim();
+      if (email && email.trim()) {
+        const cleanEmail = email.trim().toLowerCase();
+        if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
+          return errorResponse("Please provide a valid email address.");
+        }
+        updateData.email = cleanEmail;
+      }
+      if (relationship) updateData.relationship = relationship;
+
+      const now = new Date().toISOString();
+      updateData.updatedAt = now;
+
+      // Update both canonical and legacy Contact tables
+      try {
+        await supabase.from("contacts").update({
+          ...(updateData.name ? { name: updateData.name } : {}),
+          ...(updateData.email ? { email: updateData.email } : {}),
+          ...(updateData.relationship ? { relationship: updateData.relationship } : {}),
+          updated_at: now
+        }).eq("id", id).in("user_id", userIds);
+      } catch (_) {}
+
+      const { data: updated } = await supabase
+        .from("Contact")
+        .update(updateData)
+        .eq("id", id)
+        .in("userId", userIds)
+        .select()
+        .maybeSingle();
+
+      return jsonResponse(updated || { id, ...updateData, success: true });
+    }
+
     if ((path === "/emails" || path === "/email/history" || path === "/history") && method === "GET") {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
@@ -3801,7 +3880,7 @@ SENDER NAME: "${senderName}"`;
       let canonicalQuery = supabase.from("emails").select("*").eq("user_id", user.id);
       const { data: canonicalEmails } = await canonicalQuery.order("created_at", { ascending: false });
 
-      let legacyQuery = supabase.from("Email").select("*, attachments:Attachment(*)").or(`user_id.eq.${user.id},userId.eq.${user.id}`);
+      let legacyQuery = supabase.from("Email").select("*, attachments:Attachment(*)").eq("userId", user.id);
       const { data: legacyEmails } = await legacyQuery.order("createdAt", { ascending: false });
 
       // Merge and deduplicate by id and gmail_message_id
@@ -4561,6 +4640,87 @@ SENDER NAME: "${senderName}"`;
       return jsonResponse(templates || []);
     }
 
+    if (path === "/templates" && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+
+      const body = await req.json().catch(() => ({}));
+      const { name, title, subject, body: templateBody, category, situation, tone, defaultInstruction } = body;
+
+      const templateName = (name || title || "").trim();
+      const content = (templateBody || defaultInstruction || "").trim();
+      if (!templateName) return errorResponse("Template name or title is required.", 400);
+
+      const now = new Date().toISOString();
+      const newTemplate = {
+        id: crypto.randomUUID(),
+        name: templateName,
+        subject: (subject || templateName).trim(),
+        body: content,
+        category: category || "Official",
+        situation: situation || "💼 Official / Professional",
+        tone: tone || "Professional",
+        is_system: false,
+        user_id: user.id,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const { data: created, error: crErr } = await supabase
+        .from("Template")
+        .insert(newTemplate)
+        .select()
+        .single();
+
+      if (crErr) return errorResponse(crErr.message || "Failed to create template", 400);
+      return jsonResponse(created || newTemplate, 201);
+    }
+
+    if (path.startsWith("/templates/") && (method === "PUT" || method === "PATCH")) {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const id = path.split("/")[2];
+
+      const body = await req.json().catch(() => ({}));
+      const { name, title, subject, body: templateBody, category, situation, tone, defaultInstruction } = body;
+
+      const updateData: Record<string, any> = { updatedAt: new Date().toISOString() };
+      if (name || title) updateData.name = (name || title).trim();
+      if (subject !== undefined) updateData.subject = subject.trim();
+      if (templateBody !== undefined || defaultInstruction !== undefined) {
+        updateData.body = (templateBody !== undefined ? templateBody : defaultInstruction).trim();
+      }
+      if (category !== undefined) updateData.category = category;
+      if (situation !== undefined) updateData.situation = situation;
+      if (tone !== undefined) updateData.tone = tone;
+
+      const { data: updated, error: upErr } = await supabase
+        .from("Template")
+        .update(updateData)
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .select()
+        .maybeSingle();
+
+      if (upErr) return errorResponse(upErr.message || "Failed to update template", 400);
+      return jsonResponse(updated || { id, ...updateData, success: true });
+    }
+
+    if (path.startsWith("/templates/") && method === "DELETE") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const id = path.split("/")[2];
+
+      const { error: delErr } = await supabase
+        .from("Template")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id);
+
+      if (delErr) return errorResponse(delErr.message || "Failed to delete template", 400);
+      return jsonResponse({ success: true, message: "Template deleted." });
+    }
+
     if (path === "/notifications" && method === "GET") {
       const user = await getAuthUser(req, supabase);
       if (!user) return jsonResponse({ notifications: [], unreadCount: 0, activeCount: 0, trashedCount: 0 });
@@ -4568,88 +4728,17 @@ SENDER NAME: "${senderName}"`;
       const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
       const isTrashed = url.searchParams.get("trashed") === "true";
 
-      // Auto-backfill any missing notifications for recent incoming emails strictly for this user
-      try {
-        const { data: existingNotifs } = await supabase
-          .from("Notification")
-          .select("id, emailId, message")
-          .or(`user_id.in.(${userIds.join(",")}),userId.in.(${userIds.join(",")})`);
-
-        const notifMessages = new Set((existingNotifs || []).map((n: any) => n.message));
-
-        // Strictly query canonical emails and legacy Email belonging to this user
-        const [canonRec, legRec] = await Promise.all([
-          supabase.from("emails")
-            .select("id, user_id, sender, sender_name, from_name, from_email, sender_email, subject, email_type, status, direction, is_read, created_at")
-            .in("user_id", userIds)
-            .order("created_at", { ascending: false })
-            .limit(40),
-          supabase.from("Email")
-            .select("id, userId, sender, recipient, subject, category, situation, status, isReceived, isSent, createdAt")
-            .in("userId", userIds)
-            .order("createdAt", { ascending: false })
-            .limit(40)
-        ]);
-
-        const candidates: Array<{ sender: string; subject: string; type: string; isRead: boolean; date: string }> = [];
-        for (const ce of (canonRec.data || [])) {
-          const st = (ce.status || "").toLowerCase();
-          const dir = (ce.direction || "").toLowerCase();
-          if (st === "received" || st === "incoming" || dir === "received" || dir === "incoming") {
-            candidates.push({
-              sender: ce.from_name || ce.sender_name || ce.sender || ce.sender_email || ce.from_email || "Client",
-              subject: ce.subject || "(No Subject)",
-              type: ce.email_type || "General",
-              isRead: ce.is_read !== false,
-              date: ce.created_at,
-            });
-          }
-        }
-        for (const le of (legRec.data || [])) {
-          const st = (le.status || "").toLowerCase();
-          if (st === "received" || st === "incoming" || le.isReceived === true) {
-            candidates.push({
-              sender: le.sender || "Client",
-              subject: le.subject || "(No Subject)",
-              type: le.category || le.situation || "General",
-              isRead: false,
-              date: le.createdAt,
-            });
-          }
-        }
-
-        for (const cand of candidates) {
-          const notifMsg = `New email from ${cand.sender}: "${cand.subject}"`;
-          if (!notifMessages.has(notifMsg)) {
-            await safeInsertNotification(supabase, {
-              id: crypto.randomUUID(),
-              user_id: user.id,
-              userId: user.id,
-              emailId: null,
-              notificationType: cand.type || "General",
-              message: notifMsg,
-              read: cand.isRead,
-              isTrashed: false,
-              createdAt: normalizeIsoUtc(cand.date) || new Date().toISOString(),
-            });
-            notifMessages.add(notifMsg);
-          }
-        }
-      } catch (backfillErr: any) {
-        console.warn("Notifications backfill notice:", backfillErr);
-      }
-
       const { data: notifications } = await supabase
         .from("Notification")
         .select("*")
-        .or(`user_id.in.(${userIds.join(",")}),userId.in.(${userIds.join(",")})`)
+        .in("userId", userIds)
         .eq("isTrashed", isTrashed)
         .order("createdAt", { ascending: false });
 
       const { data: allNotifs } = await supabase
         .from("Notification")
         .select("id, read, isTrashed")
-        .or(`user_id.in.(${userIds.join(",")}),userId.in.(${userIds.join(",")})`);
+        .in("userId", userIds);
 
       const unreadCount = (allNotifs || []).filter((n: any) => !n.read && !n.isTrashed).length;
       const activeCount = (allNotifs || []).filter((n: any) => !n.isTrashed).length;
@@ -5102,6 +5191,18 @@ SENDER NAME: "${senderName}"`;
 
       const { data, error } = await safeInsertEmail(supabase, schedPayload);
       if (error) throw error;
+
+      await safeInsertNotification(supabase, {
+        id: crypto.randomUUID(),
+        userId: user.id,
+        emailId: schedPayload.id,
+        notificationType: schedPayload.category || "General",
+        message: `Email "${schedPayload.subject}" scheduled for delivery at ${schedPayload.scheduledAt}.`,
+        read: false,
+        isTrashed: false,
+        createdAt: now,
+      });
+
       return jsonResponse({ success: true, email: data || schedPayload });
     }
 
@@ -5152,7 +5253,7 @@ SENDER NAME: "${senderName}"`;
       const userIds = (user.userIds && user.userIds.length > 0) ? user.userIds : [user.id];
 
       let canonicalQuery = supabase.from("emails").select("*").in("user_id", userIds);
-      let legacyQuery = supabase.from("Email").select("*").or(`user_id.in.(${userIds.join(",")}),userId.in.(${userIds.join(",")})`);
+      let legacyQuery = supabase.from("Email").select("*").in("userId", userIds);
 
       // Parallelize execution of canonical, legacy, recent events, and sync state queries
       const [
