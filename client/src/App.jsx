@@ -56,6 +56,7 @@ export default function App() {
   const [composeInitialData, setComposeInitialData] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isGmailConnected, setIsGmailConnected] = useState(false);
+  const [needsReauth, setNeedsReauth] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const userDropdownTimeoutRef = useRef(null);
   const lastKnownNotifsRef = useRef(new Set());
@@ -347,6 +348,14 @@ export default function App() {
       }
       if (tokenParam) {
         localStorage.setItem('authToken', tokenParam);
+        try {
+          if (supabase?.auth?.setSession) {
+            supabase.auth.setSession({
+              access_token: tokenParam,
+              refresh_token: tokenParam
+            }).catch(() => {});
+          }
+        } catch (_) {}
       }
 
       navigateTo('/app');
@@ -440,12 +449,18 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setIsGmailConnected(!!data.isConnected);
+        setNeedsReauth(!!data.needsReauth);
+        if (data.connectedEmail) {
+          localStorage.setItem('connectedEmail', data.connectedEmail);
+        }
       } else {
         setIsGmailConnected(false);
+        setNeedsReauth(false);
       }
     } catch (err) {
       console.error('Failed to check auth status:', err);
       setIsGmailConnected(false);
+      setNeedsReauth(false);
     }
   };
 
@@ -984,6 +999,9 @@ export default function App() {
               onUpdateComposeState={handleUpdateComposeState}
               onResetCompose={handleResetCompose}
               initialData={composeInitialData}
+              isGmailConnected={isGmailConnected}
+              needsReauth={needsReauth}
+              onCheckGmailConnection={checkGmailConnection}
               onComplete={() => setActiveTab('dashboard')}
               onNavigateToDashboard={() => setActiveTab('dashboard')}
               onViewHistory={() => setActiveTab('history')}

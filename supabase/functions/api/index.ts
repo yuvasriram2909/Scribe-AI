@@ -148,6 +148,108 @@ async function decryptToken(cipherText: string): Promise<string> {
 }
 
 // ----------------------------------------------------
+// Cryptographic JWT Signing & Verification (HS256)
+// ----------------------------------------------------
+
+function base64UrlEncode(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function base64UrlEncodeString(str: string): string {
+  return base64UrlEncode(new TextEncoder().encode(str));
+}
+
+function base64UrlDecode(str: string): Uint8Array {
+  let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (base64.length % 4) {
+    base64 += "=";
+  }
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function signSupabaseJwt(
+  payload: {
+    sub: string;
+    email: string;
+    role?: string;
+    aud?: string;
+    user_metadata?: Record<string, any>;
+    app_metadata?: Record<string, any>;
+    exp?: number;
+  },
+  secret: string
+): Promise<string> {
+  const iat = Math.floor(Date.now() / 1000);
+  const fullPayload = {
+    aud: payload.aud || "authenticated",
+    role: payload.role || "authenticated",
+    sub: payload.sub,
+    email: payload.email ? payload.email.toLowerCase() : "",
+    phone: "",
+    app_metadata: payload.app_metadata || { provider: "google", providers: ["google"] },
+    user_metadata: payload.user_metadata || { email: payload.email },
+    iat,
+    exp: payload.exp || (iat + 30 * 86400),
+  };
+  const header = { alg: "HS256", typ: "JWT" };
+  const encodedHeader = base64UrlEncodeString(JSON.stringify(header));
+  const encodedPayload = base64UrlEncodeString(JSON.stringify(fullPayload));
+  const data = `${encodedHeader}.${encodedPayload}`;
+
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sigBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(data));
+  const encodedSig = base64UrlEncode(new Uint8Array(sigBuffer));
+  return `${data}.${encodedSig}`;
+}
+
+async function verifySupabaseJwt(token: string, secret: string): Promise<Record<string, any> | null> {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const [encodedHeader, encodedPayload, encodedSig] = parts;
+    const data = `${encodedHeader}.${encodedPayload}`;
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    const sigBytes = base64UrlDecode(encodedSig);
+    const isValid = await crypto.subtle.verify("HMAC", key, sigBytes, enc.encode(data));
+    if (!isValid) return null;
+    const payloadStr = new TextDecoder().decode(base64UrlDecode(encodedPayload));
+    const payload = JSON.parse(payloadStr);
+    if (payload.exp && Date.now() / 1000 > payload.exp) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+// ----------------------------------------------------
 // Google Credentials Dynamic Resolver
 // ----------------------------------------------------
 
@@ -216,7 +318,7 @@ async function syncAndAssociateUserData(userId: string, userEmail: string, supab
 }
 
 async function getAuthUser(req: Request, supabase: any) {
-  const authHeader = req.headers.get("authorization") || "";
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
   if (!authHeader.startsWith("Bearer ")) {
     return null;
   }
@@ -226,7 +328,7 @@ async function getAuthUser(req: Request, supabase: any) {
     return null;
   }
 
-  // 1. Strictly verify the Supabase Auth JWT token
+  // 1. Strictly verify the Supabase Auth JWT token via GoTrue
   let supaUser: any = null;
   try {
     const { data: authData, error: authErr } = await supabase.auth.getUser(token);
@@ -234,6 +336,38 @@ async function getAuthUser(req: Request, supabase: any) {
       supaUser = authData.user;
     }
   } catch (_) {}
+
+  // 2. Cryptographic HMAC-SHA256 fallback verification with JWT_SECRET
+  if (!supaUser || !supaUser.id) {
+    const jwtSecret = Deno.env.get("JWT_SECRET");
+    if (jwtSecret) {
+      const verifiedPayload = await verifySupabaseJwt(token, jwtSecret);
+      if (verifiedPayload?.sub) {
+        try {
+          const { data: adminUserData, error: adminErr } = await supabase.auth.admin.getUserById(verifiedPayload.sub);
+          if (!adminErr && adminUserData?.user) {
+            supaUser = adminUserData.user;
+          } else {
+            supaUser = {
+              id: verifiedPayload.sub,
+              email: verifiedPayload.email,
+              user_metadata: verifiedPayload.user_metadata || {},
+              app_metadata: verifiedPayload.app_metadata || {},
+              role: verifiedPayload.role || "authenticated",
+            };
+          }
+        } catch (_) {
+          supaUser = {
+            id: verifiedPayload.sub,
+            email: verifiedPayload.email,
+            user_metadata: verifiedPayload.user_metadata || {},
+            app_metadata: verifiedPayload.app_metadata || {},
+            role: verifiedPayload.role || "authenticated",
+          };
+        }
+      }
+    }
+  }
 
   // Reject unverified or forged sessions immediately
   if (!supaUser || !supaUser.id) {
@@ -2160,10 +2294,14 @@ serve(async (req: Request) => {
             } catch (_) {}
 
             if (!sessionToken) {
-              // Sign legacy session token fallback if admin auth unavailable
-              const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-              const payload = btoa(JSON.stringify({ id: authId, email: cleanEmail, exp: Math.floor(Date.now() / 1000) + 7 * 86400 }));
-              sessionToken = `${header}.${payload}.signature`;
+              const jwtSecret = Deno.env.get("JWT_SECRET") || "scribe_ai_default_encryption_secret_key_32_chars";
+              sessionToken = await signSupabaseJwt({
+                sub: authId,
+                email: cleanEmail,
+                user_metadata: { name: legacyUser.name || cleanEmail.split("@")[0], email: cleanEmail },
+                app_metadata: { provider: "email", providers: ["email"] },
+                exp: Math.floor(Date.now() / 1000) + 7 * 86400,
+              }, jwtSecret);
               authenticatedUser = {
                 id: authId,
                 name: legacyUser.name,
@@ -2268,7 +2406,7 @@ serve(async (req: Request) => {
     // Google OAuth 2.0 Status, URL, and Callback
     // ----------------------------------------------------
 
-    if ((path === "/auth/status" || path === "/auth/google/status") && method === "GET") {
+    if ((path === "/auth/status" || path === "/auth/google/status" || path === "/gmail/status" || path === "/api/gmail/status") && method === "GET") {
       const user = await getAuthUser(req, supabase);
       if (!user) {
         return jsonResponse({
@@ -2281,6 +2419,7 @@ serve(async (req: Request) => {
           needsReauth: false,
           isGoogleConfigured: true,
           mode: "Not Logged In",
+          authenticated: false,
           user: null,
         });
       }
@@ -2351,6 +2490,7 @@ serve(async (req: Request) => {
         messagesTotal,
         threadsTotal,
         isGoogleConfigured: true,
+        authenticated: true,
         mode: hasModifyScope ? "Complete Two-Way Gmail Sync" : (isConnected ? "Limited (Send Only - Upgrade Needed)" : "Ready to Connect"),
         user: {
           id: user.id,
@@ -2638,7 +2778,17 @@ serve(async (req: Request) => {
           type: "magiclink",
           email: authorizedEmail.toLowerCase(),
         });
-        if (linkData?.action_link) {
+        if (linkData?.properties?.email_otp) {
+          const { data: otpData } = await supabase.auth.verifyOtp({
+            email: authorizedEmail.toLowerCase(),
+            token: linkData.properties.email_otp,
+            type: "magiclink",
+          });
+          if (otpData?.session?.access_token) {
+            sessionToken = otpData.session.access_token;
+          }
+        }
+        if (!sessionToken && linkData?.action_link) {
           const verifyRes = await fetch(linkData.action_link, { redirect: "manual" });
           const loc = verifyRes.headers.get("location");
           if (loc && loc.includes("access_token=")) {
@@ -2652,9 +2802,14 @@ serve(async (req: Request) => {
       }
 
       if (!sessionToken) {
-        const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-        const payload = btoa(JSON.stringify({ id: effectiveUserId, email: authorizedEmail.toLowerCase(), name: googleName, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }));
-        sessionToken = `${header}.${payload}.signature`;
+        const jwtSecret = Deno.env.get("JWT_SECRET") || "scribe_ai_default_encryption_secret_key_32_chars";
+        sessionToken = await signSupabaseJwt({
+          sub: effectiveUserId,
+          email: authorizedEmail.toLowerCase(),
+          user_metadata: { name: googleName, full_name: googleName, email: authorizedEmail.toLowerCase() },
+          app_metadata: { provider: "google", providers: ["google"] },
+          exp: Math.floor(Date.now() / 1000) + 30 * 86400,
+        }, jwtSecret);
       }
 
       return Response.redirect(
@@ -2790,7 +2945,13 @@ serve(async (req: Request) => {
 
     if ((path === "/auth/send-email" || path === "/emails/send" || path === "/email/send" || path === "/send-email") && method === "POST") {
       const user = await getAuthUser(req, supabase);
-      if (!user) return errorResponse("Authentication required to send emails.", 401);
+      if (!user) {
+        return jsonResponse({
+          success: false,
+          error: "Authentication required to send emails. Please sign in.",
+          code: "AUTH_REQUIRED",
+        }, 401);
+      }
 
       let body: any = {};
       const contentType = req.headers.get("content-type") || "";
@@ -2854,12 +3015,21 @@ serve(async (req: Request) => {
 
       const connectedEmail = connection?.gmail_email || connection?.gmailEmail;
       if (!connection || (!connection.access_token_encrypted && !connection.encryptedAccessToken && !connection.refresh_token_encrypted && !connection.encryptedRefreshToken)) {
-        return errorResponse("Gmail account is not connected. Please connect Google first.", 400);
+        return jsonResponse({
+          success: false,
+          error: "Gmail account is not connected. Please connect Google first.",
+          code: "GMAIL_NOT_CONNECTED",
+        }, 400);
       }
 
       const accessToken = await getValidAccessToken(connection, supabase);
       if (!accessToken) {
-        return errorResponse("Gmail connection expired or invalid. Please reconnect Google.", 401);
+        return jsonResponse({
+          success: false,
+          error: "Your Gmail connection has expired. Please reconnect Gmail.",
+          code: "GMAIL_REAUTH_REQUIRED",
+          needsReauth: true,
+        }, 401);
       }
 
       const sendIndividually = body.sendIndividually === true ||
@@ -2909,11 +3079,15 @@ serve(async (req: Request) => {
         if (!sendRes.ok || sendData.error) {
           const errorMsg = sendData.error?.message || "Failed to send email through Gmail API";
           let isReauthError = false;
+          let userSafeError = "Failed to send email through Gmail API.";
+          let errorCode = "GMAIL_SEND_FAILED";
           if (sendRes.status === 403 && (errorMsg.includes("insufficient") || errorMsg.includes("scope") || errorMsg.includes("ACCESS_TOKEN_SCOPE_INSUFFICIENT"))) {
-            userSafeError = "Gmail authorization is missing the required send permission.";
+            userSafeError = "Gmail authorization is missing the required send permission. Please reconnect Gmail.";
+            errorCode = "GMAIL_SCOPE_MISSING";
             isReauthError = true;
           } else if (sendRes.status === 401 || errorMsg.includes("invalid_grant") || errorMsg.includes("Token has been expired")) {
             userSafeError = "Your Gmail connection has expired. Please reconnect Gmail.";
+            errorCode = "GMAIL_REAUTH_REQUIRED";
             isReauthError = true;
           }
 
@@ -2951,7 +3125,7 @@ serve(async (req: Request) => {
             });
           } catch (_) {}
 
-          failedTargets.push({ recipient: target.recipientEmail, error: userSafeError, status: sendRes.status });
+          failedTargets.push({ recipient: target.recipientEmail, error: userSafeError, code: errorCode, status: sendRes.status });
           continue;
         }
 
@@ -3197,6 +3371,7 @@ serve(async (req: Request) => {
         return jsonResponse({
           success: false,
           error: failedTargets[0].error,
+          code: failedTargets[0].code || "GMAIL_SEND_FAILED",
           needsReauth: failedTargets[0].status === 401 || failedTargets[0].status === 403,
         }, failedTargets[0].status || 400);
       }

@@ -28,7 +28,10 @@ export function ComposeWorkflow({
   onNavigateToDashboard,
   onViewHistory,
   onCancel, 
-  onNavigateToSettings 
+  onNavigateToSettings,
+  isGmailConnected = false,
+  needsReauth = false,
+  onCheckGmailConnection
 }) {
   // Helper to sync state directly with the authoritative composeState
   const updateState = (updates) => {
@@ -437,7 +440,12 @@ export function ComposeWorkflow({
       });
 
       const data = await safeParseResponse(res);
-      if (!res.ok || data.error) throw new Error(data.error || 'Failed to send email.');
+      if (!res.ok || data?.error) {
+        const errObj = new Error(data?.error || 'Failed to send email.');
+        errObj.code = data?.code;
+        errObj.needsReauth = data?.needsReauth;
+        throw errObj;
+      }
 
       const sentCount = data?.count || (parsedRecipients.length > 1 && sendIndividually ? parsedRecipients.length : 1);
 
@@ -483,8 +491,13 @@ export function ComposeWorkflow({
       console.error('Send Error:', err);
       updateState({
         errorMessage: err.message || 'Failed to send email. Please check your Gmail connection.',
+        errorCode: err.code || '',
+        needsReauth: !!err.needsReauth,
         step: 3
       });
+      if (onCheckGmailConnection) {
+        onCheckGmailConnection();
+      }
     }
   };
 
@@ -521,7 +534,7 @@ export function ComposeWorkflow({
             <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
             <span>{errorMessage}</span>
           </div>
-          {(errorMessage.includes('Gmail') || errorMessage.includes('connect') || errorMessage.includes('OAuth') || errorMessage.includes('scopes') || errorMessage.includes('permission') || errorMessage.includes('revoked') || errorMessage.includes('expired')) && (
+          {(errorMessage.includes('Gmail') || errorMessage.includes('connect') || errorMessage.includes('OAuth') || errorMessage.includes('scopes') || errorMessage.includes('permission') || errorMessage.includes('revoked') || errorMessage.includes('expired') || errorMessage.includes('Authentication') || errorMessage.includes('sign in') || composeState.errorCode === 'AUTH_REQUIRED' || composeState.errorCode === 'GMAIL_NOT_CONNECTED' || composeState.errorCode === 'GMAIL_REAUTH_REQUIRED' || composeState.errorCode === 'GMAIL_SCOPE_MISSING') && (
             <button
               onClick={async () => {
                 try {
@@ -1351,14 +1364,43 @@ export function ComposeWorkflow({
               )}
             </div>
 
-            <div className="p-3 rounded-xl bg-[#22211F] border border-[#D4A373]/30 text-[#D4A373] text-[11px] flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-[#D4A373] shrink-0" />
-              {parsedRecipients.length > 1 && sendIndividually ? (
-                <span>Clicking "Authorize & Send" will transmit <strong>{parsedRecipients.length} separate private emails</strong> via Gmail. Each recipient will receive their own email and cannot see the other recipients.</span>
-              ) : (
-                <span>Clicking "Authorize & Send Now" will transmit this message directly to the recipient via your Gmail API credentials.</span>
-              )}
-            </div>
+            {(!isGmailConnected || needsReauth) ? (
+              <div className="p-3.5 rounded-xl bg-amber-950/50 border border-amber-500/40 text-amber-200 text-xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>{needsReauth ? 'Gmail authorization needs to be refreshed before sending.' : 'Gmail is not connected yet.'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await apiFetch('/api/auth/google/start');
+                      const data = await safeParseResponse(res);
+                      if (data?.url) {
+                        window.location.href = data.url;
+                      } else if (onNavigateToSettings) {
+                        onNavigateToSettings();
+                      }
+                    } catch (_) {
+                      if (onNavigateToSettings) onNavigateToSettings();
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg gradient-btn text-white font-bold text-xs flex items-center gap-1 cursor-pointer shadow-sm shrink-0"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  ⚡ {needsReauth ? 'Reconnect Gmail' : 'Connect Gmail'}
+                </button>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-[#22211F] border border-[#D4A373]/30 text-[#D4A373] text-[11px] flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-[#D4A373] shrink-0" />
+                {parsedRecipients.length > 1 && sendIndividually ? (
+                  <span>Clicking "Authorize & Send" will transmit <strong>{parsedRecipients.length} separate private emails</strong> via Gmail. Each recipient will receive their own email and cannot see the other recipients.</span>
+                ) : (
+                  <span>Clicking "Authorize & Send Now" will transmit this message directly to the recipient via your Gmail API credentials.</span>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
@@ -1368,13 +1410,34 @@ export function ComposeWorkflow({
                 Cancel / Edit
               </button>
               <button
-                onClick={handleFinalConfirmedSend}
+                onClick={(!isGmailConnected || needsReauth) ? async () => {
+                  try {
+                    const res = await apiFetch('/api/auth/google/start');
+                    const data = await safeParseResponse(res);
+                    if (data?.url) {
+                      window.location.href = data.url;
+                    } else if (onNavigateToSettings) {
+                      onNavigateToSettings();
+                    }
+                  } catch (_) {
+                    if (onNavigateToSettings) onNavigateToSettings();
+                  }
+                } : handleFinalConfirmedSend}
                 className="px-6 py-2.5 rounded-xl gold-btn text-[#121211] font-bold text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] transition-transform cursor-pointer"
               >
-                <Send className="w-4 h-4" />
-                {parsedRecipients.length > 1 && sendIndividually
-                  ? `Authorize & Send ${parsedRecipients.length} Private Emails`
-                  : 'Authorize & Send Now'}
+                {(!isGmailConnected || needsReauth) ? (
+                  <>
+                    <ExternalLink className="w-4 h-4" />
+                    ⚡ {needsReauth ? 'Reconnect Gmail to Send' : 'Connect Gmail to Send'}
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    {parsedRecipients.length > 1 && sendIndividually
+                      ? `Authorize & Send ${parsedRecipients.length} Private Emails`
+                      : 'Authorize & Send Now'}
+                  </>
+                )}
               </button>
             </div>
           </div>
