@@ -1090,6 +1090,7 @@ export function Dashboard({
                     {/* Generate Email Button */}
                     <button
                       type="submit"
+                      data-cursor="ai"
                       className="gold-btn light-sweep px-5 py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer shrink-0 group"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-[#121211] btn-icon-spin transition-transform" />

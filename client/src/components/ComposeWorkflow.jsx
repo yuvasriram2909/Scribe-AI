@@ -991,6 +991,7 @@ export function ComposeWorkflow({
               <button
                 type="submit"
                 disabled={aiLoading}
+                data-cursor="ai"
                 className="px-8 py-3 rounded-xl gold-btn light-sweep text-[#121211] font-bold text-xs flex items-center gap-2 shadow-lg cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
               >
                 <Sparkles className="w-4 h-4 text-[#121211] btn-icon-spin transition-transform" />
@@ -1196,6 +1197,7 @@ export function ComposeWorkflow({
                   type="button"
                   disabled={aiLoading}
                   onClick={handleRegenerateEmail}
+                  data-cursor="ai"
                   className="px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-[#22211F] text-[#D4A373] border border-[#2E2D2B] hover:bg-[#2A2926] hover:border-[#D4A373]/50 transition-colors cursor-pointer disabled:opacity-50"
                   title="Regenerate email using the original request"
                 >
@@ -1393,6 +1395,7 @@ export function ComposeWorkflow({
               <button
                 type="button"
                 onClick={() => setShowScheduleModal(true)}
+                data-cursor="primary"
                 className="px-4 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#D4A373] border border-[#2E2D2B] text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
               >
                 <Clock className="w-4 h-4 text-[#D4A373]" />
@@ -1401,6 +1404,7 @@ export function ComposeWorkflow({
 
               <button
                 onClick={handleStartSending}
+                data-cursor="primary"
                 className="px-6 py-2.5 rounded-xl gold-btn light-sweep text-[#121211] font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer group active:scale-95 transition-all"
                 title="Send this email now via Gmail API"
               >

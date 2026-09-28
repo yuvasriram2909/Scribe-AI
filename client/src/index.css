@@ -1564,6 +1564,389 @@
   animation: glassFloatGlow 3.5s ease-in-out infinite;
 }
 
+/* ==========================================================================
+   Coffee-Brown Premium Custom Cursor & Micro-Interactions System
+   ========================================================================== */
+
+:root, .dark {
+  --coffee-primary: #6F4E37;
+  --coffee-dark: #3E2723;
+  --coffee-light: #A67B5B;
+  --warm-beige: #D8B384;
+  --cream: #F3E5D0;
+
+  --cursor-primary: #6F4E37;
+  --cursor-dark: #3E2723;
+  --cursor-light: #A67B5B;
+  --cursor-beige: #D8B384;
+  --cursor-cream: #F3E5D0;
+  --cursor-glow: rgba(111, 78, 55, 0.45);
+  --cursor-glow-strong: rgba(216, 179, 132, 0.55);
+  --cursor-ring-border: rgba(216, 179, 132, 0.55);
+  --cursor-dot-bg: #D8B384;
+}
+
+.light {
+  --coffee-primary: #6F4E37;
+  --coffee-dark: #3E2723;
+  --coffee-light: #8C5E3D;
+  --warm-beige: #C59362;
+  --cream: #3E2723;
+
+  --cursor-primary: #6F4E37;
+  --cursor-dark: #3E2723;
+  --cursor-light: #8C5E3D;
+  --cursor-beige: #8A623B;
+  --cursor-cream: #2E1F18;
+  --cursor-glow: rgba(111, 78, 55, 0.25);
+  --cursor-glow-strong: rgba(111, 78, 55, 0.4);
+  --cursor-ring-border: rgba(111, 78, 55, 0.65);
+  --cursor-dot-bg: #6F4E37;
+}
+
+/* Sophisticated Coffee/Cream Text Selection */
+::selection {
+  background-color: rgba(111, 78, 55, 0.5) !important;
+  color: #F3E5D0 !important;
+}
+::-moz-selection {
+  background-color: rgba(111, 78, 55, 0.5) !important;
+  color: #F3E5D0 !important;
+}
+
+/* Coffee-Brown Text Caret for Inputs & Textareas */
+input, textarea, [contenteditable="true"] {
+  caret-color: #D4A373;
+}
+.light input, .light textarea, .light [contenteditable="true"] {
+  caret-color: #6F4E37;
+}
+
+/* Subtle Coffee-Brown Focus Glow for Inputs */
+input:focus-visible, 
+textarea:focus-visible, 
+select:focus-visible {
+  outline: none;
+  border-color: rgba(216, 179, 132, 0.65) !important;
+  box-shadow: 0 0 0 3px rgba(111, 78, 55, 0.22), 0 2px 8px -2px rgba(111, 78, 55, 0.25) !important;
+}
+
+/* Scoping: Hide Default Mouse Cursor ONLY where safe on desktop fine pointers */
+@media (hover: hover) and (pointer: fine) {
+  body.custom-cursor-enabled,
+  body.custom-cursor-enabled button,
+  body.custom-cursor-enabled a,
+  body.custom-cursor-enabled [role="button"],
+  body.custom-cursor-enabled select,
+  body.custom-cursor-enabled label,
+  body.custom-cursor-enabled summary {
+    cursor: none !important;
+  }
+
+  /* CRITICAL: Retain native text cursor on inputs and textareas so users have perfect text precision */
+  body.custom-cursor-enabled input,
+  body.custom-cursor-enabled textarea,
+  body.custom-cursor-enabled [contenteditable="true"] {
+    cursor: text !important;
+  }
+
+  /* Retain native grab/resize cursors where useful */
+  body.custom-cursor-enabled [draggable="true"] {
+    cursor: grab;
+  }
+}
+
+/* Cursor Container */
+.custom-cursor-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999999;
+  overflow: hidden;
+  transition: opacity 0.2s ease;
+}
+
+/* Mobile & Touch Fallback: completely hidden with zero overhead */
+@media not all and (hover: hover) and (pointer: fine) {
+  .custom-cursor-container {
+    display: none !important;
+  }
+}
+
+/* Center Precision Dot */
+.cursor-dot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--cursor-dot-bg, #D8B384);
+  box-shadow: 0 0 6px var(--cursor-glow, rgba(111, 78, 55, 0.6));
+  pointer-events: none;
+  z-index: 9999999;
+  opacity: 0;
+  will-change: transform, width, height, opacity;
+  transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              height 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.18s ease,
+              opacity 0.2s ease,
+              box-shadow 0.18s ease;
+}
+
+/* Center Dot States */
+.cursor-dot.cursor-dot-input {
+  width: 4px;
+  height: 4px;
+  opacity: 0.75;
+  background-color: var(--cursor-beige, #D8B384);
+}
+
+.cursor-dot.cursor-dot-button {
+  width: 7px;
+  height: 7px;
+  background-color: var(--cursor-cream, #F3E5D0);
+  box-shadow: 0 0 8px var(--cursor-glow-strong);
+}
+
+.cursor-dot.cursor-dot-primary {
+  width: 8px;
+  height: 8px;
+  background-color: #FFFFFF;
+  box-shadow: 0 0 10px rgba(216, 179, 132, 0.85);
+}
+
+.cursor-dot.cursor-dot-ai {
+  width: 8px;
+  height: 8px;
+  background-color: var(--cursor-cream, #F3E5D0);
+  box-shadow: 0 0 10px rgba(216, 179, 132, 0.85);
+}
+
+.cursor-dot.cursor-dot-disabled {
+  opacity: 0.35;
+  background-color: #75716B;
+}
+
+.cursor-dot.cursor-dot-clicking {
+  transform: translate3d(var(--x, 0), var(--y, 0), 0) translate(-50%, -50%) scale(0.75) !important;
+}
+
+/* Outer Smooth Following Ring */
+.cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--cursor-ring-border, rgba(216, 179, 132, 0.55));
+  box-shadow: 0 0 14px var(--cursor-glow, rgba(111, 78, 55, 0.4)),
+              inset 0 0 4px rgba(216, 179, 132, 0.12);
+  background-color: transparent;
+  pointer-events: none;
+  z-index: 9999998;
+  opacity: 0;
+  will-change: transform, width, height, border-color, box-shadow, background-color;
+  transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              height 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease,
+              border-width 0.2s ease,
+              box-shadow 0.2s ease,
+              background-color 0.2s ease,
+              opacity 0.2s ease;
+}
+
+/* Outer Ring States */
+.cursor-ring.cursor-state-link {
+  width: 38px;
+  height: 38px;
+  border-color: var(--cursor-beige, #D8B384);
+  box-shadow: 0 0 16px var(--cursor-glow-strong);
+  background-color: rgba(111, 78, 55, 0.06);
+}
+
+.cursor-ring.cursor-state-button {
+  width: 44px;
+  height: 44px;
+  border-color: var(--cursor-beige, #D8B384);
+  border-width: 1.5px;
+  box-shadow: 0 0 20px var(--cursor-glow-strong), inset 0 0 6px rgba(216, 179, 132, 0.15);
+  background-color: rgba(111, 78, 55, 0.08);
+}
+
+.cursor-ring.cursor-state-primary {
+  width: 48px;
+  height: 48px;
+  border-color: var(--cursor-cream, #F3E5D0);
+  border-width: 2px;
+  box-shadow: 0 0 24px rgba(216, 179, 132, 0.6), inset 0 0 8px rgba(216, 179, 132, 0.2);
+  background-color: rgba(111, 78, 55, 0.12);
+}
+
+.cursor-ring.cursor-state-ai {
+  width: 48px;
+  height: 48px;
+  border-color: var(--cursor-cream, #F3E5D0);
+  border-width: 2px;
+  box-shadow: 0 0 24px rgba(216, 179, 132, 0.65), 0 0 40px rgba(111, 78, 55, 0.4);
+  background-color: rgba(111, 78, 55, 0.14);
+}
+
+.cursor-ring.cursor-state-input {
+  width: 22px;
+  height: 22px;
+  border-width: 1px;
+  border-color: var(--cursor-light, #A67B5B);
+  opacity: 0.65;
+  box-shadow: 0 0 8px var(--cursor-glow);
+  background-color: transparent;
+}
+
+.cursor-ring.cursor-state-card {
+  width: 42px;
+  height: 42px;
+  border-color: var(--cursor-light, #A67B5B);
+  border-width: 1px;
+  opacity: 0.8;
+  box-shadow: 0 0 14px var(--cursor-glow);
+  background-color: rgba(111, 78, 55, 0.05);
+}
+
+.cursor-ring.cursor-state-icon {
+  width: 34px;
+  height: 34px;
+  border-color: var(--cursor-beige, #D8B384);
+  box-shadow: 0 0 14px var(--cursor-glow);
+  background-color: rgba(111, 78, 55, 0.06);
+}
+
+.cursor-ring.cursor-state-disabled {
+  width: 20px;
+  height: 20px;
+  border-color: #75716B;
+  opacity: 0.35;
+  box-shadow: none;
+}
+
+.cursor-ring.cursor-clicking {
+  transform: translate3d(var(--x, 0), var(--y, 0), 0) translate(-50%, -50%) scale(0.9) !important;
+  border-color: var(--cursor-cream, #F3E5D0);
+  background-color: rgba(111, 78, 55, 0.18);
+}
+
+/* Rotating AI Orbit Sparkle Dot */
+.cursor-ai-sparkle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--cursor-cream, #F3E5D0);
+  box-shadow: 0 0 6px #FFFFFF;
+  margin-top: -2px;
+  margin-left: -2px;
+  animation: cursor-ai-orbit 2.4s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes cursor-ai-orbit {
+  0% {
+    transform: rotate(0deg) translateX(25px) rotate(0deg);
+    opacity: 0.75;
+  }
+  50% {
+    transform: rotate(180deg) translateX(25px) rotate(-180deg);
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(360deg) translateX(25px) rotate(-360deg);
+    opacity: 0.75;
+  }
+}
+
+/* Click Ripple Ring */
+.cursor-ripple {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid var(--cursor-beige, #D8B384);
+  box-shadow: 0 0 12px var(--cursor-glow);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 9999997;
+  will-change: transform, opacity;
+}
+
+.cursor-ripple.active {
+  animation: cursor-click-ripple 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes cursor-click-ripple {
+  0% {
+    transform: translate3d(var(--x, 0), var(--y, 0), 0) translate(-50%, -50%) scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate3d(var(--x, 0), var(--y, 0), 0) translate(-50%, -50%) scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Micro-trail dots during rapid pointer movement */
+.cursor-trail-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999996;
+  overflow: hidden;
+}
+
+.cursor-trail-dot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: var(--cursor-beige, #D8B384);
+  box-shadow: 0 0 5px var(--cursor-glow);
+  opacity: 0.55;
+  animation: cursor-trail-fade 0.22s ease-out forwards;
+}
+
+@keyframes cursor-trail-fade {
+  0% {
+    transform: translate3d(var(--x, 0), var(--y, 0), 0) translate(-50%, -50%) scale(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate3d(var(--x, 0), var(--y, 0), 0) translate(-50%, -50%) scale(0.2);
+    opacity: 0;
+  }
+}
+
+/* Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  .cursor-ring, .cursor-dot {
+    transition: none !important;
+  }
+  .cursor-ai-sparkle {
+    animation: none !important;
+    display: none !important;
+  }
+  .cursor-trail-container {
+    display: none !important;
+  }
+  .cursor-ripple.active {
+    animation: none !important;
+  }
+}
+
 
 
 

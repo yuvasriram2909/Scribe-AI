@@ -30,6 +30,7 @@ import { TrashView } from './components/TrashView';
 import { PublicLandingPage } from './components/PublicLandingPage';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { TermsOfService } from './components/TermsOfService';
+import { CustomCursor } from './components/CustomCursor';
 import { apiFetch } from './utils/api';
 import { supabase, subscribeToNotificationChanges, signOutUser } from './utils/supabaseClient';
 import { connectionManager, ConnectionStates } from './utils/connectionManager';
@@ -529,50 +530,71 @@ export default function App() {
   // Public Routes (Accessible without login)
   if (currentRoute === '/privacy') {
     return (
-      <PrivacyPolicy 
-        onBackToHome={() => navigateTo('/')} 
-        onNavigateToTerms={() => navigateTo('/terms')} 
-        onNavigateToLogin={() => navigateTo('/login')}
-      />
+      <>
+        <CustomCursor />
+        <PrivacyPolicy 
+          onBackToHome={() => navigateTo('/')} 
+          onNavigateToTerms={() => navigateTo('/terms')} 
+          onNavigateToLogin={() => navigateTo('/login')}
+        />
+      </>
     );
   }
 
   if (currentRoute === '/terms') {
     return (
-      <TermsOfService 
-        onBackToHome={() => navigateTo('/')} 
-        onNavigateToPrivacy={() => navigateTo('/privacy')} 
-        onNavigateToLogin={() => navigateTo('/login')}
-      />
+      <>
+        <CustomCursor />
+        <TermsOfService 
+          onBackToHome={() => navigateTo('/')} 
+          onNavigateToPrivacy={() => navigateTo('/privacy')} 
+          onNavigateToLogin={() => navigateTo('/login')}
+        />
+      </>
     );
   }
 
   if (currentRoute === '/login') {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} onBackToHome={() => navigateTo('/')} />;
+    return (
+      <>
+        <CustomCursor />
+        <LoginPage onLoginSuccess={handleLoginSuccess} onBackToHome={() => navigateTo('/')} />
+      </>
+    );
   }
 
   // If on homepage and not logged in, show Public Landing Page
   if (!currentUserEmail && (currentRoute === '/' || currentRoute === '')) {
     return (
-      <PublicLandingPage
-        onNavigateToLogin={() => navigateTo('/login')}
-        onNavigateToPrivacy={() => navigateTo('/privacy')}
-        onNavigateToTerms={() => navigateTo('/terms')}
-      />
+      <>
+        <CustomCursor />
+        <PublicLandingPage
+          onNavigateToLogin={() => navigateTo('/login')}
+          onNavigateToPrivacy={() => navigateTo('/privacy')}
+          onNavigateToTerms={() => navigateTo('/terms')}
+        />
+      </>
     );
   }
 
   // If no user is logged in, show Login Page
   if (!currentUserEmail) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} onBackToHome={() => navigateTo('/')} />;
+    return (
+      <>
+        <CustomCursor />
+        <LoginPage onLoginSuccess={handleLoginSuccess} onBackToHome={() => navigateTo('/')} />
+      </>
+    );
   }
 
   const displayName = currentUserName || (currentUserEmail ? currentUserEmail.split('@')[0] : 'User');
 
   return (
-    <div className={`min-h-screen flex flex-col md:flex-row font-sans selection:bg-[#D4A373] selection:text-[#121211] relative overflow-x-hidden transition-colors duration-200 ${
-      theme === 'dark' ? 'bg-[#121211] text-[#F5F3EF]' : 'bg-[#FAF8F5] text-stone-900'
-    }`}>
+    <>
+      <CustomCursor />
+      <div className={`min-h-screen flex flex-col md:flex-row font-sans selection:bg-[#D4A373] selection:text-[#121211] relative overflow-x-hidden transition-colors duration-200 ${
+        theme === 'dark' ? 'bg-[#121211] text-[#F5F3EF]' : 'bg-[#FAF8F5] text-stone-900'
+      }`}>
       
       {/* Subtle Ambient Warm Cashmere Glows */}
       {theme === 'dark' ? (
@@ -1093,5 +1115,6 @@ export default function App() {
         </footer>
       </div>
     </div>
-  );
+  </>
+);
 }

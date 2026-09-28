@@ -523,6 +523,7 @@ export function ScheduleModal({
             type="button"
             disabled={!validation.isValid || submitting}
             onClick={handleConfirm}
+            data-cursor="primary"
             className="px-7 py-2.5 rounded-xl gold-btn text-[#121211] text-xs font-bold transition-all shadow-lg shadow-[#D4A373]/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {submitting ? (
