@@ -614,6 +614,197 @@ async function getValidAccessToken(
 }
 
 // ----------------------------------------------------
+// Background Scheduler Execution Engine
+// ----------------------------------------------------
+
+async function getValidAccessTokenForUser(
+  userId: string,
+  supabase: any,
+  options: { forceRefresh?: boolean } = {}
+): Promise<{ token: string | null; email: string | null; conn: any }> {
+  try {
+    const { data: conn } = await supabase
+      .from("gmail_connections")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (conn) {
+      const token = await getValidAccessToken(conn, supabase, options);
+      if (token) return { token, email: conn.email, conn };
+    }
+
+    const { data: legAcc } = await supabase
+      .from("GmailAccount")
+      .select("*")
+      .eq("userId", userId)
+      .maybeSingle();
+
+    if (legAcc) {
+      const token = await getValidAccessToken(legAcc, supabase, options);
+      if (token) return { token, email: legAcc.email, conn: legAcc };
+    }
+  } catch (e) {
+    console.warn("getValidAccessTokenForUser notice:", e);
+  }
+
+  return { token: null, email: null, conn: null };
+}
+
+async function processDueScheduledEmails(supabase: any) {
+  try {
+    const { data: claimedJobs, error: claimErr } = await supabase.rpc("claim_due_scheduled_emails", { batch_size: 10 });
+    if (claimErr) {
+      console.warn("[Scheduler] claim_due_scheduled_emails notice:", claimErr.message);
+      return { processed: 0, error: claimErr.message };
+    }
+
+    if (!claimedJobs || claimedJobs.length === 0) {
+      return { processed: 0 };
+    }
+
+    console.log(`[Scheduler] Claimed ${claimedJobs.length} due scheduled email(s) for dispatch.`);
+    let successCount = 0;
+
+    for (const job of claimedJobs) {
+      try {
+        const { token: accessToken, email: connectedEmail, conn } = await getValidAccessTokenForUser(job.user_id, supabase);
+
+        if (!accessToken || !connectedEmail) {
+          console.warn(`[Scheduler] No valid Gmail access token for user ${job.user_id} on job ${job.id}`);
+          await supabase.from("scheduled_emails").update({
+            status: "reauth_required",
+            error: "Gmail connection missing or authorization expired.",
+            updated_at: new Date().toISOString()
+          }).eq("id", job.id);
+          continue;
+        }
+
+        const toList = Array.isArray(job.to_emails) ? job.to_emails : (job.to_emails ? [job.to_emails] : []);
+        const ccList = Array.isArray(job.cc_emails) ? job.cc_emails : (job.cc_emails ? [job.cc_emails] : []);
+        const bccList = Array.isArray(job.bcc_emails) ? job.bcc_emails : (job.bcc_emails ? [job.bcc_emails] : []);
+        const toHeader = toList.join(", ");
+        const ccHeader = ccList.join(", ");
+        const bccHeader = bccList.join(", ");
+
+        const emailLines = [
+          `From: ${connectedEmail}`,
+          `To: ${toHeader}`,
+          ccHeader ? `Cc: ${ccHeader}` : "",
+          bccHeader ? `Bcc: ${bccHeader}` : "",
+          `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(job.subject)))}?=`,
+          "MIME-Version: 1.0",
+          "Content-Type: text/plain; charset=UTF-8",
+          "Content-Transfer-Encoding: 7bit",
+          "",
+          job.body,
+        ].filter(Boolean).join("\r\n");
+
+        const rawBase64 = btoa(unescape(encodeURIComponent(emailLines)))
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
+
+        let sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ raw: rawBase64 }),
+        });
+
+        let sendData = await sendRes.json();
+
+        // 1-TIME AUTO-REFRESH & RETRY IF 401
+        if (sendRes.status === 401 && conn) {
+          console.warn(`[Scheduler] 401 on dispatch for job ${job.id}. Attempting force refresh...`);
+          const refreshedToken = await getValidAccessToken(conn, supabase, { forceRefresh: true });
+          if (refreshedToken) {
+            sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${refreshedToken}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ raw: rawBase64 }),
+            });
+            sendData = await sendRes.json();
+          }
+        }
+
+        if (!sendRes.ok || sendData.error) {
+          const errMsg = sendData.error?.message || "Failed to send email via Gmail API";
+          console.error(`[Scheduler] Gmail send failed for job ${job.id}:`, errMsg);
+          await supabase.from("scheduled_emails").update({
+            status: "failed",
+            error: errMsg,
+            updated_at: new Date().toISOString()
+          }).eq("id", job.id);
+          continue;
+        }
+
+        const now = new Date().toISOString();
+        const gmailMessageId = sendData.id;
+
+        // Update scheduled_emails
+        await supabase.from("scheduled_emails").update({
+          status: "sent",
+          sent_at: now,
+          gmail_message_id: gmailMessageId,
+          updated_at: now
+        }).eq("id", job.id);
+
+        // Update emails
+        await supabase.from("emails").update({
+          status: "Sent",
+          direction: "sent",
+          is_sent: true,
+          sent_at: now,
+          gmail_message_id: gmailMessageId,
+          updated_at: now
+        }).eq("id", job.id);
+
+        // Update legacy Email
+        await supabase.from("Email").update({
+          status: "Sent",
+          isSent: true,
+          sentAt: now,
+          gmailMessageId: gmailMessageId,
+          updatedAt: now
+        }).eq("id", job.id);
+
+        // Notify user
+        await safeInsertNotification(supabase, {
+          id: crypto.randomUUID(),
+          userId: job.user_id,
+          emailId: job.id,
+          notificationType: job.category || "Scheduled",
+          message: `Scheduled email "${job.subject}" sent to ${toHeader} via Gmail.`,
+          read: false,
+          isTrashed: false,
+          createdAt: now,
+        });
+
+        successCount++;
+      } catch (jobErr: any) {
+        console.error(`[Scheduler] Error processing job ${job.id}:`, jobErr);
+        await supabase.from("scheduled_emails").update({
+          status: "failed",
+          error: jobErr?.message || String(jobErr),
+          updated_at: new Date().toISOString()
+        }).eq("id", job.id);
+      }
+    }
+
+    return { processed: claimedJobs.length, success: successCount };
+  } catch (err: any) {
+    console.error("[Scheduler] Fatal error in processDueScheduledEmails:", err);
+    return { error: err.message };
+  }
+}
+
+// ----------------------------------------------------
 // Safe Database Insert Helpers (Graceful Fallback)
 // ----------------------------------------------------
 
@@ -3746,6 +3937,11 @@ Ensure:
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
 
+      // Opportunistically process due scheduled emails in background
+      try {
+        processDueScheduledEmails(supabase).catch(() => {});
+      } catch (_) {}
+
       const statusQuery = url.searchParams.get("status");
       const categoryQuery = url.searchParams.get("category");
       const searchQuery = url.searchParams.get("q");
@@ -5024,6 +5220,22 @@ Ensure:
         .filter(Boolean);
       const schedRecipient = schedToList.join(", ");
 
+      const scheduledAtUtc = body.scheduledAt || body.scheduledAtUtc;
+      if (!scheduledAtUtc) {
+        return errorResponse("Please choose a scheduled date and time.", 400);
+      }
+      const scheduledDate = new Date(scheduledAtUtc);
+      if (isNaN(scheduledDate.getTime())) {
+        return errorResponse("Invalid scheduled date and time.", 400);
+      }
+      // Require strictly future time (at least 30 seconds ahead)
+      if (scheduledDate.getTime() <= Date.now() + 30000) {
+        return errorResponse("Please select a future time. (The selected time has already passed or is too soon).", 400);
+      }
+
+      const timezone = body.timezone || "UTC";
+      const scheduledForLocal = body.scheduledForLocal || scheduledDate.toISOString();
+
       const schedPayload = {
         id: body.id || crypto.randomUUID(),
         userId: user.id,
@@ -5037,7 +5249,9 @@ Ensure:
         priority: body.priority || "Normal",
         tone: body.tone || "Professional",
         status: "Scheduled",
-        scheduledAt: body.scheduledAt || now,
+        scheduledAt: scheduledDate.toISOString(),
+        timezone,
+        scheduledForLocal,
         isReceived: false,
         isSent: false,
         isSpam: false,
@@ -5060,14 +5274,22 @@ Ensure:
           situation: schedPayload.situation,
           priority: schedPayload.priority,
           tone: schedPayload.tone,
-          scheduled_for: body.scheduledAt || now,
+          scheduled_for: scheduledDate.toISOString(),
+          timezone,
+          scheduled_for_local: scheduledForLocal,
           status: "scheduled",
+          attempts: 0,
           created_at: now,
           updated_at: now,
         });
       } catch (_) {}
 
-      const { data, error } = await safeInsertEmail(supabase, schedPayload);
+      const { data, error } = await safeInsertEmail(supabase, {
+        ...schedPayload,
+        scheduled_at: scheduledDate.toISOString(),
+        scheduled_for_local: scheduledForLocal,
+        timezone
+      });
       if (error) throw error;
 
       await safeInsertNotification(supabase, {
@@ -5075,13 +5297,119 @@ Ensure:
         userId: user.id,
         emailId: schedPayload.id,
         notificationType: schedPayload.category || "General",
-        message: `Email "${schedPayload.subject}" scheduled for delivery at ${schedPayload.scheduledAt}.`,
+        message: `Email "${schedPayload.subject}" scheduled for ${scheduledForLocal} (${timezone}).`,
         read: false,
         isTrashed: false,
         createdAt: now,
       });
 
-      return jsonResponse({ success: true, email: data || schedPayload });
+      return jsonResponse({
+        success: true,
+        email: data || schedPayload,
+        scheduledAt: scheduledDate.toISOString(),
+        timezone,
+        scheduledForLocal
+      });
+    }
+
+    if (path.startsWith("/emails/scheduled/") && path.endsWith("/cancel") && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const emailId = path.split("/")[3];
+
+      const { data: cancelled, error: cancelErr } = await supabase.rpc("cancel_scheduled_email", {
+        p_id: emailId,
+        p_user_id: user.id
+      });
+
+      if (cancelErr || !cancelled) {
+        await supabase.from("scheduled_emails")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("id", emailId)
+          .eq("user_id", user.id);
+        await supabase.from("emails")
+          .update({ status: "Cancelled", updated_at: new Date().toISOString() })
+          .eq("id", emailId)
+          .eq("user_id", user.id);
+        await supabase.from("Email")
+          .update({ status: "Cancelled", updatedAt: new Date().toISOString() })
+          .eq("id", emailId)
+          .eq("userId", user.id);
+      }
+
+      return jsonResponse({ success: true, message: "Scheduled email cancelled." });
+    }
+
+    if (path.startsWith("/emails/scheduled/") && path.endsWith("/reschedule") && method === "POST") {
+      const user = await getAuthUser(req, supabase);
+      if (!user) return errorResponse("Unauthorized", 401);
+      const emailId = path.split("/")[3];
+      const body = await req.json().catch(() => ({}));
+
+      const scheduledAtUtc = body.scheduledAt || body.scheduledAtUtc;
+      if (!scheduledAtUtc) return errorResponse("Please choose a scheduled date and time.", 400);
+      const scheduledDate = new Date(scheduledAtUtc);
+      if (isNaN(scheduledDate.getTime())) return errorResponse("Invalid scheduled date.", 400);
+      if (scheduledDate.getTime() <= Date.now() + 30000) {
+        return errorResponse("Please select a future time. (The selected time has already passed or is too soon).", 400);
+      }
+
+      const timezone = body.timezone || "UTC";
+      const scheduledForLocal = body.scheduledForLocal || scheduledDate.toISOString();
+
+      const { data: rescheduled, error: reschedErr } = await supabase.rpc("reschedule_email", {
+        p_id: emailId,
+        p_user_id: user.id,
+        p_scheduled_for: scheduledDate.toISOString(),
+        p_timezone: timezone,
+        p_scheduled_for_local: scheduledForLocal
+      });
+
+      if (reschedErr || !rescheduled) {
+        await supabase.from("scheduled_emails")
+          .update({
+            scheduled_for: scheduledDate.toISOString(),
+            timezone,
+            scheduled_for_local: scheduledForLocal,
+            status: "scheduled",
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", emailId)
+          .eq("user_id", user.id);
+        await supabase.from("emails")
+          .update({
+            scheduled_at: scheduledDate.toISOString(),
+            timezone,
+            scheduled_for_local: scheduledForLocal,
+            status: "Scheduled",
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", emailId)
+          .eq("user_id", user.id);
+        await supabase.from("Email")
+          .update({
+            scheduledAt: scheduledDate.toISOString(),
+            timezone,
+            scheduledForLocal,
+            status: "Scheduled",
+            updatedAt: new Date().toISOString()
+          })
+          .eq("id", emailId)
+          .eq("userId", user.id);
+      }
+
+      return jsonResponse({
+        success: true,
+        message: "Email rescheduled successfully.",
+        scheduledAt: scheduledDate.toISOString(),
+        timezone,
+        scheduledForLocal
+      });
+    }
+
+    if ((path === "/emails/process-scheduled" || path === "/emails/scheduler/tick") && (method === "POST" || method === "GET")) {
+      const result = await processDueScheduledEmails(supabase);
+      return jsonResponse({ success: true, result });
     }
 
     if (path === "/emails/pending" && method === "POST") {
@@ -5125,6 +5453,11 @@ Ensure:
     if ((path === "/emails/stats" || path === "/dashboard/stats" || path === "/stats") && method === "GET") {
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
+
+      // Opportunistically process due scheduled emails in background
+      try {
+        processDueScheduledEmails(supabase).catch(() => {});
+      } catch (_) {}
 
       // Fetch emails from BOTH canonical emails and legacy Email tables with strict user isolation across all userIds
       const userEmail = (user.email || "").toLowerCase().trim();

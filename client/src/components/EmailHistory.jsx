@@ -8,6 +8,7 @@ import { apiFetch } from '../utils/api';
 import { subscribeToEmailChanges } from '../utils/supabaseClient';
 import { sanitizeHtml } from '../utils/sanitize';
 import { formatNormalDateTime } from '../utils/dateUtils';
+import { ScheduleModal } from './ScheduleModal';
 
 const FOLDERS = [
   { id: 'inbox', label: 'Inbox', icon: Inbox },
@@ -69,6 +70,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
   const [bodyViewMode, setBodyViewMode] = useState('formatted'); // 'formatted' | 'text'
   const [retryingId, setRetryingId] = useState(null);
   const [actionInProgress, setActionInProgress] = useState({});
+  const [reschedulingEmail, setReschedulingEmail] = useState(null);
 
   // Deep filter synchronization when navigated from Dashboard cards or links
   useEffect(() => {
@@ -310,6 +312,60 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
       onReuseEmail(email);
     }
     setSelectedEmail(null);
+  };
+
+  const handleCancelSchedule = async (emailId) => {
+    if (!window.confirm('Are you sure you want to cancel this scheduled email?')) return;
+    try {
+      const res = await apiFetch(`/api/emails/scheduled/${emailId}/cancel`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        setEmails(prev => prev.map(e => e.id === emailId ? { ...e, status: 'Cancelled' } : e));
+        if (selectedEmail && selectedEmail.id === emailId) {
+          setSelectedEmail(prev => ({ ...prev, status: 'Cancelled' }));
+        }
+      }
+    } catch (e) {
+      console.error('Cancel schedule error:', e);
+    }
+  };
+
+  const handleExecuteReschedule = async (emailId, newSchedule) => {
+    try {
+      const res = await apiFetch(`/api/emails/scheduled/${emailId}/reschedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scheduledAt: newSchedule.scheduledAtUtc,
+          timezone: newSchedule.timezone,
+          scheduledForLocal: newSchedule.formattedLocal || newSchedule.scheduledForLocal
+        })
+      });
+      if (res.ok) {
+        setReschedulingEmail(null);
+        setEmails(prev => prev.map(e => e.id === emailId ? {
+          ...e,
+          status: 'Scheduled',
+          scheduledAt: newSchedule.scheduledAtUtc,
+          scheduled_for: newSchedule.scheduledAtUtc,
+          timezone: newSchedule.timezone,
+          scheduled_for_local: newSchedule.formattedLocal || newSchedule.scheduledForLocal
+        } : e));
+        if (selectedEmail && selectedEmail.id === emailId) {
+          setSelectedEmail(prev => ({
+            ...prev,
+            status: 'Scheduled',
+            scheduledAt: newSchedule.scheduledAtUtc,
+            scheduled_for: newSchedule.scheduledAtUtc,
+            timezone: newSchedule.timezone,
+            scheduled_for_local: newSchedule.formattedLocal || newSchedule.scheduledForLocal
+          }));
+        }
+      }
+    } catch (e) {
+      console.error('Reschedule error:', e);
+    }
   };
 
   const renderEmailBadge = (email) => {
@@ -763,6 +819,20 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
                 <p><strong className="text-purple-400">Gmail Message ID:</strong> {selectedEmail.gmailMessageId}</p>
               )}
               <p><strong className="text-[#D4A373]">Timestamp:</strong> {formatNormalDateTime(selectedEmail.sentAt || selectedEmail.receivedAt || selectedEmail.createdAt)}</p>
+              
+              {((selectedEmail.status || '').toLowerCase() === 'scheduled') && (
+                <div className="p-3 rounded-xl bg-[#D4A373]/15 border border-[#D4A373]/40 text-xs flex items-center justify-between flex-wrap gap-2 text-[#D4A373]">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 shrink-0 text-[#D4A373]" />
+                    <span>
+                      <strong>Scheduled for:</strong> {selectedEmail.scheduled_for_local || selectedEmail.scheduledAt || selectedEmail.scheduled_for} {selectedEmail.timezone ? `(${selectedEmail.timezone})` : ''}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#22211F] text-[#D4A373] border border-[#2E2D2B]">
+                    Queue Active
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Body View Mode Selector (Formatted HTML vs Plain Text) */}
@@ -825,6 +895,26 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
 
               {/* Right action buttons */}
               <div className="flex items-center gap-2">
+                {/* If scheduled: show Reschedule & Cancel Schedule */}
+                {(selectedEmail.status || '').toLowerCase() === 'scheduled' && (
+                  <>
+                    <button
+                      onClick={() => setReschedulingEmail(selectedEmail)}
+                      className="px-4 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#D4A373] text-xs font-bold transition-all cursor-pointer border border-[#D4A373]/30 flex items-center gap-2 shadow-sm"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Reschedule</span>
+                    </button>
+                    <button
+                      onClick={() => handleCancelSchedule(selectedEmail.id)}
+                      className="px-4 py-2.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-500/40 text-xs font-bold transition-all cursor-pointer flex items-center gap-2"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Cancel Schedule</span>
+                    </button>
+                  </>
+                )}
+
                 {/* If draft: show Edit in Compose */}
                 {(selectedEmail.isDraft || selectedEmail.is_draft || selectedEmail.direction === 'draft' || (selectedEmail.status || '').toLowerCase() === 'draft') && (
                   <button
@@ -837,7 +927,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
                 )}
 
                 {/* Reuse as Template */}
-                {onReuseEmail && !(selectedEmail.isDraft || selectedEmail.is_draft || selectedEmail.direction === 'draft' || (selectedEmail.status || '').toLowerCase() === 'draft') && (
+                {onReuseEmail && !(selectedEmail.isDraft || selectedEmail.is_draft || selectedEmail.direction === 'draft' || (selectedEmail.status || '').toLowerCase() === 'draft' || (selectedEmail.status || '').toLowerCase() === 'scheduled') && (
                   <button
                     onClick={() => {
                       onReuseEmail(selectedEmail);
@@ -861,6 +951,18 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
 
           </div>
         </div>
+      )}
+
+      {/* Dynamic Reschedule Modal */}
+      {reschedulingEmail && (
+        <ScheduleModal
+          isOpen={true}
+          title="Reschedule Email Dispatch"
+          subtitle="Choose a new date, time, and timezone. The database will immediately update."
+          initialTimezone={reschedulingEmail.timezone || ''}
+          onClose={() => setReschedulingEmail(null)}
+          onConfirmSchedule={(newSchedule) => handleExecuteReschedule(reschedulingEmail.id, newSchedule)}
+        />
       )}
     </div>
   );

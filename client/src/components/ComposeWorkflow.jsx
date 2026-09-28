@@ -19,6 +19,7 @@ import {
   formatEmailList 
 } from '../utils/emailValidation';
 import { connectionManager, ConnectionStates } from '../utils/connectionManager';
+import { ScheduleModal } from './ScheduleModal';
 
 export function ComposeWorkflow({ 
   composeState = {}, 
@@ -84,7 +85,6 @@ export function ComposeWorkflow({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [draftToast, setDraftToast] = useState('');
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleTime, setScheduleTime] = useState('');
 
   // Parsed recipient list for multi-recipient rendering and interaction
   const parsedRecipients = parseEmailList(recipient);
@@ -154,7 +154,7 @@ export function ComposeWorkflow({
     }
   };
 
-  const handleConfirmSchedule = async () => {
+  const handleConfirmSchedule = async (scheduleData) => {
     const valRes = validateEmailList(recipient, { fieldName: 'Recipient email' });
     if (!valRes.isValid) {
       updateState({ errorMessage: valRes.error });
@@ -188,16 +188,23 @@ export function ComposeWorkflow({
           situation,
           priority,
           tone,
-          scheduledAt: scheduleTime ? new Date(scheduleTime).toISOString() : new Date(Date.now() + 3600000).toISOString()
+          scheduledAt: scheduleData.scheduledAtUtc,
+          timezone: scheduleData.timezone,
+          scheduledForLocal: scheduleData.scheduledForLocal,
+          sendIndividually
         })
       });
       if (res.ok) {
         setShowScheduleModal(false);
-        setDraftToast('✓ Email successfully scheduled in Supabase queue!');
-        setTimeout(() => setDraftToast(''), 4000);
+        setDraftToast(`✓ Email scheduled for ${scheduleData.scheduledForLocal} (${scheduleData.timezone})!`);
+        setTimeout(() => setDraftToast(''), 5000);
+      } else {
+        const errData = await safeParseResponse(res);
+        updateState({ errorMessage: errData?.error || 'Failed to schedule email.' });
       }
     } catch (e) {
       console.error('Schedule error:', e);
+      updateState({ errorMessage: e.message || 'Failed to schedule email.' });
     }
   };
 
@@ -1348,52 +1355,12 @@ export function ComposeWorkflow({
         </div>
       )}
 
-      {/* SCHEDULE MODAL */}
-      {showScheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="glass-panel max-w-md w-full p-6 rounded-3xl border border-[#2E2D2B] bg-[#1A1918] space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#2E2D2B] pb-3">
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-[#D4A373]" />
-                <h3 className="text-base font-bold text-[#F5F3EF]">Schedule Email Dispatch</h3>
-              </div>
-              <button onClick={() => setShowScheduleModal(false)} className="text-[#99958F] hover:text-[#F5F3EF] p-1 cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <label className="block text-xs font-semibold text-[#ECE8E1]">
-                Choose Scheduled Date & Time:
-              </label>
-              <input
-                type="datetime-local"
-                value={scheduleTime}
-                onChange={(e) => setScheduleTime(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-[#121211] text-[#F5F3EF] text-xs border border-[#2E2D2B] focus:outline-none focus:border-[#D4A373]"
-              />
-              <p className="text-[11px] text-[#99958F]">
-                Your email will be queued in Supabase as "Scheduled" and will appear on the dashboard queue.
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-[#2E2D2B]">
-              <button
-                onClick={() => setShowScheduleModal(false)}
-                className="px-4 py-2 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#99958F] text-xs font-bold border border-[#2E2D2B] cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmSchedule}
-                className="px-5 py-2 rounded-xl gold-btn text-[#121211] text-xs font-bold cursor-pointer shadow-lg shadow-[#D4A373]/20"
-              >
-                Save Schedule
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* DYNAMIC USER-CONTROLLED SCHEDULE MODAL */}
+      <ScheduleModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        onConfirmSchedule={handleConfirmSchedule}
+      />
 
       {/* STEP 4: CONFIRMATION SECURITY MODAL */}
       {showConfirmModal && (
