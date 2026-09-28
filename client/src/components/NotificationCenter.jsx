@@ -157,7 +157,11 @@ export function NotificationCenter({ onUnreadCountChange, onViewHistory, theme =
           query = senderMatch[1];
         }
       }
-      onViewHistory({ q: query, folder: 'all' });
+      onViewHistory({ 
+        openEmailId: n.emailId || n.email_id || null,
+        q: query, 
+        folder: 'inbox' 
+      });
     }
   };
 

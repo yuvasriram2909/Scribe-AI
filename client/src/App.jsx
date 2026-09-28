@@ -163,6 +163,7 @@ export default function App() {
   };
 
   const [toastMessage, setToastMessage] = useState('');
+  const [toastEmailId, setToastEmailId] = useState(null);
 
   // Listen to Supabase Auth State & Session
   useEffect(() => {
@@ -296,7 +297,11 @@ export default function App() {
           if (newUnreadNotifs.length > 0) {
             const newest = newUnreadNotifs[0];
             setToastMessage(`📬 ${newest.message}`);
-            setTimeout(() => setToastMessage(''), 7000);
+            setToastEmailId(newest.emailId || newest.email_id || null);
+            setTimeout(() => {
+              setToastMessage('');
+              setToastEmailId(null);
+            }, 8000);
 
             // Native Browser Notification
             if (typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission === 'granted') {
@@ -996,11 +1001,29 @@ export default function App() {
         {/* Global Toast Alert */}
         {toastMessage && (
           <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-[#D4A373]/20 border border-[#D4A373]/40 text-[#ECE8E1] text-xs font-semibold shadow-lg flex items-center justify-between animate-fadeIn">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#D4A373]" />
+            <div className="flex items-center gap-2 flex-wrap">
+              <Sparkles className="w-4 h-4 text-[#D4A373] shrink-0" />
               <span className={theme === 'dark' ? 'text-[#ECE8E1]' : 'text-amber-900'}>{toastMessage}</span>
+              {toastEmailId && (
+                <button
+                  onClick={() => {
+                    handleNavigateToHistory({ openEmailId: toastEmailId, folder: 'inbox' });
+                    setToastMessage('');
+                    setToastEmailId(null);
+                  }}
+                  className="ml-3 px-3 py-1 rounded-xl bg-[#D4A373] hover:bg-[#c49262] text-[#121211] font-bold text-xs cursor-pointer transition-colors shadow-sm"
+                >
+                  Read Reply →
+                </button>
+              )}
             </div>
-            <button onClick={() => setToastMessage('')} className="text-[#99958F] hover:text-[#F5F3EF]">
+            <button 
+              onClick={() => {
+                setToastMessage('');
+                setToastEmailId(null);
+              }} 
+              className="text-[#99958F] hover:text-[#F5F3EF] cursor-pointer shrink-0 ml-2"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>

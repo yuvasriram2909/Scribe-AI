@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Mail, Search, Filter, CheckCircle, Paperclip, RefreshCw, Eye, X, Trash2, 
   AlertCircle, Clock, Calendar, Send, Inbox, ArrowUpRight, ArrowDownLeft, ShieldAlert,
-  Star, Archive, MailOpen, RotateCcw, Edit3, Sparkles
+  Star, Archive, MailOpen, RotateCcw, Edit3, Sparkles, CornerUpLeft, MessageSquare
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { subscribeToEmailChanges } from '../utils/supabaseClient';
@@ -55,9 +55,10 @@ const DATE_RANGES = [
   { id: 'month', label: 'Last 30 Days' }
 ];
 
-export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
+export function EmailHistory({ onReuseEmail, onEditDraft, onStartCompose, initialFilters }) {
   const [emails, setEmails] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isBackgroundSyncing, setIsBackgroundSyncing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState(() => initialFilters?.folder || 'inbox');
   const [selectedDirection, setSelectedDirection] = useState(() => initialFilters?.direction || 'All');
@@ -68,10 +69,18 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
   const [selectedDateRange, setSelectedDateRange] = useState(() => initialFilters?.dateRange || 'All');
   const [searchQuery, setSearchQuery] = useState(() => initialFilters?.q || '');
   const [selectedEmail, setSelectedEmail] = useState(null);
+  const [selectedEmailId, setSelectedEmailId] = useState(null);
+  const [isFetchingDetail, setIsFetchingDetail] = useState(false);
   const [bodyViewMode, setBodyViewMode] = useState('formatted'); // 'formatted' | 'text'
   const [retryingId, setRetryingId] = useState(null);
   const [actionInProgress, setActionInProgress] = useState({});
   const [reschedulingEmail, setReschedulingEmail] = useState(null);
+
+  const isFetchingRef = useRef(false);
+  const pendingFetchRef = useRef(false);
+  const debounceTimerRef = useRef(null);
+  const selectedEmailIdRef = useRef(null);
+  selectedEmailIdRef.current = selectedEmailId;
 
   // Deep filter synchronization when navigated from Dashboard cards or links
   useEffect(() => {
@@ -87,6 +96,20 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
     }
   }, [initialFilters]);
 
+  // Open specific email if openEmailId passed in filters
+  useEffect(() => {
+    if (initialFilters?.openEmailId) {
+      apiFetch(`/api/emails/${initialFilters.openEmailId}`)
+        .then(r => r.json())
+        .then(em => {
+          if (em && (em.id || em.gmailMessageId)) {
+            handleOpenEmail(em);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [initialFilters?._timestamp, initialFilters?.openEmailId]);
+
   const hasActiveFilters = selectedFolder !== 'inbox' || selectedDirection !== 'All' || selectedCategory !== 'All' || selectedTone !== 'All' || selectedImportance !== 'All' || selectedStatus !== 'All' || selectedDateRange !== 'All' || searchQuery.trim() !== '';
 
   const handleResetFilters = () => {
@@ -100,28 +123,43 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
     setSearchQuery('');
   };
 
+  const scheduleBackgroundSync = () => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      fetchEmails(true);
+    }, 400);
+  };
+
   useEffect(() => {
-    fetchEmails();
+    // Initial fetch (only shows full loader if emails list is empty)
+    fetchEmails(emails.length > 0);
 
     // Auto-sync Gmail in background on mount
     apiFetch('/api/gmail/sync', { method: 'POST' })
       .then(r => r.json())
       .then(d => {
         if (d?.newReceived > 0 || d?.newSent > 0 || d?.newSpam > 0 || d?.newDrafts > 0) {
-          fetchEmails();
+          scheduleBackgroundSync();
         }
       })
       .catch(() => {});
 
-    // Supabase Realtime Listener
-    const unsubscribe = subscribeToEmailChanges(localStorage.getItem('userId') || localStorage.getItem('userEmail') || '', () => {
-      fetchEmails();
-    });
+    // Supabase Realtime Listener (debounced to avoid multiple unmounts)
+    const unsubscribe = subscribeToEmailChanges(
+      localStorage.getItem('userId') || localStorage.getItem('userEmail') || '',
+      () => {
+        scheduleBackgroundSync();
+      }
+    );
 
-    const interval = setInterval(fetchEmails, 15000);
+    const interval = setInterval(() => {
+      fetchEmails(true);
+    }, 15000);
+
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
       clearInterval(interval);
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
   }, [selectedFolder, selectedDirection, selectedCategory, selectedTone, selectedImportance, selectedStatus, selectedDateRange, searchQuery]);
 
@@ -131,7 +169,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
     try {
       const res = await apiFetch('/api/gmail/sync', { method: 'POST' });
       const data = await res.json();
-      await fetchEmails();
+      await fetchEmails(true);
       if (data?.newReceived > 0 || data?.newSent > 0 || data?.newDrafts > 0) {
         alert(`Synced ${data.newReceived || 0} received, ${data.newSent || 0} sent, and ${data.newDrafts || 0} drafts with Gmail!`);
       }
@@ -142,8 +180,20 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
     }
   };
 
-  const fetchEmails = async () => {
-    setLoading(true);
+  const fetchEmails = async (isBackground = false) => {
+    if (isFetchingRef.current) {
+      pendingFetchRef.current = true;
+      return;
+    }
+    isFetchingRef.current = true;
+
+    // Never unmount existing email list during background sync or polling
+    if (!isBackground && emails.length === 0) {
+      setInitialLoading(true);
+    } else {
+      setIsBackgroundSyncing(true);
+    }
+
     try {
       let url = `/api/emails?folder=${encodeURIComponent(selectedFolder)}&`;
       if (selectedDirection !== 'All') url += `direction=${encodeURIComponent(selectedDirection)}&`;
@@ -157,13 +207,42 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
 
       const res = await apiFetch(url);
       if (res.ok) {
-        const data = await res.json();
-        setEmails(Array.isArray(data) ? data : []);
+        const rawData = await res.json();
+        const incoming = Array.isArray(rawData) ? rawData : [];
+
+        // Functional non-destructive update
+        setEmails(prev => {
+          if (!prev || prev.length === 0) return incoming;
+          return incoming;
+        });
+
+        // Reconcile open email without closing or resetting it
+        if (selectedEmailIdRef.current) {
+          const targetId = selectedEmailIdRef.current;
+          const fresh = incoming.find(e => e.id === targetId || e.gmailMessageId === targetId);
+          if (fresh) {
+            setSelectedEmail(prev => {
+              if (!prev) return fresh;
+              return {
+                ...prev,
+                ...fresh,
+                threadMessages: prev.threadMessages || fresh.threadMessages
+              };
+            });
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to fetch email history:', err);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setIsBackgroundSyncing(false);
+      isFetchingRef.current = false;
+
+      if (pendingFetchRef.current) {
+        pendingFetchRef.current = false;
+        fetchEmails(true);
+      }
     }
   };
 
@@ -283,27 +362,61 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
 
   const handleOpenEmail = async (email) => {
     setSelectedEmail(email);
-    setBodyViewMode(email.bodyHtml ? 'formatted' : 'text');
+    setSelectedEmailId(email.id || email.gmailMessageId);
+    setBodyViewMode((email.bodyHtml || email.body_html) ? 'formatted' : 'text');
 
     // If unread, mark read in background
     if (!email.isRead) {
       handleToggleRead(null, email);
     }
 
-    // If email lacks body_html and has gmailMessageId, fetch full details on-demand
-    if (!email.bodyHtml && email.gmailMessageId) {
+    // Always fetch full details and thread messages if id is available
+    if (email.id) {
+      setIsFetchingDetail(true);
       try {
         const res = await apiFetch(`/api/emails/${email.id}`);
         if (res.ok) {
           const fullEmail = await res.json();
-          setSelectedEmail(fullEmail);
-          setEmails(prev => prev.map(item => item.id === fullEmail.id ? fullEmail : item));
-          if (fullEmail.bodyHtml) setBodyViewMode('formatted');
+          if (fullEmail && (fullEmail.id || fullEmail.gmailMessageId)) {
+            setSelectedEmail(prev => {
+              if (!prev) return fullEmail;
+              return { ...prev, ...fullEmail };
+            });
+            setEmails(prev => prev.map(item => item.id === fullEmail.id ? { ...item, ...fullEmail } : item));
+            if (fullEmail.bodyHtml || fullEmail.body_html) setBodyViewMode('formatted');
+          }
         }
       } catch (fErr) {
         console.warn('Detailed email fetch note:', fErr);
+      } finally {
+        setIsFetchingDetail(false);
       }
     }
+  };
+
+  const handleReplyEmail = (email) => {
+    if (!email) return;
+    const replySubject = (email.subject || '').startsWith('Re:') ? email.subject : `Re: ${email.subject || ''}`;
+    const replyRecipient = email.isReceived || email.direction === 'incoming' || email.direction === 'received'
+      ? (email.sender_email || email.from_email || email.sender || '')
+      : (email.recipient || email.recipient_email || '');
+
+    if (onStartCompose) {
+      onStartCompose({
+        subject: replySubject,
+        recipient: replyRecipient,
+        instruction: `Reply to ${email.sender || replyRecipient} regarding: "${email.subject || ''}". Reference their latest message: "${email.snippet || (email.body ? email.body.slice(0, 100) : '')}"`,
+        step: 1
+      });
+    } else if (onReuseEmail) {
+      onReuseEmail({
+        subject: replySubject,
+        recipient: replyRecipient,
+        body: `\n\n--- On ${formatNormalDateTime(email.sentAt || email.receivedAt || email.createdAt)}, ${email.sender} wrote:\n> ${email.bodyText || email.body || ''}`
+      });
+    }
+    setSelectedEmail(null);
+    setSelectedEmailId(null);
   };
 
   const handleEditDraftAction = (email) => {
@@ -531,6 +644,13 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
           </button>
         )}
 
+        {isBackgroundSyncing && (
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#D4A373] bg-[#D4A373]/10 px-2.5 py-1 rounded-lg border border-[#D4A373]/30 animate-pulse">
+            <RefreshCw className="w-3 h-3 animate-spin" />
+            <span>Syncing updates...</span>
+          </div>
+        )}
+
         <div className="ml-auto text-[11px] font-medium text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-lg border border-slate-800">
           <span>{emails.length} {emails.length === 1 ? 'email' : 'emails'}</span>
         </div>
@@ -565,7 +685,7 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
       )}
 
       {/* 3. Cards Grid */}
-      {loading ? (
+      {initialLoading && emails.length === 0 ? (
         <div className="glass-panel p-12 text-center text-xs text-slate-400 rounded-3xl space-y-3 border border-slate-800">
           <RefreshCw className="w-6 h-6 animate-spin text-[#D4A373] mx-auto" />
           <p className="font-semibold">Synchronizing mailbox from Gmail & Supabase...</p>
@@ -762,6 +882,11 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
                   }`}>
                     Priority: {selectedEmail.priority || selectedEmail.importance || 'Normal'}
                   </span>
+                  {isFetchingDetail && (
+                    <span className="text-[11px] text-[#D4A373] animate-pulse flex items-center gap-1 font-medium">
+                      <RefreshCw className="w-3 h-3 animate-spin" /> Fetching full thread...
+                    </span>
+                  )}
                 </div>
                 <h3 className="text-lg font-bold text-white mt-1">
                   {selectedEmail.subject || '(No Subject)'}
@@ -791,7 +916,10 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
                 </button>
 
                 <button
-                  onClick={() => setSelectedEmail(null)}
+                  onClick={() => {
+                    setSelectedEmail(null);
+                    setSelectedEmailId(null);
+                  }}
                   className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
@@ -836,50 +964,111 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
               )}
             </div>
 
-            {/* Body View Mode Selector (Formatted HTML vs Plain Text) */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-400">Email Content:</label>
-                {selectedEmail.bodyHtml && (
-                  <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px]">
-                    <button
-                      onClick={() => setBodyViewMode('formatted')}
-                      className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
-                        bodyViewMode === 'formatted' 
-                          ? 'bg-[#D4A373] text-[#121211]' 
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Formatted View
-                    </button>
-                    <button
-                      onClick={() => setBodyViewMode('text')}
-                      className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
-                        bodyViewMode === 'text' 
-                          ? 'bg-[#D4A373] text-[#121211]' 
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Plain Text
-                    </button>
-                  </div>
-                )}
+            {/* Conversation Thread Messages or Single Email View */}
+            {selectedEmail.threadMessages && selectedEmail.threadMessages.length > 1 ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span className="text-xs font-bold text-[#D4A373] flex items-center gap-1.5">
+                    <MessageSquare className="w-4 h-4 text-[#D4A373]" />
+                    Conversation Thread ({selectedEmail.threadMessages.length} Messages)
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-medium">Chronological Order</span>
+                </div>
+                <div className="space-y-3.5 max-h-80 overflow-y-auto pr-1">
+                  {selectedEmail.threadMessages.map((msg, idx) => {
+                    const isMsgReceived = msg.isReceived || msg.direction === 'incoming' || msg.direction === 'received' || msg.status === 'Received';
+                    const isLatest = idx === selectedEmail.threadMessages.length - 1;
+                    return (
+                      <div
+                        key={msg.id || idx}
+                        className={`p-4 rounded-2xl border transition-all ${
+                          isLatest && isMsgReceived
+                            ? 'bg-[#221F1B] border-[#D4A373]/50 shadow-md ring-1 ring-[#D4A373]/30'
+                            : isMsgReceived
+                            ? 'bg-[#181716] border-slate-800'
+                            : 'bg-[#141413] border-slate-800/80 opacity-95'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap text-xs mb-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              isMsgReceived
+                                ? (isLatest ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-blue-500/15 text-blue-300 border-blue-500/30')
+                                : 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                            }`}>
+                              {isMsgReceived ? (isLatest ? 'Latest Incoming Reply' : 'Received') : 'Sent by You'}
+                            </span>
+                            <span className="font-bold text-white text-xs">{msg.sender_name || msg.sender}</span>
+                            {msg.sender_email && (
+                              <span className="text-[10px] text-slate-400 font-mono">&lt;{msg.sender_email}&gt;</span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {formatNormalDateTime(msg.sentAt || msg.receivedAt || msg.createdAt)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-200 leading-relaxed font-sans mt-2 pt-2 border-t border-slate-800/60 max-h-56 overflow-y-auto">
+                          {msg.body_html ? (
+                            <div 
+                              className="prose prose-invert max-w-none prose-sm font-sans"
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(msg.body_html) }}
+                            />
+                          ) : (
+                            <div className="whitespace-pre-wrap font-mono text-xs">
+                              {msg.body_text || msg.body || msg.snippet || '(No content)'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+            ) : (
+              /* Single Email Body View */
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-400">Email Content:</label>
+                  {(selectedEmail.bodyHtml || selectedEmail.body_html) && (
+                    <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px]">
+                      <button
+                        onClick={() => setBodyViewMode('formatted')}
+                        className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
+                          bodyViewMode === 'formatted' 
+                            ? 'bg-[#D4A373] text-[#121211]' 
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Formatted View
+                      </button>
+                      <button
+                        onClick={() => setBodyViewMode('text')}
+                        className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
+                          bodyViewMode === 'text' 
+                            ? 'bg-[#D4A373] text-[#121211]' 
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Plain Text
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-              {/* Render content */}
-              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-200 leading-relaxed max-h-72 overflow-y-auto">
-                {bodyViewMode === 'formatted' && selectedEmail.bodyHtml ? (
-                  <div 
-                    className="prose prose-invert max-w-none prose-sm font-sans"
-                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedEmail.bodyHtml) }} 
-                  />
-                ) : (
-                  <div className="whitespace-pre-wrap font-mono text-xs">
-                    {selectedEmail.bodyText || selectedEmail.body || '(No body content)'}
-                  </div>
-                )}
+                <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-200 leading-relaxed max-h-72 overflow-y-auto">
+                  {bodyViewMode === 'formatted' && (selectedEmail.bodyHtml || selectedEmail.body_html) ? (
+                    <div 
+                      className="prose prose-invert max-w-none prose-sm font-sans"
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedEmail.bodyHtml || selectedEmail.body_html) }} 
+                    />
+                  ) : (
+                    <div className="whitespace-pre-wrap font-mono text-xs">
+                      {selectedEmail.bodyText || selectedEmail.body || selectedEmail.snippet || '(No body content)'}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Footer Toolbar */}
             <div className="flex items-center justify-between pt-4 border-t border-slate-800 flex-wrap gap-2">
@@ -896,6 +1085,17 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
 
               {/* Right action buttons */}
               <div className="flex items-center gap-2">
+                {/* Reply to Email */}
+                {!(selectedEmail.isDraft || selectedEmail.is_draft || selectedEmail.direction === 'draft' || (selectedEmail.status || '').toLowerCase() === 'draft') && (
+                  <button
+                    onClick={() => handleReplyEmail(selectedEmail)}
+                    className="gold-btn text-[#121211] px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg flex items-center gap-2"
+                  >
+                    <CornerUpLeft className="w-3.5 h-3.5 text-[#121211]" />
+                    <span>Reply</span>
+                  </button>
+                )}
+
                 {/* If scheduled: show Reschedule & Cancel Schedule */}
                 {(selectedEmail.status || '').toLowerCase() === 'scheduled' && (
                   <>
@@ -933,16 +1133,20 @@ export function EmailHistory({ onReuseEmail, onEditDraft, initialFilters }) {
                     onClick={() => {
                       onReuseEmail(selectedEmail);
                       setSelectedEmail(null);
+                      setSelectedEmailId(null);
                     }}
-                    className="gold-btn text-[#121211] px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg flex items-center gap-2"
+                    className="px-4 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2E2D2B] text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-2"
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Reuse as Template</span>
+                    <Send className="w-3.5 h-3.5 text-[#D4A373]" />
+                    <span>Reuse</span>
                   </button>
                 )}
 
                 <button
-                  onClick={() => setSelectedEmail(null)}
+                  onClick={() => {
+                    setSelectedEmail(null);
+                    setSelectedEmailId(null);
+                  }}
                   className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-5 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
                   Close

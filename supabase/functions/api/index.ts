@@ -1555,7 +1555,7 @@ async function syncUserGmail(user: any, account: any, supabase: any) {
             await safeInsertNotification(supabase, {
               id: crypto.randomUUID(),
               userId: legacyUserId,
-              emailId: null,
+              emailId: cu.id || null,
               notificationType: cu.email_type || "General",
               message: notifMsg,
               read: Boolean(cu.is_read),
@@ -4342,6 +4342,56 @@ Ensure:
       const isReceived = !isDraft && (rawDir === "received" || rawDir === "incoming" || rawStatus === "received" || rawStatus === "incoming" || Boolean(emailRecord.isReceived));
       const isSent = !isDraft && !isReceived && (rawDir === "sent" || rawDir === "outgoing" || rawStatus === "sent" || rawStatus === "outgoing" || rawStatus === "delivered" || Boolean(emailRecord.isSent));
 
+      // Fetch all messages in the same conversation thread (chronological order)
+      const threadId = emailRecord.gmail_thread_id || emailRecord.thread_id;
+      let threadMessages: any[] = [];
+      if (threadId) {
+        try {
+          const { data: tData } = await supabase
+            .from("emails")
+            .select("id, user_id, sender, sender_email, sender_name, from_email, from_name, recipient_email, recipient_emails, to_emails, subject, body, body_text, body_html, snippet, status, direction, is_read, is_starred, created_at, sent_at, received_at, gmail_message_id, gmail_thread_id")
+            .eq("gmail_thread_id", threadId)
+            .in("user_id", userIds)
+            .order("created_at", { ascending: true });
+          if (tData && tData.length > 0) {
+            threadMessages = tData.map((tm: any) => {
+              const tmDir = (tm.direction || "").toLowerCase();
+              const tmSt = (tm.status || "").toLowerCase();
+              const tmDraft = tmDir === "draft" || tmSt === "draft";
+              const tmReceived = !tmDraft && (tmDir === "incoming" || tmDir === "received" || tmSt === "received" || tmSt === "incoming");
+              const tmSent = !tmDraft && !tmReceived && (tmDir === "outgoing" || tmDir === "sent" || tmSt === "sent" || tmSt === "outgoing");
+              return {
+                id: tm.id,
+                sender: tm.from_name || tm.sender_name || tm.sender || tm.sender_email || tm.from_email || "",
+                sender_name: tm.from_name || tm.sender_name || tm.sender || "",
+                sender_email: tm.sender_email || tm.from_email || "",
+                recipient: tm.recipient_email || (Array.isArray(tm.to_emails) ? tm.to_emails.join(", ") : ""),
+                recipient_email: tm.recipient_email || (Array.isArray(tm.to_emails) ? tm.to_emails[0] : ""),
+                subject: tm.subject || "(No Subject)",
+                body: tm.body || tm.body_text || "",
+                body_text: tm.body_text || tm.body || "",
+                body_html: tm.body_html || null,
+                snippet: tm.snippet || "",
+                status: tmDraft ? "Draft" : (tm.status || (tmReceived ? "Received" : "Sent")),
+                direction: tmDraft ? "draft" : (tmReceived ? "received" : (tmSent ? "sent" : tm.direction)),
+                isReceived: tmReceived,
+                isSent: tmSent,
+                isDraft: tmDraft,
+                isRead: tm.is_read !== false,
+                isStarred: Boolean(tm.is_starred),
+                gmailMessageId: tm.gmail_message_id,
+                gmailThreadId: tm.gmail_thread_id,
+                createdAt: normalizeIsoUtc(tm.created_at),
+                sentAt: normalizeIsoUtc(tm.sent_at),
+                receivedAt: normalizeIsoUtc(tm.received_at),
+              };
+            });
+          }
+        } catch (tErr) {
+          console.warn("Thread messages fetch note:", tErr);
+        }
+      }
+
       return jsonResponse({
         id: emailRecord.id,
         userId: emailRecord.user_id || emailRecord.userId,
@@ -4376,6 +4426,8 @@ Ensure:
         isSpam: Boolean(emailRecord.is_spam || emailRecord.isSpam),
         gmailMessageId: msgId || null,
         gmailDraftId: emailRecord.gmail_draft_id || emailRecord.gmailDraftId || null,
+        gmailThreadId: threadId || null,
+        threadMessages: threadMessages.length > 0 ? threadMessages : undefined,
         labels: emailRecord.labels || [],
         createdAt: normalizeIsoUtc(emailRecord.created_at || emailRecord.createdAt),
         sentAt: normalizeIsoUtc(emailRecord.sent_at || emailRecord.sentAt),

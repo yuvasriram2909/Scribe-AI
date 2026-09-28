@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Mail, Send, AlertTriangle, Calendar, FileText, Briefcase, Sparkles, 
   ArrowRight, CheckCircle, Trash2, Search, Filter, RefreshCw, X, AlertCircle, Clock, ShieldAlert, Heart, Users, Check, ExternalLink, Settings, Bell, LogOut, ChevronRight, Wand2, Inbox, UserPlus,
-  Sun, Moon, TrendingUp, BarChart3, Zap, MoreVertical, Star
+  Sun, Moon, TrendingUp, BarChart3, Zap, MoreVertical, Star, CornerUpLeft
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { sanitizeHtml } from '../utils/sanitize';
@@ -466,7 +466,7 @@ export function Dashboard({
   const handleOpenDetailModal = async (em) => {
     setDetailModalEmail(em);
     setDetailModalTab(em.bodyHtml || em.body_html ? 'html' : 'text');
-    if (em.id && (!em.bodyHtml && !em.body_html)) {
+    if (em.id) {
       setLoadingDetailModal(true);
       try {
         const res = await apiFetch(`/api/emails/${em.id}`);
@@ -483,6 +483,24 @@ export function Dashboard({
         setLoadingDetailModal(false);
       }
     }
+  };
+
+  const handleReplyEmail = (em) => {
+    if (!em) return;
+    const replySubject = (em.subject || '').startsWith('Re:') ? em.subject : `Re: ${em.subject || ''}`;
+    const replyRecipient = em.isReceived || em.direction === 'incoming' || em.direction === 'received'
+      ? (em.sender_email || em.from_email || em.sender || '')
+      : (em.recipient || em.recipient_email || '');
+
+    if (onStartCompose) {
+      onStartCompose({
+        subject: replySubject,
+        recipient: replyRecipient,
+        instruction: `Reply to ${em.sender || replyRecipient} regarding: "${em.subject || ''}". Reference their latest message: "${em.snippet || (em.body ? em.body.slice(0, 100) : '')}"`,
+        step: 1
+      });
+    }
+    setDetailModalEmail(null);
   };
 
   const handleToggleStar = async (e, em) => {
@@ -566,6 +584,11 @@ export function Dashboard({
         const emails = await emailsRes.json();
         emailList = Array.isArray(emails) ? emails : [];
         setRecentEmails(emailList);
+        setDetailModalEmail(prev => {
+          if (!prev) return null;
+          const match = emailList.find(e => e.id === prev.id);
+          return match ? { ...prev, ...match } : prev;
+        });
       }
 
       // Compute local metric fallbacks directly from loaded emails
@@ -1812,8 +1835,81 @@ export function Dashboard({
               </div>
             </div>
 
-            {/* Content Tabs (HTML vs Plain Text) */}
-            {(detailModalEmail.bodyHtml || detailModalEmail.body_html) ? (
+            {/* Thread Conversation or Single Body View */}
+            {detailModalEmail.threadMessages && detailModalEmail.threadMessages.length > 1 ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-[#ECE8E1]">Conversation Thread</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#D4A373]/20 text-[#D4A373] border border-[#D4A373]/30">
+                      {detailModalEmail.threadMessages.length} Messages
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[#99958F]">Chronological Order</span>
+                </div>
+
+                <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                  {detailModalEmail.threadMessages.map((msg, idx) => {
+                    const isLatest = idx === detailModalEmail.threadMessages.length - 1;
+                    const isMsgReceived = msg.isReceived || msg.direction === 'incoming' || msg.direction === 'received';
+                    return (
+                      <div
+                        key={msg.id || idx}
+                        className={`p-4 rounded-2xl border transition-all ${
+                          isMsgReceived
+                            ? 'bg-[#1e1b18] border-[#D4A373]/40 shadow-md'
+                            : 'bg-[#141413] border-[#2E2D2B]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${
+                              isMsgReceived
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                            }`}>
+                              {isMsgReceived ? 'Incoming Client Reply' : 'Sent by You'}
+                            </span>
+                            {isLatest && isMsgReceived && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                Latest Reply
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] font-mono text-[#99958F] shrink-0">
+                            {formatNormalDateTime(msg.sentAt || msg.receivedAt || msg.createdAt)}
+                          </span>
+                        </div>
+
+                        <div className="text-xs mb-2">
+                          <span className="text-[#99958F] font-bold">From: </span>
+                          <span className="text-[#ECE8E1] font-mono">{msg.sender || msg.sender_email || 'Client'}</span>
+                          {msg.recipient && (
+                            <>
+                              <span className="text-[#99958F] font-bold ml-3">To: </span>
+                              <span className="text-[#99958F] font-mono">{msg.recipient}</span>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="text-xs text-[#ECE8E1] leading-relaxed pt-2 border-t border-[#2E2D2B]/50">
+                          {msg.body_html ? (
+                            <div
+                              className="prose prose-invert max-w-none prose-xs font-sans"
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(msg.body_html) }}
+                            />
+                          ) : (
+                            <div className="whitespace-pre-wrap font-sans text-xs">
+                              {msg.body_text || msg.body || msg.snippet || '(No content)'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (detailModalEmail.bodyHtml || detailModalEmail.body_html) ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <button
@@ -1859,8 +1955,17 @@ export function Dashboard({
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#2E2D2B]">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#2E2D2B] flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                {!(detailModalEmail.isDraft || detailModalEmail.is_draft || detailModalEmail.direction === 'draft' || (detailModalEmail.status || '').toLowerCase() === 'draft') && (
+                  <button
+                    onClick={() => handleReplyEmail(detailModalEmail)}
+                    className="gold-btn text-[#121211] px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg flex items-center gap-1.5"
+                  >
+                    <CornerUpLeft className="w-3.5 h-3.5 text-[#121211]" />
+                    <span>Reply</span>
+                  </button>
+                )}
                 <button
                   onClick={() => handleToggleRead(detailModalEmail)}
                   className="px-3 py-2 rounded-xl bg-[#22211F] hover:bg-[#2E2D2B] text-[#ECE8E1] text-xs font-semibold cursor-pointer transition-colors"
@@ -1870,8 +1975,10 @@ export function Dashboard({
                 {onViewHistory && (
                   <button
                     onClick={() => {
+                      const emailId = detailModalEmail.id;
+                      const isRecv = detailModalEmail.isReceived || detailModalEmail.direction === 'incoming' || detailModalEmail.direction === 'received';
                       setDetailModalEmail(null);
-                      onViewHistory();
+                      onViewHistory({ openEmailId: emailId, folder: isRecv ? 'inbox' : 'sent' });
                     }}
                     className="px-3 py-2 rounded-xl bg-[#22211F] hover:bg-[#2E2D2B] text-[#D4A373] text-xs font-semibold cursor-pointer transition-colors"
                   >
