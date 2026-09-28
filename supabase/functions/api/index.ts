@@ -986,6 +986,8 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       updated_at: now,
     };
 
+    let canonicalData: any = null;
+    let canonicalError: any = null;
     try {
       let onConflictTarget = "id";
       if (canonicalPayload.gmail_message_id) {
@@ -993,11 +995,16 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       } else if (canonicalPayload.gmail_draft_id) {
         onConflictTarget = "user_id,gmail_draft_id";
       }
-      const { error: upErr } = await supabase.from("emails").upsert(canonicalPayload, { onConflict: onConflictTarget });
+      const { data: cData, error: upErr } = await supabase.from("emails").upsert(canonicalPayload, { onConflict: onConflictTarget }).select().maybeSingle();
       if (upErr) {
-        await supabase.from("emails").upsert(canonicalPayload, { onConflict: "id" });
+        const { data: cRetry, error: retryErr } = await supabase.from("emails").upsert(canonicalPayload, { onConflict: "id" }).select().maybeSingle();
+        if (cRetry) canonicalData = cRetry;
+        else canonicalError = retryErr || upErr;
+      } else if (cData) {
+        canonicalData = cData;
       }
     } catch (e: any) {
+      canonicalError = e;
       console.warn("Canonical emails upsert notice:", e?.message);
     }
 
@@ -1067,10 +1074,10 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
   }
 
   // 3. Write to legacy "Email" table for dual-table compatibility
-  const { data, error } = await supabase.from("Email").insert(payload).select().maybeSingle();
-  if (!error) return { data, error: null };
-
-  console.warn("Full Email insert notice, falling back to core columns:", error?.message);
+  try {
+    const { data, error } = await supabase.from("Email").insert(payload).select().maybeSingle();
+    if (!error && data) return { data: canonicalData || data, error: null };
+  } catch (_) {}
 
   const coreColumns = [
     "id", "userId", "sender", "recipient", "cc", "bcc", "subject", "body",
@@ -1085,8 +1092,16 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
     if (payload[c] !== undefined) fallbackPayload[c] = payload[c];
   }
 
-  const { data: fbData, error: fbError } = await supabase.from("Email").insert(fallbackPayload).select().maybeSingle();
-  return { data: fbData, error: fbError };
+  try {
+    const { data: fbData, error: fbError } = await supabase.from("Email").insert(fallbackPayload).select().maybeSingle();
+    if (!fbError && fbData) return { data: canonicalData || fbData, error: null };
+  } catch (_) {}
+
+  // If canonical emails table write succeeded, return success!
+  if (canonicalData) {
+    return { data: canonicalData, error: null };
+  }
+  return { data: canonicalData || null, error: canonicalError || null };
 }
 
 async function safeInsertNotification(supabase: any, payload: Record<string, any>) {
@@ -4076,18 +4091,20 @@ Ensure:
 
       let result = combined;
 
-      // Folder Query Filter (Inbox, Sent, Drafts, Starred, Archive, Trash, Spam)
+      // Folder Query Filter (Inbox, Sent, Scheduled, Drafts, Starred, Archive, Trash, Spam)
       const folderQuery = url.searchParams.get("folder");
       if (folderQuery && folderQuery !== "all") {
         const fQ = folderQuery.toLowerCase().trim();
         result = result.filter((e: any) => {
-          if (fQ === "inbox") return !e.isDraft && !e.isTrash && !e.isSpam && !e.isArchived && !e.isSent && (e.isReceived || (e.status || "").toLowerCase() === "received" || (e.status || "").toLowerCase() === "incoming" || (e.direction || "").toLowerCase() === "incoming" || (e.direction || "").toLowerCase() === "received");
-          if (fQ === "sent") return !e.isDraft && !e.isTrash && !e.isReceived && !e.isSpam && (e.isSent || (e.direction || "").toLowerCase() === "sent" || (e.direction || "").toLowerCase() === "outgoing" || (e.status || "").toLowerCase() === "sent" || (e.status || "").toLowerCase() === "outgoing");
-          if (fQ === "drafts" || fQ === "draft") return e.isDraft || (e.direction || "").toLowerCase() === "draft" || (e.status || "").toLowerCase() === "draft";
+          const s = (e.status || "").toLowerCase();
+          if (fQ === "scheduled") return s === "scheduled";
+          if (fQ === "inbox") return !e.isDraft && !e.isTrash && !e.isSpam && !e.isArchived && !e.isSent && s !== "scheduled" && (e.isReceived || s === "received" || s === "incoming" || (e.direction || "").toLowerCase() === "incoming" || (e.direction || "").toLowerCase() === "received");
+          if (fQ === "sent") return !e.isDraft && !e.isTrash && !e.isReceived && !e.isSpam && s !== "scheduled" && (e.isSent || (e.direction || "").toLowerCase() === "sent" || (e.direction || "").toLowerCase() === "outgoing" || s === "sent" || s === "outgoing");
+          if (fQ === "drafts" || fQ === "draft") return e.isDraft || (e.direction || "").toLowerCase() === "draft" || s === "draft";
           if (fQ === "starred") return !e.isTrash && Boolean(e.isStarred);
           if (fQ === "archive" || fQ === "archived") return !e.isTrash && !e.isSpam && !e.isDraft && Boolean(e.isArchived);
           if (fQ === "trash") return Boolean(e.isTrash);
-          if (fQ === "spam") return Boolean(e.isSpam) || (e.status || "").toLowerCase() === "spam";
+          if (fQ === "spam") return Boolean(e.isSpam) || s === "spam";
           return true;
         });
       }
@@ -5219,6 +5236,9 @@ Ensure:
         .map((e: string) => e.trim())
         .filter(Boolean);
       const schedRecipient = schedToList.join(", ");
+      if (!schedRecipient) {
+        return errorResponse("Please specify a recipient email before scheduling.", 400);
+      }
 
       const scheduledAtUtc = body.scheduledAt || body.scheduledAtUtc;
       if (!scheduledAtUtc) {
@@ -5228,9 +5248,9 @@ Ensure:
       if (isNaN(scheduledDate.getTime())) {
         return errorResponse("Invalid scheduled date and time.", 400);
       }
-      // Require strictly future time (at least 30 seconds ahead)
-      if (scheduledDate.getTime() <= Date.now() + 30000) {
-        return errorResponse("Please select a future time. (The selected time has already passed or is too soon).", 400);
+      // Require strictly future time: allow upcoming minute (buffer 5s in past for clock skew)
+      if (scheduledDate.getTime() <= Date.now() - 5000) {
+        return errorResponse("Please select a future time. (The selected time has already passed).", 400);
       }
 
       const timezone = body.timezone || "UTC";
@@ -5350,8 +5370,8 @@ Ensure:
       if (!scheduledAtUtc) return errorResponse("Please choose a scheduled date and time.", 400);
       const scheduledDate = new Date(scheduledAtUtc);
       if (isNaN(scheduledDate.getTime())) return errorResponse("Invalid scheduled date.", 400);
-      if (scheduledDate.getTime() <= Date.now() + 30000) {
-        return errorResponse("Please select a future time. (The selected time has already passed or is too soon).", 400);
+      if (scheduledDate.getTime() <= Date.now() - 5000) {
+        return errorResponse("Please select a future time. (The selected time has already passed).", 400);
       }
 
       const timezone = body.timezone || "UTC";

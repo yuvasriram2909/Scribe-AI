@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Clock, Calendar, Globe, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, X, Sparkles 
+  Clock, Calendar, Globe, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, X, Sparkles, RefreshCw 
 } from 'lucide-react';
 import { 
   getUserTimezone, 
@@ -137,15 +137,33 @@ export function ScheduleModal({
     return false;
   };
 
-  const handleConfirm = () => {
-    if (!validation.isValid) return;
-    onConfirmSchedule({
-      dateStr: selectedDate,
-      timeStr: time24,
-      timezone: selectedTz,
-      scheduledAtUtc: validation.utcIso,
-      scheduledForLocal: validation.formattedLocal
-    });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const handleConfirm = async () => {
+    if (!validation.isValid || submitting) return;
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      if (typeof onConfirmSchedule === 'function') {
+        await onConfirmSchedule({
+          dateStr: selectedDate,
+          timeStr: time24,
+          timezone: selectedTz,
+          scheduledAtUtc: validation.utcIso,
+          scheduledForLocal: validation.formattedLocal
+        });
+      }
+      if (typeof onClose === 'function') {
+        onClose();
+      }
+    } catch (err) {
+      console.error('Modal schedule confirmation error:', err);
+      setSubmitError(err?.message || 'Failed to schedule email. Please check details and try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -303,17 +321,21 @@ export function ScheduleModal({
                   </select>
                 </div>
 
-                {/* Minute */}
+                {/* Minute (00 - 59: every minute) */}
                 <div>
-                  <label className="text-[10px] text-[#99958F] font-semibold block mb-1">Minute</label>
+                  <label className="text-[10px] text-[#99958F] font-semibold block mb-1">Minute (00-59)</label>
                   <select
                     value={selectedMinute}
-                    onChange={(e) => setSelectedMinute(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedMinute(e.target.value);
+                      if (submitError) setSubmitError('');
+                    }}
                     className="w-full px-2 py-2 rounded-xl bg-[#22211F] text-xs font-bold text-[#ECE8E1] border border-[#2E2D2B] text-center cursor-pointer"
                   >
-                    {['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'].map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
+                    {Array.from({ length: 60 }).map((_, i) => {
+                      const m = String(i).padStart(2, '0');
+                      return <option key={m} value={m}>{m}</option>;
+                    })}
                   </select>
                 </div>
 
@@ -323,7 +345,10 @@ export function ScheduleModal({
                   <div className="grid grid-cols-2 rounded-xl bg-[#22211F] p-0.5 border border-[#2E2D2B]">
                     <button
                       type="button"
-                      onClick={() => setSelectedAmPm('AM')}
+                      onClick={() => {
+                        setSelectedAmPm('AM');
+                        if (submitError) setSubmitError('');
+                      }}
                       className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         selectedAmPm === 'AM' ? 'bg-[#D4A373] text-[#121211]' : 'text-[#99958F]'
                       }`}
@@ -332,7 +357,10 @@ export function ScheduleModal({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setSelectedAmPm('PM')}
+                      onClick={() => {
+                        setSelectedAmPm('PM');
+                        if (submitError) setSubmitError('');
+                      }}
                       className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         selectedAmPm === 'PM' ? 'bg-[#D4A373] text-[#121211]' : 'text-[#99958F]'
                       }`}
@@ -344,13 +372,16 @@ export function ScheduleModal({
               </div>
 
               {/* Quick minute preset buttons */}
-              <div className="flex items-center gap-1.5 pt-1">
+              <div className="flex items-center gap-1.5 pt-1 flex-wrap">
                 <span className="text-[10px] text-[#99958F]">Quick:</span>
                 {['00', '15', '30', '45'].map(minPreset => (
                   <button
                     key={minPreset}
                     type="button"
-                    onClick={() => setSelectedMinute(minPreset)}
+                    onClick={() => {
+                      setSelectedMinute(minPreset);
+                      if (submitError) setSubmitError('');
+                    }}
                     className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition-colors cursor-pointer ${
                       selectedMinute === minPreset
                         ? 'bg-[#D4A373]/20 border-[#D4A373] text-[#D4A373]'
@@ -360,6 +391,48 @@ export function ScheduleModal({
                     :{minPreset}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cur = getCurrentDateTimeParts(selectedTz);
+                    let targetH = cur.currentHour;
+                    let targetM = cur.currentMinute + 10;
+                    if (targetM >= 60) {
+                      targetM -= 60;
+                      targetH = (targetH + 1) % 24;
+                    }
+                    const h12 = targetH % 12 || 12;
+                    setSelectedHour12(String(h12));
+                    setSelectedMinute(String(targetM).padStart(2, '0'));
+                    setSelectedAmPm(targetH >= 12 ? 'PM' : 'AM');
+                    if (submitError) setSubmitError('');
+                  }}
+                  className="px-2 py-1 rounded-md text-[11px] font-semibold border bg-[#22211F] border-[#2E2D2B] text-[#D4A373] hover:border-[#D4A373]/50 cursor-pointer"
+                  title="Schedule 10 minutes from now"
+                >
+                  +10m
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cur = getCurrentDateTimeParts(selectedTz);
+                    let targetH = cur.currentHour;
+                    let targetM = cur.currentMinute + 30;
+                    if (targetM >= 60) {
+                      targetM -= 60;
+                      targetH = (targetH + 1) % 24;
+                    }
+                    const h12 = targetH % 12 || 12;
+                    setSelectedHour12(String(h12));
+                    setSelectedMinute(String(targetM).padStart(2, '0'));
+                    setSelectedAmPm(targetH >= 12 ? 'PM' : 'AM');
+                    if (submitError) setSubmitError('');
+                  }}
+                  className="px-2 py-1 rounded-md text-[11px] font-semibold border bg-[#22211F] border-[#2E2D2B] text-[#D4A373] hover:border-[#D4A373]/50 cursor-pointer"
+                  title="Schedule 30 minutes from now"
+                >
+                  +30m
+                </button>
               </div>
             </div>
 
@@ -402,8 +475,25 @@ export function ScheduleModal({
           </div>
         </div>
 
+        {/* In-Modal Submission Error Alert */}
+        {submitError && (
+          <div className="p-3.5 rounded-2xl bg-rose-950/80 border border-rose-500/60 text-rose-200 text-xs flex items-center justify-between gap-2.5 animate-fadeIn shadow-lg">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span className="font-semibold">{submitError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSubmitError('')}
+              className="text-rose-400 hover:text-white p-1 rounded-lg cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Validation Error Alert if Past Date/Time */}
-        {!validation.isValid && (
+        {!validation.isValid && !submitError && (
           <div className="p-3.5 rounded-2xl bg-rose-950/70 border border-rose-500/50 text-rose-200 text-xs flex items-center gap-2.5 animate-fadeIn">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             <span className="font-semibold">{validation.error || 'Please select a future time.'}</span>
@@ -414,19 +504,29 @@ export function ScheduleModal({
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#2E2D2B]">
           <button
             type="button"
+            disabled={submitting}
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#ECE8E1] text-xs font-bold border border-[#2E2D2B] transition-colors cursor-pointer"
+            className="px-5 py-2.5 rounded-xl bg-[#22211F] hover:bg-[#2A2926] text-[#ECE8E1] text-xs font-bold border border-[#2E2D2B] transition-colors cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
-            disabled={!validation.isValid}
+            disabled={!validation.isValid || submitting}
             onClick={handleConfirm}
             className="px-7 py-2.5 rounded-xl gold-btn text-[#121211] text-xs font-bold transition-all shadow-lg shadow-[#D4A373]/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <Clock className="w-4 h-4" />
-            <span>Confirm & Schedule Email</span>
+            {submitting ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin text-[#121211]" />
+                <span>Scheduling Email...</span>
+              </>
+            ) : (
+              <>
+                <Clock className="w-4 h-4" />
+                <span>Confirm & Schedule Email</span>
+              </>
+            )}
           </button>
         </div>
 

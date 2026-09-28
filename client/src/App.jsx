@@ -1008,7 +1008,7 @@ export default function App() {
               onCheckGmailConnection={checkGmailConnection}
               onComplete={() => setActiveTab('dashboard')}
               onNavigateToDashboard={() => setActiveTab('dashboard')}
-              onViewHistory={() => setActiveTab('history')}
+              onViewHistory={handleNavigateToHistory}
               onCancel={() => setActiveTab('dashboard')}
               onNavigateToSettings={() => setActiveTab('settings')}
             />

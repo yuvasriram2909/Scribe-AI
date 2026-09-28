@@ -155,25 +155,33 @@ export function ComposeWorkflow({
   };
 
   const handleConfirmSchedule = async (scheduleData) => {
-    const valRes = validateEmailList(recipient, { fieldName: 'Recipient email' });
+    const cleanRecip = (recipient || '').trim();
+    if (!cleanRecip) {
+      const err = 'Please specify a recipient email before scheduling.';
+      updateState({ errorMessage: err });
+      throw new Error(err);
+    }
+    const valRes = validateEmailList(cleanRecip, { fieldName: 'Recipient email' });
     if (!valRes.isValid) {
-      updateState({ errorMessage: valRes.error });
-      return;
+      const err = valRes.error || 'Please provide a valid recipient email address.';
+      updateState({ errorMessage: err });
+      throw new Error(err);
     }
     if (cc && cc.trim()) {
       const ccVal = validateEmailList(cc, { fieldName: 'CC', allowEmpty: true });
       if (!ccVal.isValid) {
         updateState({ errorMessage: ccVal.error });
-        return;
+        throw new Error(ccVal.error);
       }
     }
     if (bcc && bcc.trim()) {
       const bccVal = validateEmailList(bcc, { fieldName: 'BCC', allowEmpty: true });
       if (!bccVal.isValid) {
         updateState({ errorMessage: bccVal.error });
-        return;
+        throw new Error(bccVal.error);
       }
     }
+
     try {
       const res = await apiFetch('/api/emails/schedule', {
         method: 'POST',
@@ -194,17 +202,62 @@ export function ComposeWorkflow({
           sendIndividually
         })
       });
-      if (res.ok) {
-        setShowScheduleModal(false);
-        setDraftToast(`✓ Email scheduled for ${scheduleData.scheduledForLocal} (${scheduleData.timezone})!`);
-        setTimeout(() => setDraftToast(''), 5000);
-      } else {
-        const errData = await safeParseResponse(res);
-        updateState({ errorMessage: errData?.error || 'Failed to schedule email.' });
+
+      const data = await safeParseResponse(res);
+      if (!res.ok || data?.error) {
+        throw new Error(data?.error || `Server returned HTTP ${res.status}`);
       }
+
+      setShowScheduleModal(false);
+      setDraftToast(`✓ Email scheduled for ${scheduleData.scheduledForLocal} (${scheduleData.timezone})!`);
+      setTimeout(() => setDraftToast(''), 6000);
+
+      // Instant optimistic increment for stats cache in localStorage
+      try {
+        const cachedRaw = localStorage.getItem('scribe_stats_cache');
+        const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
+        if (cached) {
+          cached.scheduled = (Number(cached.scheduled) || 0) + 1;
+          cached.total = (Number(cached.total) || 0) + 1;
+          localStorage.setItem('scribe_stats_cache', JSON.stringify(cached));
+        }
+      } catch (_) {}
+
+      // Dispatch global real-time event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('scribe-email-scheduled', {
+          detail: {
+            email: data.email || null,
+            category: detectedCategory || 'Official / Professional',
+            recipient: valRes.formatted,
+            subject: subject || '(Scheduled Email)',
+            scheduledAt: scheduleData.scheduledAtUtc,
+            scheduledForLocal: scheduleData.scheduledForLocal,
+            timezone: scheduleData.timezone
+          }
+        }));
+      }
+
+      // Transition to Step 6 with scheduledResult details
+      updateState({
+        scheduledResult: {
+          ...data,
+          scheduledForLocal: scheduleData.scheduledForLocal,
+          timezone: scheduleData.timezone,
+          scheduledAt: scheduleData.scheduledAtUtc,
+          recipient: valRes.formatted,
+          subject: subject || '(Scheduled Email)',
+          emailType: detectedCategory || 'Official / Professional'
+        },
+        sentResult: null,
+        step: 6
+      });
+
+      return data;
     } catch (e) {
       console.error('Schedule error:', e);
       updateState({ errorMessage: e.message || 'Failed to schedule email.' });
+      throw e;
     }
   };
 
@@ -1536,17 +1589,31 @@ export function ComposeWorkflow({
         </div>
       )}
 
-      {/* STEP 6: SENT SUCCESS SCREEN */}
+      {/* STEP 6: SENT / SCHEDULED SUCCESS SCREEN */}
       {step === 6 && (
-        <div className="glass-panel p-8 sm:p-12 rounded-3xl border border-emerald-500/30 bg-[#1A1918] text-center space-y-6 animate-fadeIn shadow-2xl">
-          <div className="w-20 h-20 mx-auto rounded-2xl bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-center shadow-lg shadow-emerald-900/30">
-            <Check className="w-10 h-10 text-emerald-400" />
+        <div className={`glass-panel p-8 sm:p-12 rounded-3xl border text-center space-y-6 animate-fadeIn shadow-2xl ${
+          composeState.scheduledResult ? 'border-[#D4A373]/40 bg-[#1A1918]' : 'border-emerald-500/30 bg-[#1A1918]'
+        }`}>
+          <div className={`w-20 h-20 mx-auto rounded-2xl flex items-center justify-center shadow-lg ${
+            composeState.scheduledResult 
+              ? 'bg-[#D4A373]/15 border border-[#D4A373]/40 shadow-[#D4A373]/20' 
+              : 'bg-emerald-950/60 border border-emerald-500/40 shadow-emerald-900/30'
+          }`}>
+            {composeState.scheduledResult ? (
+              <Clock className="w-10 h-10 text-[#D4A373]" />
+            ) : (
+              <Check className="w-10 h-10 text-emerald-400" />
+            )}
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-2xl font-extrabold text-[#F5F3EF]">Email Sent Successfully!</h3>
+            <h3 className="text-2xl font-extrabold text-[#F5F3EF]">
+              {composeState.scheduledResult ? 'Email Scheduled Successfully!' : 'Email Sent Successfully!'}
+            </h3>
             <p className="text-[#99958F] text-xs max-w-md mx-auto">
-              {parsedRecipients.length > 1 ? (
+              {composeState.scheduledResult ? (
+                <>Your email to <strong className="text-[#D4A373] font-mono">{composeState.scheduledResult.recipient || recipient}</strong> has been successfully scheduled for <strong className="text-[#ECE8E1]">{composeState.scheduledResult.scheduledForLocal} ({composeState.scheduledResult.timezone})</strong> and is queued in your database.</>
+              ) : parsedRecipients.length > 1 ? (
                 <>Your email was successfully delivered to <strong className="text-[#D4A373]">{parsedRecipients.length} recipients</strong> {sendIndividually ? 'as separate private emails (each recipient received an isolated copy without seeing others)' : 'in a shared email thread'} and recorded in your account email history.</>
               ) : (
                 <>Your email was successfully delivered to <strong className="text-[#D4A373] font-mono">{recipient}</strong> and recorded in your account email history.</>
@@ -1554,7 +1621,28 @@ export function ComposeWorkflow({
             </p>
           </div>
 
-          {sentResult && (
+          {composeState.scheduledResult && (
+            <div className="max-w-md mx-auto p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] text-xs text-left space-y-2 font-mono">
+              <div className="flex justify-between">
+                <span className="text-[#99958F]">Status:</span>
+                <span className="text-[#D4A373] font-bold">✓ Scheduled (Queue Active)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#99958F]">Scheduled For:</span>
+                <span className="text-[#ECE8E1] font-bold">{composeState.scheduledResult.scheduledForLocal}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#99958F]">Timezone:</span>
+                <span className="text-[#D4A373] font-bold">{composeState.scheduledResult.timezone}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#99958F]">Email Subject:</span>
+                <span className="text-[#ECE8E1] truncate max-w-[200px]">{composeState.scheduledResult.subject || subject}</span>
+              </div>
+            </div>
+          )}
+
+          {sentResult && !composeState.scheduledResult && (
             <div className="max-w-md mx-auto p-4 rounded-2xl bg-[#161514] border border-[#2E2D2B] text-xs text-left space-y-2 font-mono">
               <div className="flex justify-between">
                 <span className="text-[#99958F]">Status:</span>
@@ -1586,7 +1674,8 @@ export function ComposeWorkflow({
                     subject: '',
                     body: '',
                     selectedFile: null,
-                    sentResult: null
+                    sentResult: null,
+                    scheduledResult: null
                   });
                 }
               }}
@@ -1612,8 +1701,9 @@ export function ComposeWorkflow({
             {onViewHistory && (
               <button
                 onClick={() => {
+                  const targetFilter = composeState.scheduledResult ? { folder: 'scheduled', status: 'Scheduled' } : undefined;
                   if (onResetCompose) onResetCompose();
-                  onViewHistory();
+                  onViewHistory(targetFilter);
                 }}
                 className="px-4 py-3 rounded-xl hover:bg-[#22211F] text-[#99958F] hover:text-[#F5F3EF] text-xs font-semibold cursor-pointer transition-colors"
               >

@@ -134,11 +134,11 @@ export function validateFutureSchedule(dateStr, timeStr, timeZone = getUserTimez
   const diffMs = utcDate.getTime() - nowMs;
   const diffMinutes = Math.floor(diffMs / 60000);
 
-  // Require at least 1 minute in the future
-  if (diffMs <= 30000) { // less than 30 seconds ahead
+  // Require strictly future time: allow upcoming minute (buffer 5s in past for clock skew)
+  if (diffMs <= -5000) {
     return { 
       isValid: false, 
-      error: 'Please select a future time. (The selected time has already passed or is too soon).',
+      error: 'The selected date & time has already passed. Please select a future time.',
       diffMinutes
     };
   }

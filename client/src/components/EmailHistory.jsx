@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Mail, Search, Filter, CheckCircle, Paperclip, RefreshCw, Eye, X, Trash2, 
-  AlertCircle, Clock, Send, Inbox, ArrowUpRight, ArrowDownLeft, ShieldAlert,
+  AlertCircle, Clock, Calendar, Send, Inbox, ArrowUpRight, ArrowDownLeft, ShieldAlert,
   Star, Archive, MailOpen, RotateCcw, Edit3, Sparkles
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
@@ -13,7 +13,8 @@ import { ScheduleModal } from './ScheduleModal';
 const FOLDERS = [
   { id: 'inbox', label: 'Inbox', icon: Inbox },
   { id: 'sent', label: 'Sent', icon: ArrowUpRight },
-  { id: 'drafts', label: 'Drafts', icon: Clock },
+  { id: 'scheduled', label: 'Scheduled', icon: Calendar },
+  { id: 'drafts', label: 'Drafts', icon: Edit3 },
   { id: 'starred', label: 'Starred', icon: Star },
   { id: 'archive', label: 'Archive', icon: Archive },
   { id: 'trash', label: 'Trash', icon: Trash2 },
