@@ -620,18 +620,34 @@ async function getValidAccessToken(
 async function getValidAccessTokenForUser(
   userId: string,
   supabase: any,
-  options: { forceRefresh?: boolean } = {}
+  options: { forceRefresh?: boolean; connectionId?: string } = {}
 ): Promise<{ token: string | null; email: string | null; conn: any }> {
   try {
-    const { data: conn } = await supabase
-      .from("gmail_connections")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
+    let conn: any = null;
+    if (options.connectionId) {
+      const { data: cById } = await supabase
+        .from("gmail_connections")
+        .select("*")
+        .eq("id", options.connectionId)
+        .maybeSingle();
+      if (cById) conn = cById;
+    }
+
+    if (!conn) {
+      const { data: cByUser } = await supabase
+        .from("gmail_connections")
+        .select("*")
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cByUser) conn = cByUser;
+    }
 
     if (conn) {
       const token = await getValidAccessToken(conn, supabase, options);
-      if (token) return { token, email: conn.email, conn };
+      const email = conn.gmail_email || conn.gmail_address || conn.email || null;
+      if (token && email) return { token, email, conn };
     }
 
     const { data: legAcc } = await supabase
@@ -642,7 +658,8 @@ async function getValidAccessTokenForUser(
 
     if (legAcc) {
       const token = await getValidAccessToken(legAcc, supabase, options);
-      if (token) return { token, email: legAcc.email, conn: legAcc };
+      const email = legAcc.gmailEmail || legAcc.email || null;
+      if (token && email) return { token, email, conn: legAcc };
     }
   } catch (e) {
     console.warn("getValidAccessTokenForUser notice:", e);
@@ -668,7 +685,11 @@ async function processDueScheduledEmails(supabase: any) {
 
     for (const job of claimedJobs) {
       try {
-        const { token: accessToken, email: connectedEmail, conn } = await getValidAccessTokenForUser(job.user_id, supabase);
+        const { token: accessToken, email: connectedEmail, conn } = await getValidAccessTokenForUser(
+          job.user_id,
+          supabase,
+          { connectionId: job.gmail_connection_id }
+        );
 
         if (!accessToken || !connectedEmail) {
           console.warn(`[Scheduler] No valid Gmail access token for user ${job.user_id} on job ${job.id}`);
@@ -687,20 +708,21 @@ async function processDueScheduledEmails(supabase: any) {
         const ccHeader = ccList.join(", ");
         const bccHeader = bccList.join(", ");
 
-        const emailLines = [
+        // RFC 2822 compliant format: headers separated from body by an explicit CRLF CRLF
+        const headers = [
           `From: ${connectedEmail}`,
           `To: ${toHeader}`,
           ccHeader ? `Cc: ${ccHeader}` : "",
           bccHeader ? `Bcc: ${bccHeader}` : "",
-          `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(job.subject)))}?=`,
+          `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(job.subject || "")))}?=`,
           "MIME-Version: 1.0",
           "Content-Type: text/plain; charset=UTF-8",
           "Content-Transfer-Encoding: 7bit",
-          "",
-          job.body,
         ].filter(Boolean).join("\r\n");
 
-        const rawBase64 = btoa(unescape(encodeURIComponent(emailLines)))
+        const emailRaw = headers + "\r\n\r\n" + (job.body || "");
+
+        const rawBase64 = btoa(unescape(encodeURIComponent(emailRaw)))
           .replace(/\+/g, "-")
           .replace(/\//g, "_")
           .replace(/=+$/, "");
@@ -736,8 +758,10 @@ async function processDueScheduledEmails(supabase: any) {
         if (!sendRes.ok || sendData.error) {
           const errMsg = sendData.error?.message || "Failed to send email via Gmail API";
           console.error(`[Scheduler] Gmail send failed for job ${job.id}:`, errMsg);
+          const currentAttempts = (job.attempts || 1);
+          const isFinal = currentAttempts >= 3;
           await supabase.from("scheduled_emails").update({
-            status: "failed",
+            status: isFinal ? "failed" : "scheduled",
             error: errMsg,
             updated_at: new Date().toISOString()
           }).eq("id", job.id);
@@ -752,14 +776,14 @@ async function processDueScheduledEmails(supabase: any) {
           status: "sent",
           sent_at: now,
           gmail_message_id: gmailMessageId,
+          error: null,
           updated_at: now
         }).eq("id", job.id);
 
-        // Update emails
+        // Update emails (canonical)
         await supabase.from("emails").update({
           status: "Sent",
           direction: "sent",
-          is_sent: true,
           sent_at: now,
           gmail_message_id: gmailMessageId,
           updated_at: now
@@ -771,7 +795,6 @@ async function processDueScheduledEmails(supabase: any) {
           isSent: true,
           sentAt: now,
           gmailMessageId: gmailMessageId,
-          updatedAt: now
         }).eq("id", job.id);
 
         // Notify user
