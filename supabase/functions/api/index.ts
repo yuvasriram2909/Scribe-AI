@@ -898,6 +898,8 @@ function extractEmailBodies(payload: any): { text: string; html: string } {
 async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
   const emailId = payload.id || crypto.randomUUID();
   const now = new Date().toISOString();
+  let canonicalData: any = null;
+  let canonicalError: any = null;
 
   // 1. Dual Write to Canonical "emails" table
   try {
@@ -986,8 +988,6 @@ async function safeInsertEmail(supabase: any, payload: Record<string, any>) {
       updated_at: now,
     };
 
-    let canonicalData: any = null;
-    let canonicalError: any = null;
     try {
       let onConflictTarget = "id";
       if (canonicalPayload.gmail_message_id) {
@@ -5229,107 +5229,117 @@ Ensure:
       const user = await getAuthUser(req, supabase);
       if (!user) return errorResponse("Unauthorized", 401);
 
-      const body = await req.json().catch(() => ({}));
-      const now = new Date().toISOString();
-      const schedRawRecip = body.recipient || body.to || "";
-      const schedToList = (Array.isArray(schedRawRecip) ? schedRawRecip : String(schedRawRecip).split(/[,;\n\r]+/))
-        .map((e: string) => e.trim())
-        .filter(Boolean);
-      const schedRecipient = schedToList.join(", ");
-      if (!schedRecipient) {
-        return errorResponse("Please specify a recipient email before scheduling.", 400);
-      }
-
-      const scheduledAtUtc = body.scheduledAt || body.scheduledAtUtc;
-      if (!scheduledAtUtc) {
-        return errorResponse("Please choose a scheduled date and time.", 400);
-      }
-      const scheduledDate = new Date(scheduledAtUtc);
-      if (isNaN(scheduledDate.getTime())) {
-        return errorResponse("Invalid scheduled date and time.", 400);
-      }
-      // Require strictly future time: allow upcoming minute (buffer 5s in past for clock skew)
-      if (scheduledDate.getTime() <= Date.now() - 5000) {
-        return errorResponse("Please select a future time. (The selected time has already passed).", 400);
-      }
-
-      const timezone = body.timezone || "UTC";
-      const scheduledForLocal = body.scheduledForLocal || scheduledDate.toISOString();
-
-      const schedPayload = {
-        id: body.id || crypto.randomUUID(),
-        userId: user.id,
-        recipient: schedRecipient,
-        cc: body.cc || null,
-        bcc: body.bcc || null,
-        subject: body.subject || "(Scheduled Email)",
-        body: body.body || "",
-        category: body.category || "Official/Professional",
-        situation: body.situation || "💼 Official / Professional",
-        priority: body.priority || "Normal",
-        tone: body.tone || "Professional",
-        status: "Scheduled",
-        scheduledAt: scheduledDate.toISOString(),
-        timezone,
-        scheduledForLocal,
-        isReceived: false,
-        isSent: false,
-        isSpam: false,
-        isRead: true,
-        createdAt: now,
-      };
-
-      const connection = (user.gmailConnections || [])[0] || null;
       try {
-        await supabase.from("scheduled_emails").insert({
-          id: schedPayload.id,
-          user_id: user.id,
-          gmail_connection_id: connection?.id || null,
-          to_emails: schedToList,
-          cc_emails: body.cc ? (Array.isArray(body.cc) ? body.cc : [body.cc]) : [],
-          bcc_emails: body.bcc ? (Array.isArray(body.bcc) ? body.bcc : [body.bcc]) : [],
-          subject: schedPayload.subject,
-          body: schedPayload.body,
-          category: schedPayload.category,
-          situation: schedPayload.situation,
-          priority: schedPayload.priority,
-          tone: schedPayload.tone,
-          scheduled_for: scheduledDate.toISOString(),
+        const body = await req.json().catch(() => ({}));
+        const now = new Date().toISOString();
+        const schedRawRecip = body.recipient || body.to || "";
+        const schedToList = (Array.isArray(schedRawRecip) ? schedRawRecip : String(schedRawRecip).split(/[,;\n\r]+/))
+          .map((e: string) => e.trim())
+          .filter(Boolean);
+        const schedRecipient = schedToList.join(", ");
+        if (!schedRecipient) {
+          return errorResponse("Please specify a recipient email before scheduling.", 400);
+        }
+
+        const scheduledAtUtc = body.scheduledAt || body.scheduledAtUtc || body.scheduled_at_utc || body.scheduled_at;
+        if (!scheduledAtUtc) {
+          return errorResponse("Please choose a scheduled date and time.", 400);
+        }
+        const scheduledDate = new Date(scheduledAtUtc);
+        if (isNaN(scheduledDate.getTime())) {
+          return errorResponse("Invalid scheduled date and time.", 400);
+        }
+        // Require strictly future time: allow upcoming minute (buffer 5s in past for clock skew)
+        if (scheduledDate.getTime() <= Date.now() - 5000) {
+          return errorResponse("Please select a future time. (The selected time has already passed).", 400);
+        }
+
+        const timezone = body.timezone || "UTC";
+        const scheduledForLocal = body.scheduledForLocal || scheduledDate.toISOString();
+
+        const schedPayload = {
+          id: body.id || crypto.randomUUID(),
+          userId: user.id,
+          recipient: schedRecipient,
+          cc: body.cc || null,
+          bcc: body.bcc || null,
+          subject: body.subject || "(Scheduled Email)",
+          body: body.body || "",
+          category: body.category || "Official/Professional",
+          situation: body.situation || "💼 Official / Professional",
+          priority: body.priority || "Normal",
+          tone: body.tone || "Professional",
+          status: "Scheduled",
+          scheduledAt: scheduledDate.toISOString(),
           timezone,
+          scheduledForLocal,
+          isReceived: false,
+          isSent: false,
+          isSpam: false,
+          isRead: true,
+          createdAt: now,
+        };
+
+        const connection = (user.gmailConnections || [])[0] || null;
+        try {
+          await supabase.from("scheduled_emails").insert({
+            id: schedPayload.id,
+            user_id: user.id,
+            gmail_connection_id: connection?.id || null,
+            to_emails: schedToList,
+            cc_emails: body.cc ? (Array.isArray(body.cc) ? body.cc : [body.cc]) : [],
+            bcc_emails: body.bcc ? (Array.isArray(body.bcc) ? body.bcc : [body.bcc]) : [],
+            subject: schedPayload.subject,
+            body: schedPayload.body,
+            category: schedPayload.category,
+            situation: schedPayload.situation,
+            priority: schedPayload.priority,
+            tone: schedPayload.tone,
+            scheduled_for: scheduledDate.toISOString(),
+            timezone,
+            scheduled_for_local: scheduledForLocal,
+            status: "scheduled",
+            attempts: 0,
+            created_at: now,
+            updated_at: now,
+          });
+        } catch (schedInsertErr: any) {
+          console.warn("scheduled_emails insert notice:", schedInsertErr?.message);
+        }
+
+        const { data, error } = await safeInsertEmail(supabase, {
+          ...schedPayload,
+          scheduled_at: scheduledDate.toISOString(),
           scheduled_for_local: scheduledForLocal,
-          status: "scheduled",
-          attempts: 0,
-          created_at: now,
-          updated_at: now,
+          timezone
         });
-      } catch (_) {}
+        if (error) {
+          console.warn("safeInsertEmail warning in /emails/schedule:", error?.message);
+        }
 
-      const { data, error } = await safeInsertEmail(supabase, {
-        ...schedPayload,
-        scheduled_at: scheduledDate.toISOString(),
-        scheduled_for_local: scheduledForLocal,
-        timezone
-      });
-      if (error) throw error;
+        await safeInsertNotification(supabase, {
+          id: crypto.randomUUID(),
+          userId: user.id,
+          emailId: schedPayload.id,
+          notificationType: schedPayload.category || "General",
+          message: `Email "${schedPayload.subject}" scheduled for ${scheduledForLocal} (${timezone}).`,
+          read: false,
+          isTrashed: false,
+          createdAt: now,
+        });
 
-      await safeInsertNotification(supabase, {
-        id: crypto.randomUUID(),
-        userId: user.id,
-        emailId: schedPayload.id,
-        notificationType: schedPayload.category || "General",
-        message: `Email "${schedPayload.subject}" scheduled for ${scheduledForLocal} (${timezone}).`,
-        read: false,
-        isTrashed: false,
-        createdAt: now,
-      });
-
-      return jsonResponse({
-        success: true,
-        email: data || schedPayload,
-        scheduledAt: scheduledDate.toISOString(),
-        timezone,
-        scheduledForLocal
-      });
+        return jsonResponse({
+          success: true,
+          email: data || schedPayload,
+          scheduledAt: scheduledDate.toISOString(),
+          scheduled_at_utc: scheduledDate.toISOString(),
+          timezone,
+          scheduledForLocal
+        });
+      } catch (err: any) {
+        console.error("Scheduled email submission error:", err?.message);
+        return errorResponse("Unable to schedule email. Please try again.", 500);
+      }
     }
 
     if (path.startsWith("/emails/scheduled/") && path.endsWith("/cancel") && method === "POST") {

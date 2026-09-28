@@ -196,9 +196,14 @@ export function ComposeWorkflow({
           situation,
           priority,
           tone,
-          scheduledAt: scheduleData.scheduledAtUtc,
+          scheduledAt: scheduleData.scheduledAtUtc || scheduleData.scheduledAt,
+          scheduledAtUtc: scheduleData.scheduledAtUtc || scheduleData.scheduledAt,
+          scheduled_at_utc: scheduleData.scheduledAtUtc || scheduleData.scheduledAt,
+          scheduled_at: scheduleData.scheduledAtUtc || scheduleData.scheduledAt,
           timezone: scheduleData.timezone,
           scheduledForLocal: scheduleData.scheduledForLocal,
+          localDate: scheduleData.localDate || scheduleData.dateStr,
+          localTime: scheduleData.localTime || scheduleData.timeStr,
           sendIndividually
         })
       });

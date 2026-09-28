@@ -146,21 +146,30 @@ export function ScheduleModal({
     setSubmitError('');
 
     try {
+      // Build reliable canonical schedule object from user selection
+      const canonicalData = {
+        localDate: selectedDate,
+        localTime: time24,
+        dateStr: selectedDate,
+        timeStr: time24,
+        timezone: selectedTz,
+        scheduledAtUtc: validation.utcIso,
+        scheduledForLocal: validation.formattedLocal
+      };
+
       if (typeof onConfirmSchedule === 'function') {
-        await onConfirmSchedule({
-          dateStr: selectedDate,
-          timeStr: time24,
-          timezone: selectedTz,
-          scheduledAtUtc: validation.utcIso,
-          scheduledForLocal: validation.formattedLocal
-        });
+        await onConfirmSchedule(canonicalData);
       }
       if (typeof onClose === 'function') {
         onClose();
       }
     } catch (err) {
       console.error('Modal schedule confirmation error:', err);
-      setSubmitError(err?.message || 'Failed to schedule email. Please check details and try again.');
+      const rawMsg = err?.message || '';
+      const userFriendlyMsg = (rawMsg.includes('is not defined') || rawMsg.includes('ReferenceError') || rawMsg.includes('TypeError'))
+        ? 'Unable to schedule email. Please try again.'
+        : (rawMsg || 'Unable to schedule email. Please try again.');
+      setSubmitError(userFriendlyMsg);
     } finally {
       setSubmitting(false);
     }
