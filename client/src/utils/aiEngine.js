@@ -711,15 +711,13 @@ export async function generateAIEmail({
     throw new Error('Please enter a subject or problem description to generate an email.');
   }
 
-  // 1. Identify category & tone metadata
-  const category = customCategory 
-    ? (EMAIL_CATEGORIES.find(c => c.id === customCategory || c.name === customCategory) || classifyEmailIntent(rawInput, userSubject))
-    : classifyEmailIntent(rawInput, userSubject);
-
-  const rawTone = customTone || category.defaultTone;
-  const toneId = normalizeToneId(rawTone);
-  const activeToneObj = ADVANCED_TONES.find(t => t.id === toneId) || ADVANCED_TONES[0];
-  const priority = customPriority || category.importance;
+  // 1. Resolve explicit user preferences (null if auto)
+  const explicitCategory = customCategory 
+    ? (EMAIL_CATEGORIES.find(c => c.id === customCategory || c.name === customCategory)?.name || customCategory)
+    : null;
+  const explicitTone = (customTone && customTone !== 'Auto')
+    ? (ADVANCED_TONES.find(t => t.id === customTone || t.name === customTone)?.name || customTone)
+    : null;
   const activeSenderName = getSenderDisplayName(senderName);
 
   // 2. Call Supabase Edge Function with Google AI / Gemini
@@ -729,10 +727,10 @@ export async function generateAIEmail({
     body: JSON.stringify({
       instruction: rawInput,
       subject: userSubject ? userSubject.trim() : '',
-      situation: `${category.icon || ''} ${category.name}`.trim(),
-      category: category.name,
-      tone: activeToneObj.name,
-      priority,
+      situation: explicitCategory,
+      category: explicitCategory,
+      tone: explicitTone,
+      priority: customPriority || null,
       recipient: recipient ? recipient.trim() : '',
       senderName: activeSenderName
     })
@@ -745,25 +743,28 @@ export async function generateAIEmail({
     const err = new Error(errorMsg);
     err.code = data?.error || 'AI_GENERATION_FAILED';
     err.details = data?.details;
+    err.needsClarification = !!data?.needsClarification;
     throw err;
   }
 
   return {
-    subject: data.subject || userSubject || `${category.name} Communication`,
+    subject: data.subject || userSubject || 'Email Communication',
     body: data.body,
-    category: data.category || category.name,
-    categoryId: category.id,
-    situation: data.situation || `${category.icon || ''} ${category.name}`.trim(),
-    priority: data.priority || priority,
-    importance: data.priority || priority,
-    tone: data.tone || activeToneObj.name,
-    toneId: activeToneObj.id,
-    urgency: data.urgency || category.urgency,
+    category: data.category || data.emailType || 'General Professional',
+    categoryId: (data.category || data.emailType || 'general').toLowerCase().replace(/[^a-z0-9]/g, '_'),
+    situation: data.situation || `💼 ${data.category || data.emailType || 'General Professional'}`,
+    priority: data.priority || 'MEDIUM',
+    importance: data.priority || 'MEDIUM',
+    tone: data.tone || 'Corporate Professional',
+    toneId: normalizeToneId(data.tone),
+    urgency: data.urgency || 'Normal response',
+    language: data.language || 'English',
     greeting: data.greeting || '',
     closing: data.closing || '',
-    attachment_recommended: data.attachment_recommended || Boolean(category.id === 'job_application' || category.id === 'resume_submission'),
-    attachment_filename: data.attachment_filename || (category.id === 'job_application' || category.id === 'resume_submission' ? 'resume.pdf' : null),
-    modelUsed: data.model_used || null
+    attachment_recommended: data.attachment_recommended || false,
+    attachment_filename: data.attachment_filename || null,
+    modelUsed: data.model_used || null,
+    keyFactsPreserved: data.key_facts_preserved || []
   };
 }
 

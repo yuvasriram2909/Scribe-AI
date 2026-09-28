@@ -211,7 +211,7 @@ export function ComposeWorkflow({
 
   // Core AI Intent Classification & Email Generation Function (Pure Real AI via Google Gemini)
   const executeAIGeneration = async (instrText, recipText) => {
-    updateState({ errorMessage: '', step: 2 });
+    updateState({ errorMessage: '', step: 2, originalInstruction: instrText, needsClarification: false });
     setAiLoading(true);
 
     try {
@@ -226,6 +226,7 @@ export function ComposeWorkflow({
       });
 
       updateState({
+        originalInstruction: instrText,
         emailType: aiResult.category,
         detectedCategory: aiResult.category,
         situation: aiResult.situation,
@@ -237,14 +238,56 @@ export function ComposeWorkflow({
         subject: aiResult.subject,
         body: aiResult.body,
         step: 3, // Real AI email generated! Proceed directly to Step 3 Preview.
-        errorMessage: ''
+        errorMessage: '',
+        needsClarification: false
       });
     } catch (err) {
       console.error('AI Generation Error:', err);
+      const isClarification = err.code === 'CLARIFICATION_REQUIRED' || (err.message && err.message.toLowerCase().includes('clarif'));
       updateState({
         errorMessage: err.message || 'AI generation failed. Please try again.',
+        errorCode: err.code || '',
+        needsClarification: isClarification,
         step: 1
       });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // One-click AI Re-generation from Step 3 Preview
+  const handleRegenerateEmail = async () => {
+    setAiLoading(true);
+    updateState({ errorMessage: '' });
+    try {
+      const customToneParam = (composeState.tone && composeState.tone !== 'Auto') ? composeState.tone : null;
+      const baseInstruction = composeState.originalInstruction || instruction || subject;
+      const reGen = await generateIntelligentEmail({
+        instruction: baseInstruction,
+        userSubject: subject,
+        recipient,
+        hasAttachment: !!selectedFile,
+        customCategory: detectedCategory,
+        customTone: customToneParam,
+        customPriority: priority,
+        senderName: localStorage.getItem('userName') || ''
+      });
+
+      updateState({
+        emailType: reGen.category || detectedCategory,
+        detectedCategory: reGen.category || detectedCategory,
+        situation: reGen.situation || situation,
+        tone: reGen.tone || tone,
+        priority: reGen.priority || priority,
+        importance: reGen.priority || importance,
+        urgency: reGen.urgency || urgency,
+        subject: reGen.subject || subject,
+        body: reGen.body || body,
+        errorMessage: ''
+      });
+    } catch (err) {
+      console.error('Regeneration Error:', err);
+      updateState({ errorMessage: err.message || 'Failed to regenerate email.' });
     } finally {
       setAiLoading(false);
     }
@@ -283,7 +326,7 @@ export function ComposeWorkflow({
     }
 
     const normalizedRecipient = valRes.formatted;
-    updateState({ recipient: normalizedRecipient, errorMessage: '' });
+    updateState({ recipient: normalizedRecipient, errorMessage: '', originalInstruction: cleanInstr || subject.trim() });
     executeAIGeneration(cleanInstr || subject.trim(), normalizedRecipient);
   };
 
@@ -305,8 +348,9 @@ export function ComposeWorkflow({
     });
 
     try {
+      const baseInstruction = composeState.originalInstruction || instruction || subject;
       const reGen = await generateIntelligentEmail({
-        instruction: instruction || subject,
+        instruction: baseInstruction,
         userSubject: subject,
         recipient,
         hasAttachment: !!selectedFile,
@@ -340,8 +384,9 @@ export function ComposeWorkflow({
     });
 
     try {
+      const baseInstruction = composeState.originalInstruction || instruction || subject;
       const reGen = await generateIntelligentEmail({
-        instruction: instruction || subject,
+        instruction: baseInstruction,
         userSubject: subject,
         recipient,
         hasAttachment: !!selectedFile,
@@ -545,8 +590,28 @@ export function ComposeWorkflow({
         ))}
       </div>
 
+      {/* CLARIFICATION REQUEST BANNER */}
+      {composeState.needsClarification && (
+        <div className="p-4 rounded-2xl bg-amber-950/70 border border-amber-500/50 text-amber-200 text-xs flex items-center justify-between gap-3 animate-fadeIn flex-wrap shadow-lg">
+          <div className="flex items-center gap-3">
+            <HelpCircle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <span className="font-bold block text-amber-100">More Details Needed</span>
+              <span className="text-amber-200/90">{errorMessage || 'Your prompt is too brief or ambiguous. Please provide specific details (e.g. reason, timeline, dates, or deliverables).'}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => updateState({ needsClarification: false, errorMessage: '' })}
+            className="p-1 rounded-lg text-amber-400 hover:text-white cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* ERROR BANNER WITH RE-AUTHORIZE BUTTON */}
-      {errorMessage && (
+      {errorMessage && !composeState.needsClarification && (
         <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center justify-between gap-3 animate-fadeIn flex-wrap shadow-lg">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
@@ -1062,6 +1127,16 @@ export function ComposeWorkflow({
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={aiLoading}
+                  onClick={handleRegenerateEmail}
+                  className="px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-[#22211F] text-[#D4A373] border border-[#2E2D2B] hover:bg-[#2A2926] hover:border-[#D4A373]/50 transition-colors cursor-pointer disabled:opacity-50"
+                  title="Regenerate email using the original request"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${aiLoading ? 'animate-spin' : ''}`} />
+                  {aiLoading ? 'Regenerating...' : 'Regenerate'}
+                </button>
                 <button
                   onClick={() => setIsEditing(!isEditing)}
                   className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${

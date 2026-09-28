@@ -3274,8 +3274,33 @@ serve(async (req: Request) => {
       const body = await req.json().catch(() => ({}));
       const { instruction, subject, situation, category, tone, priority, recipient, recipientName } = body;
       const input = (instruction || subject || "").trim();
-      if (!input) return errorResponse("Please enter a subject or instruction to generate an email.");
 
+      // 1. Validation & Clarification Engine
+      const trimmedCombined = `${instruction || ""} ${subject || ""}`.trim();
+      if (!trimmedCombined) {
+        return jsonResponse({
+          success: false,
+          error: "VALIDATION_FAILED",
+          message: "Please enter what you would like the email to say or request."
+        }, 400);
+      }
+
+      const lowerNormalized = trimmedCombined.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+      const extremelyVague = [
+        "write an email", "write email", "send an email", "send email", "email", "mail",
+        "compose an email", "compose email", "draft an email", "draft email", "new email",
+        "just write an email", "please write an email", "send message"
+      ];
+      if (extremelyVague.includes(lowerNormalized) || (lowerNormalized.length < 5 && !["thanks", "thank u", "sorry"].includes(lowerNormalized))) {
+        return jsonResponse({
+          success: false,
+          error: "CLARIFICATION_REQUIRED",
+          needsClarification: true,
+          message: "What specific topic, request, or details would you like this email to include? Please provide a brief description."
+        }, 400);
+      }
+
+      // 2. Resolve Authenticated User Sender Identity (auth.uid() strictly)
       const user = await getAuthUser(req, supabase);
       let senderName = user?.signature?.[0]?.name || user?.name || "";
       if (!senderName && user?.email) {
@@ -3288,165 +3313,291 @@ serve(async (req: Request) => {
         senderName = user?.name || (user?.email ? user.email.split("@")[0] : "Sender");
       }
 
-      // 1. Situation & Metadata Identification
-      const sitObj = situation 
-        ? (SUPPORTED_SITUATIONS.find(s => s.name === situation || s.id === situation) || detectSituationEngine(input))
-        : detectSituationEngine(input);
-
-      const targetTone = tone || sitObj.tone || "Corporate Professional";
-      const targetPriority = priority || sitObj.importance || "MEDIUM";
-      const cleanCategoryName = sitObj.name.replace(/^[\p{Emoji}\s]+/u, '').trim() || sitObj.category || "General";
-
-      // 2. Google Gemini API Key Validation
+      // 3. API Key Validation
       const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("AI_API_KEY");
       if (!geminiApiKey) {
         return new Response(JSON.stringify({
           error: "AI_GENERATION_FAILED",
-          message: "Google AI API key is not configured on the server. Please check GEMINI_API_KEY in Supabase secrets."
+          message: "Google AI API key is not configured on the server. Please configure GEMINI_API_KEY in Supabase secrets."
         }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
 
-      // 3. Construct Deeply Factual, Anti-Hallucination Prompt
-      const geminiPrompt = `You are Scribe AI, an elite corporate communications strategist and executive email author.
-Generate an exceptionally professional, articulate, and completely fact-grounded business email that directly reflects the user's specific problem, reason, timeline, numbers, and requested actions.
+      // 4. Server-Side Prompt Construction (Separation of Directives & User Input)
+      const buildPrompt = (correctiveDirective = "") => {
+        return `You are Scribe AI, an elite professional communications engine.
+Your sole mission is to understand the user's actual communication request and generate an authentic, context-aware, factually grounded email.
 
-CRITICAL INSTRUCTIONS:
-1. STRICT FACTUAL FIDELITY & NO HALLUCINATION:
-   - Ground the email strictly in the user's provided context, reasons, timelines, quantities, dates, and deliverables.
-   - Do NOT invent fake dates, company names, or commitments not requested by the user.
-   - Never output placeholder tokens such as "[Your Name]", "[Recipient Name]", "[Insert Date]", or "[Company Name]".
-2. STRUCTURE (2-3 natural, articulate paragraphs):
-   - Professional Salutation matching recipient: "${recipientName || recipient || ''}"
-   - Paragraph 1: Courteous, articulate opening clearly conveying the primary purpose of the communication.
-   - Paragraph 2: Comprehensive context, rationale, technical details, or specifics behind the situation.
-   - Paragraph 3: Actionable next steps, proposed alternatives, or timeline.
-   - Professional closing with sender's authentic name: "${senderName}"
-3. TONE & SITUATION:
-   - Target Situation: "${sitObj.name}"
-   - Target Tone: "${targetTone}"
-   - Express the message with natural human clarity, avoiding repetitive robotic cliches.
-4. STRICT JSON OUTPUT FORMAT (return pure JSON with no markdown formatting):
+==================================================
+PRIMARY DIRECTIVES
+==================================================
+1. USER REQUEST IS THE PRIMARY SOURCE OF TRUTH:
+   - USER REQUEST > PREDEFINED CATEGORY > TEMPLATE.
+   - Base everything strictly on what the user actually wants to communicate.
+   - Do NOT force the email into a predefined category based on keywords (e.g. if the user says "I will be late tomorrow because my train was cancelled", this is a Late Arrival Notification. It is NOT sick leave, NOT emergency leave, NOT a generic leave request, and NOT a job application).
+   - Understand natural, informal language:
+     * "tell sir I can't come tomorrow" -> professional absence/leave message.
+     * "ask HR if they have any update" -> professional recruitment follow-up.
+     * "tell my professor I'll submit the assignment late" -> respectful academic extension request.
+     * "need to apologize to manager for missing meeting" -> sincere professional apology.
+
+2. FACT PRESERVATION & ZERO HALLUCINATION:
+   - Preserve EVERY specific fact provided by the user: dates (e.g. October 2 to October 4, October 5 to October 9), times (e.g. 2:00 PM to 4:30 PM, 30 minutes late), durations (e.g. 3 days, 5 days), quantities, numbers, explicit names, organizations, deliverables, and reasons.
+   - NEVER alter user-provided numbers (e.g. 5 days must stay 5 days; 3 days must stay 3 days; October 5 to 9 must stay October 5 to 9).
+   - NEVER invent missing information:
+     * Never invent medical conditions or illnesses if none were mentioned (e.g. "Ask my manager for leave tomorrow" -> do NOT invent fever or sickness; use a neutral professional formulation like "due to personal reasons" or "for personal commitments").
+     * If the user says "I am not sick. I need leave for a family event", NEVER mention illness, doctors, or medical recovery!
+     * Never invent fake meeting links, fake phone numbers, fake addresses, fake attachments, fake credentials, or fake company names unless explicitly provided.
+   - NEVER output placeholder tokens such as "[Your Name]", "[Recipient Name]", "[Insert Date]", "[Company Name]".
+
+3. MULTI-REQUIREMENT HANDLING:
+   - If the user provides multiple requirements (e.g. "I am sick, won't be able to come tomorrow, and want to request leave for one day"), include ALL distinct requirements faithfully in the draft.
+
+4. RECIPIENT-AWARE SALUTATION:
+   - If an explicit human name is known from recipient context (e.g., "Sarah", "Dr. Henderson", "Mike"), address them appropriately ("Dear Sarah,", "Dear Dr. Henderson,", "Hi Mike,").
+   - If only an email address is provided (e.g. "manager@company.com" or "hr@company.com"), DO NOT assume the person's name is "Manager" or "HR". Use a natural role-appropriate or polite neutral greeting (e.g. "Hello,", "Dear Hiring Team,", "Dear Team,").
+
+5. TONE, URGENCY & LENGTH:
+   - Infer the exact appropriate tone from the user's wording and audience:
+     * Apologetic for apologies
+     * Polite & Diplomatic for delicate inquiries or extension requests
+     * Action-Oriented & Concise for rapid team or lead updates
+     * Formal & Authoritative for academic, legal, or institutional requests
+     * Warm & Collaborative for social invitations, celebrations, or friendly check-ins
+     * Urgent for true incidents or immediate blockers
+     * Respectful Professional for standard workplace communication
+   ${tone && tone !== 'Auto' ? `- User explicit tone preference: "${tone}" (Apply this tone while keeping the communication natural).` : ''}
+   ${priority ? `- User explicit priority preference: "${priority}".` : ''}
+   - Flexible length: Simple requests should produce concise, crisp emails (2-4 sentences). Complex requests should provide appropriate explanatory context without fluff.
+   - Natural human phrasing: AVOID robotic cliches like starting every email with "I hope this email finds you well". Avoid unnecessary bullet points or headers unless helpful for structured action items.
+
+6. SUBJECT LINE HANDLING:
+   - If the user provided a subject that matches their request, refine and use it.
+   - If the user provided a subject that conflicts with their instruction (e.g., Subject: "Interview Follow-up", Instruction: "I want to request leave from college tomorrow"), the instruction is the primary semantic context: generate a corrected, appropriate subject matching the instruction.
+   - If no subject provided, generate a concise, specific, meaningful corporate subject line.
+
+7. SIGN-OFF:
+   - Close naturally with the sender's authentic name: "${senderName}".
+
+8. LANGUAGE:
+   - Detect the language of the prompt or follow any explicit language instruction (e.g., "Write this in Telugu" -> generate the email in Telugu).
+
+${correctiveDirective ? `\n==================================================\nCORRECTIVE INSTRUCTION FROM PREVIOUS ATTEMPT:\n${correctiveDirective}\n==================================================` : ''}
+
+==================================================
+OUTPUT FORMAT
+==================================================
+Return valid JSON ONLY (do not include markdown \`\`\`json wrappers):
 {
-  "subject": "Concise, professional corporate subject line without conversational filler",
-  "body": "Full body text including salutation and sign-off with proper double line breaks"
+  "emailType": "Concise Category Name (e.g., Late Arrival Notification, Sick Leave Request, Recruiter Follow-up, Meeting Request, Apology, Academic Request, Complaint, Payment Extension, Casual Invitation)",
+  "situation": "Emoji + Short Situation Name (e.g., 🚗 Late Arrival, 📅 Leave Request, 💼 Interview Follow-up, 🙇 Apology)",
+  "priority": "LOW | MEDIUM | HIGH | CRITICAL",
+  "tone": "Name of tone applied (e.g., Professional, Formal, Friendly, Urgent, Apologetic, Concise, Warm)",
+  "urgency": "Normal | Time-sensitive | Urgent | Immediate attention",
+  "language": "Detected or requested language (e.g., English, Telugu)",
+  "subject": "Clear, professional, specific subject line",
+  "body": "Complete email body including greeting, body paragraphs with double line-breaks, and sign-off with sender name",
+  "key_facts_preserved": ["List of exact numbers, dates, reasons, and actions preserved from the instruction"]
 }
 
 USER INSTRUCTION: "${input}"
 USER SUBJECT (if provided): "${subject || ''}"
-RECIPIENT: "${recipientName || recipient || 'Recipient'}"
+RECIPIENT: "${recipientName || recipient || ''}"
 SENDER NAME: "${senderName}"`;
+      };
 
-      // 4. Model Selection with Priority Fallback
+      // 5. Model Selection with Priority Fallback
       const priorityModels = [
         "gemini-flash-lite-latest",
         "gemini-2.5-flash-lite",
         "gemini-3.5-flash-lite",
         "gemini-flash-latest",
         "gemini-3.7-flash",
-        "gemini-3.8-flash",
         "gemini-pro-latest"
       ];
 
-      let rawText = "";
-      let chosenModel: string | null = null;
-      let lastError: any = null;
+      // Helper function to call model
+      const executeModelCall = async (promptText: string) => {
+        let textResult = "";
+        let modelUsed: string | null = null;
+        let lastErr: any = null;
 
-      for (const modelCandidate of priorityModels) {
-        try {
-          const modelEndpoint = modelCandidate.startsWith("models/") ? modelCandidate : `models/${modelCandidate}`;
-          const aiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/${modelEndpoint}:generateContent?key=${geminiApiKey}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: geminiPrompt }] }],
-                generationConfig: { responseMimeType: "application/json" }
-              }),
-              signal: AbortSignal.timeout(6000)
+        for (const modelCandidate of priorityModels) {
+          try {
+            const modelEndpoint = modelCandidate.startsWith("models/") ? modelCandidate : `models/${modelCandidate}`;
+            const aiRes = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/${modelEndpoint}:generateContent?key=${geminiApiKey}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: promptText }] }],
+                  generationConfig: { responseMimeType: "application/json" }
+                }),
+                signal: AbortSignal.timeout(6500)
+              }
+            );
+
+            if (aiRes.status === 429) {
+              lastErr = { status: 429, message: "Rate limit reached" };
+              await new Promise(r => setTimeout(r, 600)); // Brief backoff for rate limit recovery
+              continue;
             }
-          );
 
-          if (aiRes.status === 429) {
-            // Quota exceeded: log and try next model or stop
-            lastError = { status: 429, message: "Rate limit reached" };
-            continue;
-          }
+            if (!aiRes.ok) {
+              const errData = await aiRes.json().catch(() => ({}));
+              lastErr = { status: aiRes.status, error: errData?.error || null };
+              continue;
+            }
 
-          if (!aiRes.ok) {
-            const errData = await aiRes.json().catch(() => ({}));
-            lastError = { status: aiRes.status, error: errData?.error || null };
-            continue;
+            const aiData = await aiRes.json();
+            const genText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (genText && genText.trim()) {
+              textResult = genText.trim();
+              modelUsed = modelEndpoint;
+              break;
+            }
+          } catch (callErr: any) {
+            lastErr = { message: callErr?.message || String(callErr) };
           }
-
-          const aiData = await aiRes.json();
-          const genText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (genText && genText.trim()) {
-            rawText = genText.trim();
-            chosenModel = modelEndpoint;
-            break;
-          }
-        } catch (callErr: any) {
-          lastError = { message: callErr?.message || String(callErr) };
         }
-      }
+        return { textResult, modelUsed, lastErr };
+      };
 
-      // 5. Parse Output - Absolutely ZERO Static Fallback Text
-      let parsedSubject = "";
-      let parsedBody = "";
-
-      if (rawText) {
+      // Helper to parse JSON
+      const parseJsonSafe = (raw: string) => {
+        if (!raw) return null;
         try {
-          const cleanJson = rawText.replace(/^\`\`\`json\s*/i, "").replace(/^\`\`\`\s*/i, "").replace(/\s*\`\`\`$/i, "").trim();
-          const parsed = JSON.parse(cleanJson);
-          if (parsed.subject && typeof parsed.subject === "string") parsedSubject = parsed.subject.trim();
-          if (parsed.body && typeof parsed.body === "string") parsedBody = parsed.body.trim();
+          const clean = raw.replace(/^\`\`\`json\s*/i, "").replace(/^\`\`\`\s*/i, "").replace(/\s*\`\`\`$/i, "").trim();
+          return JSON.parse(clean);
         } catch (_) {
-          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try {
-              const parsed = JSON.parse(jsonMatch[0]);
-              if (parsed.subject && typeof parsed.subject === "string") parsedSubject = parsed.subject.trim();
-              if (parsed.body && typeof parsed.body === "string") parsedBody = parsed.body.trim();
-            } catch (_) {}
+          const match = raw.match(/\{[\s\S]*\}/);
+          if (match) {
+            try { return JSON.parse(match[0]); } catch (_) {}
+          }
+        }
+        return null;
+      };
+
+      // 6. Quality Validation Engine
+      const validateOutput = (parsed: any): { isValid: boolean; reason?: string } => {
+        if (!parsed || typeof parsed !== "object") return { isValid: false, reason: "Output is not valid JSON" };
+        if (!parsed.subject || typeof parsed.subject !== "string" || parsed.subject.trim().length < 3) return { isValid: false, reason: "Subject is missing or too short" };
+        if (!parsed.body || typeof parsed.body !== "string" || parsed.body.trim().length < 15) return { isValid: false, reason: "Body is missing or too short" };
+
+        const body = parsed.body;
+        const lowerBody = body.toLowerCase();
+        const lowerInstr = input.toLowerCase();
+
+        // Check for placeholder tokens
+        const placeholderRegex = /\[(?:Your Name|Recipient Name|Insert Date|Company Name|Insert Reason|Your Title|Manager Name|Professor Name)\]/i;
+        if (placeholderRegex.test(body)) {
+          return { isValid: false, reason: "Body contains unpopulated placeholder tokens" };
+        }
+
+        // Check for negated illness hallucination
+        if ((lowerInstr.includes("not sick") || lowerInstr.includes("no illness") || lowerInstr.includes("family event") || lowerInstr.includes("family function")) && !lowerInstr.includes("fever") && !lowerInstr.includes("doctor")) {
+          if (lowerBody.includes("fever") || lowerBody.includes("unwell") || lowerBody.includes("sick leave") || lowerBody.includes("medical advice") || lowerBody.includes("doctor advised")) {
+            return { isValid: false, reason: "Body hallucinated illness when user explicitly specified a non-medical reason" };
+          }
+        }
+
+        // Check for train/late arrival misclassification as sick leave
+        if ((lowerInstr.includes("train") || lowerInstr.includes("late arrival") || lowerInstr.includes("running late") || lowerInstr.includes("traffic")) && !lowerInstr.includes("sick")) {
+          if (lowerBody.includes("sick leave") || lowerBody.includes("fever") || lowerBody.includes("unwell")) {
+            return { isValid: false, reason: "Body hallucinated sick leave for a transportation/delay request" };
+          }
+        }
+
+        // Check for duration number preservation
+        const durationMatch = input.match(/\b(\d+)\s*(days?|weeks?|hours?|months?)\b/i);
+        if (durationMatch) {
+          const num = durationMatch[1];
+          const unit = durationMatch[2].toLowerCase();
+          const wordEquivalents: Record<string, string> = { "1": "one", "2": "two", "3": "three", "4": "four", "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine", "10": "ten" };
+          const word = wordEquivalents[num];
+          const hasNum = body.includes(num) || (parsed.subject && parsed.subject.includes(num));
+          const hasWord = word && (lowerBody.includes(word) || (parsed.subject && parsed.subject.toLowerCase().includes(word)));
+          if (!hasNum && !hasWord) {
+            return { isValid: false, reason: `User specified duration ${num} ${unit} was not preserved in output` };
+          }
+        }
+
+        // Check for explicit date preservation
+        const dateMatch = input.match(/\b(october|november|december|january|february|march|april|may|june|july|august|september)\s+(\d{1,2})\b/i);
+        if (dateMatch) {
+          const month = dateMatch[1].toLowerCase();
+          if (!lowerBody.includes(month) && !(parsed.subject && parsed.subject.toLowerCase().includes(month))) {
+            return { isValid: false, reason: `User specified date (${dateMatch[0]}) was not preserved` };
+          }
+        }
+
+        return { isValid: true };
+      };
+
+      // 7. Initial Model Execution
+      let { textResult, modelUsed, lastErr } = await executeModelCall(buildPrompt());
+      let parsed = parseJsonSafe(textResult);
+      let validation = validateOutput(parsed);
+
+      // 8. Corrective Re-prompting if Validation Failed (Single Retry Loop)
+      if (!validation.isValid && textResult) {
+        console.warn("AI Quality Validation failed on attempt 1:", validation.reason, "- Initiating corrective re-prompt");
+        const correctivePrompt = buildPrompt(`Your previous response failed quality validation because: ${validation.reason}.
+Regenerate the email with strict adherence to the user's exact instruction: "${input}".
+Ensure:
+- Preserve exact duration numbers and dates without alteration.
+- Do not invent medical conditions or facts.
+- Do not leave placeholder brackets.`);
+
+        const retryRes = await executeModelCall(correctivePrompt);
+        if (retryRes.textResult) {
+          const retryParsed = parseJsonSafe(retryRes.textResult);
+          const retryVal = validateOutput(retryParsed);
+          if (retryVal.isValid) {
+            parsed = retryParsed;
+            modelUsed = retryRes.modelUsed;
+            validation = retryVal;
           }
         }
       }
 
-      if (!parsedBody) {
+      // If still invalid or empty, return AI_GENERATION_FAILED (NO STATIC FALLBACK)
+      if (!parsed || !parsed.body) {
         return new Response(JSON.stringify({
           error: "AI_GENERATION_FAILED",
-          message: "AI email generation was unable to complete due to high service demand. Please click Retry to generate.",
-          details: lastError
+          message: "Google AI was unable to generate your email to accuracy standards. Please click Retry to generate.",
+          details: lastErr || validation.reason
         }), {
           status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
 
-      const greetingLine = (parsedBody.split('\n\n')[0] || '').trim();
+      const greetingLine = (parsed.body.split('\n\n')[0] || '').trim();
 
       return jsonResponse({
         success: true,
-        emailType: cleanCategoryName,
-        situation: sitObj.name,
-        category: cleanCategoryName,
-        tone: targetTone,
-        priority: targetPriority,
-        importance: targetPriority,
-        urgency: sitObj.urgency,
-        subject: parsedSubject || subject || cleanCategoryName,
-        suggested_subject: parsedSubject || subject || cleanCategoryName,
-        body: parsedBody,
-        email_body: parsedBody,
+        emailType: parsed.emailType || "General Professional",
+        situation: parsed.situation || `💼 ${parsed.emailType || 'General Professional'}`,
+        category: parsed.emailType || "General Professional",
+        priority: parsed.priority || "MEDIUM",
+        importance: parsed.priority || "MEDIUM",
+        tone: parsed.tone || "Professional",
+        urgency: parsed.urgency || "Normal response",
+        language: parsed.language || "English",
+        subject: parsed.subject.trim(),
+        suggested_subject: parsed.subject.trim(),
+        body: parsed.body.trim(),
+        email_body: parsed.body.trim(),
         greeting: greetingLine,
         closing: `Best regards,\n${senderName}`,
-        attachment_recommended: Boolean(sitObj.name.includes("Resume")),
-        attachment_filename: sitObj.name.includes("Resume") ? "resume.pdf" : null,
-        model_used: chosenModel
+        attachment_recommended: Boolean(parsed.emailType?.toLowerCase().includes("resume") || parsed.body?.toLowerCase().includes("attached")),
+        attachment_filename: parsed.emailType?.toLowerCase().includes("resume") ? "resume.pdf" : null,
+        model_used: modelUsed,
+        key_facts_preserved: parsed.key_facts_preserved || []
       });
     }
 
