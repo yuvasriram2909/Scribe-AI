@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Sparkles, Shield, Mail, CheckCircle, Lock, ArrowRight, FileText, 
+  Sparkles, Shield, ShieldCheck, Mail, CheckCircle, Lock, ArrowRight, FileText, 
   ExternalLink, Zap, Key, Menu, X, Play, RefreshCw, Send, Check, 
   ChevronRight, User, AlertCircle, Clock, CheckCircle2
 } from 'lucide-react';
