@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Mail, ArrowRight, ShieldCheck, User, Eye, EyeOff, KeyRound, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Mail, ArrowRight, ShieldCheck, User, Eye, EyeOff, KeyRound, CheckCircle2, RefreshCw } from 'lucide-react';
 import { apiFetch, safeParseResponse } from '../utils/api';
 import { supabase, signInWithGoogle, signUpWithPassword, signInWithPassword } from '../utils/supabaseClient';
 
@@ -216,7 +216,10 @@ export function LoginPage({ onLoginSuccess }) {
             className="w-full py-3 px-4 rounded-2xl bg-[#22211F] hover:bg-[#2A2926] border border-[#2E2D2B] text-[#F5F3EF] font-bold text-xs flex items-center justify-center gap-3 shadow-lg shadow-black/30 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
           >
             {googleLoading ? (
-              <span>Connecting Google...</span>
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#D4A373]" />
+                <span>Connecting to Google OAuth...</span>
+              </span>
             ) : (
               <>
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -355,7 +358,10 @@ export function LoginPage({ onLoginSuccess }) {
               className="w-full py-3.5 px-4 rounded-2xl gold-btn text-[#121211] font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#D4A373]/20 hover:scale-[1.01] active:scale-[0.99] transition-transform cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <span>Processing...</span>
+                <span className="flex items-center gap-2">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#121211]" />
+                  <span>Processing Request...</span>
+                </span>
               ) : isSignUpMode ? (
                 <>
                   <span>Create Scribe AI Account</span>

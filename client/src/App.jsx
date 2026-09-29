@@ -626,24 +626,34 @@ export default function App() {
         }
       `}>
         <div className="p-5 space-y-6 overflow-y-auto">
-          {/* Brand Logo Header */}
-          <div 
-            className="flex items-center gap-3 cursor-pointer group px-2" 
-            onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#D4A373] to-[#ECE8E1] p-[1px] shadow-lg shadow-[#D4A373]/20 group-hover:scale-105 transition-transform shrink-0">
-              <div className={`w-full h-full ${theme === 'dark' ? 'bg-[#1A1918]' : 'bg-[#FFFDF9]'} rounded-[11px] flex items-center justify-center`}>
-                <Send className="w-5 h-5 text-[#D4A373] transform rotate-[-20deg]" />
+          {/* Brand Logo Header & Mobile Close */}
+          <div className="flex items-center justify-between px-2">
+            <div 
+              className="flex items-center gap-3 cursor-pointer group" 
+              onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
+            >
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#D4A373] to-[#ECE8E1] p-[1px] shadow-lg shadow-[#D4A373]/20 group-hover:scale-105 transition-transform shrink-0">
+                <div className={`w-full h-full ${theme === 'dark' ? 'bg-[#1A1918]' : 'bg-[#FFFDF9]'} rounded-[11px] flex items-center justify-center`}>
+                  <Send className="w-5 h-5 text-[#D4A373] transform rotate-[-20deg]" />
+                </div>
+              </div>
+              <div>
+                <h1 className={`text-base font-extrabold tracking-tight leading-tight flex items-center gap-1 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
+                  AI Smart <span className="text-[#D4A373]">Sender</span>
+                </h1>
+                <p className={`text-[11px] font-medium truncate ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
+                  AI-Powered Email Assistant
+                </p>
               </div>
             </div>
-            <div>
-              <h1 className={`text-base font-extrabold tracking-tight leading-tight flex items-center gap-1 ${theme === 'dark' ? 'text-[#F5F3EF]' : 'text-stone-900'}`}>
-                AI Smart <span className="text-[#D4A373]">Sender</span>
-              </h1>
-              <p className={`text-[11px] font-medium truncate ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-500'}`}>
-                AI-Powered Email Assistant
-              </p>
-            </div>
+
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="md:hidden p-1.5 rounded-xl text-[#99958F] hover:text-[#F5F3EF] hover:bg-[#22211F] transition-colors"
+              aria-label="Close navigation menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Glowing Compose Button with Light Sweep and Micro-Motion */}
