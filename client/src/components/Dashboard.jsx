@@ -824,37 +824,6 @@ export function Dashboard({
         </div>
       )}
 
-      {/* Scope Upgrade Banner */}
-      {connectionStatus.isConnected && (!connectionStatus.hasModifyScope || connectionStatus.needsReauth) && (
-        <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md animate-fadeIn ${
-          theme === 'dark'
-            ? 'bg-amber-950/20 border-amber-500/30 text-amber-200'
-            : 'bg-amber-50 border-amber-200 text-amber-900'
-        }`}>
-          <div className="flex items-center gap-3 text-center sm:text-left">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5 text-amber-300" />
-            </div>
-            <div>
-              <h4 className={`text-xs font-extrabold ${theme === 'dark' ? 'text-amber-200' : 'text-amber-900'}`}>
-                Two-Way Gmail Synchronization Available
-              </h4>
-              <p className={`text-[11px] ${theme === 'dark' ? 'text-[#99958F]' : 'text-stone-600'}`}>
-                Grant full read & sync permissions (<code className="font-mono text-amber-300 text-[10px]">gmail.modify</code>) to access existing Inbox emails, sync drafts, and manage stars & archives directly in Scribe AI.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={handleConnectGmail}
-              className="px-4 py-2 rounded-xl gold-btn text-[#121211] text-xs font-bold shadow-md cursor-pointer hover:scale-102 transition-transform flex items-center gap-1.5"
-            >
-              <Zap className="w-3.5 h-3.5" />
-              <span>Upgrade Permissions</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ============================================================
           1. GMAIL CONNECTED STATUS BAR (Warm Cashmere Minimalist)
